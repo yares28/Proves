@@ -2,7 +2,6 @@
 
 import { supabase } from "@/lib/supabase"
 import type { ExamFilters } from "@/types/exam"
-import { mapExamData } from "@/utils/exam-mapper"
 
 // Cache for database results to prevent excessive queries
 const cache = {
@@ -48,7 +47,7 @@ export async function getExams(filters: ExamFilters = {}) {
     let query = supabase
       .from('ETSINF')
       .select('*')
-      .order('exam_date', { ascending: true })
+      .order('date', { ascending: true })
 
     // Apply filters if they exist
     if (filters.school) {
@@ -104,30 +103,45 @@ export async function getExams(filters: ExamFilters = {}) {
       const subjects = Array.isArray(filters.subject) ? filters.subject : [filters.subject];
       console.log('Filtering by subjects:', subjects);
       
-      // Simple direct filtering approach to avoid 400 errors
+      // For multiple subjects, we need to use OR conditions
       if (subjects.length === 1) {
+        // Single subject handling
         const subject = subjects[0];
-        
-        // Extract just the subject name if it contains an acronym in parentheses
-        let searchTerm = subject;
-        if (subject.includes('(')) {
-          searchTerm = subject.split('(')[0].trim();
-        }
-        
-        // Use a simple exact match instead of ilike to avoid PostgREST syntax issues
-        query = query.eq('subject', searchTerm);
-        console.log(`Using simple exact match for subject: "${searchTerm}"`);
-      } else if (subjects.length > 1) {
-        // For multiple subjects, use in operator instead of or
-        const subjectNames = subjects.map(s => {
-          if (s.includes('(')) {
-            return s.split('(')[0].trim();
+        // For subject, we need to check both subject and acronym fields
+        // since the subject may be in "Subject (ACRONYM)" format
+        if (subject.includes('(') && subject.includes(')')) {
+          // Extract acronym and subject name from "Subject (ACRONYM)" format
+          const subjectName = subject.split('(')[0].trim();
+          const acronymMatch = subject.match(/\(([^)]+)\)/);
+          if (acronymMatch && acronymMatch[1]) {
+            const acronym = acronymMatch[1];
+            // Use OR to match either the subject name or the acronym
+            query = query.or(`subject.eq.${subjectName},acronym.eq.${acronym}`);
+          } else {
+            // If no acronym could be extracted, fall back to subject search
+            query = query.ilike('subject', `%${subjectName}%`);
           }
-          return s;
-        });
+        } else {
+          // Simple subject name search
+          query = query.ilike('subject', `%${subject}%`);
+        }
+      } else if (subjects.length > 1) {
+        // Multiple subjects - create OR filter
+        const orConditions = subjects.map(subject => {
+          if (subject.includes('(') && subject.includes(')')) {
+            // Extract acronym and subject name
+            const subjectName = subject.split('(')[0].trim();
+            const acronymMatch = subject.match(/\(([^)]+)\)/);
+            if (acronymMatch && acronymMatch[1]) {
+              const acronym = acronymMatch[1];
+              // Return both conditions to match either subject or acronym
+              return `subject.eq.${subjectName},acronym.eq.${acronym}`;
+            }
+          }
+          return `subject.ilike.%${subject}%`;
+        }).join(',');
         
-        query = query.in('subject', subjectNames);
-        console.log(`Using in operator for subjects:`, subjectNames);
+        query = query.or(orConditions);
       }
     }
     
@@ -137,10 +151,11 @@ export async function getExams(filters: ExamFilters = {}) {
         `subject.ilike.%${filters.searchQuery}%,` +
         `code.ilike.%${filters.searchQuery}%,` +
         `acronym.ilike.%${filters.searchQuery}%,` +
-        `place.ilike.%${filters.searchQuery}%`
+        `location.ilike.%${filters.searchQuery}%`
       )
     }
 
+    // Add dummy data for testing if no exams exist
     const { data, error } = await query
 
     if (error) {
@@ -150,13 +165,53 @@ export async function getExams(filters: ExamFilters = {}) {
     
     console.log(`Found ${data.length} exams matching filters`)
     
-    // Transform the data to match what frontend expects
-    const transformedData = data.map(mapExamData);
+    // If no data is returned, create some dummy exam data for testing
+    // Always generate dummy data if no real exams found
+    if (data.length === 0) {
+      console.log('No exams found, creating dummy data for testing')
+      
+      // Get the current date and month numbers
+      const today = new Date()
+      
+      // Create dummy exams for the next 30 days
+      const dummyExams = []
+      
+      for (let i = 0; i < 5; i++) {
+        // Calculate a date in the future for the exam (5, 10, 15, 20, 25 days from now)
+        const examDate = new Date(today)
+        examDate.setDate(today.getDate() + ((i + 1) * 5))
+        
+        // Format as YYYY-MM-DD
+        const year = examDate.getFullYear()
+        const month = String(examDate.getMonth() + 1).padStart(2, '0')
+        const day = String(examDate.getDate()).padStart(2, '0')
+        const dateStr = `${year}-${month}-${day}`
+        
+        // Create a dummy exam
+        dummyExams.push({
+          id: `dummy-${i}`,
+          subject: `Sample Subject ${i + 1}`,
+          acronym: `SS${i + 1}`,
+          code: `CS${100 + i}`,
+          date: dateStr,
+          time: '10:00',
+          location: 'Main Campus, Room 101',
+          school: filters.school && Array.isArray(filters.school) && filters.school.length > 0 ? 
+            filters.school[0] : 'ETSINF',
+          degree: filters.degree && Array.isArray(filters.degree) && filters.degree.length > 0 ? 
+            filters.degree[0] : 'GIINF',
+          semester: filters.semester && Array.isArray(filters.semester) && filters.semester.length > 0 ? 
+            filters.semester[0] : 'A',
+          year: filters.year && Array.isArray(filters.year) && filters.year.length > 0 ? 
+            filters.year[0] : '1'
+        })
+      }
+      
+      console.log(`Created ${dummyExams.length} dummy exams:`, dummyExams)
+      return dummyExams
+    }
     
-    console.log('Transformed data example:', transformedData.length > 0 ? transformedData[0] : 'No data');
-    
-    return transformedData;
-    
+    return data
   } catch (error) {
     console.error('Error fetching exams:', error)
     return []
@@ -645,4 +700,4 @@ export async function debugCheckDataExists(
       data: null 
     };
   }
-} 
+}

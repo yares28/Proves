@@ -3,85 +3,71 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FilterSidebar } from "@/components/filter-sidebar";
-import { debugCheckDataExists } from "@/actions/exam-actions";
+import { checkTableStructure, runDirectQuery } from "@/actions/table-check";
 
 export default function DebugPage() {
-  const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
-  const [debugResult, setDebugResult] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleCheckData = async () => {
-    setIsLoading(true);
-    setDebugResult(null);
-    
+  const checkTable = async () => {
+    setLoading(true);
     try {
-      // Extract the selected filter values
-      const schools = activeFilters.school || [];
-      const degrees = activeFilters.degree || [];
-      const semesters = activeFilters.semester || [];
-      const years = activeFilters.year || [];
-      
-      // Call the debug function
-      const result = await debugCheckDataExists(schools, degrees, semesters, years);
-      setDebugResult(result);
+      const data = await checkTableStructure();
+      setResult(data);
     } catch (error) {
-      console.error("Error checking data:", error);
-      setDebugResult({ error: "Failed to check data", data: null });
+      setResult({ error: String(error) });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
+    }
+  };
+
+  const runQuery = async () => {
+    setLoading(true);
+    try {
+      const data = await runDirectQuery();
+      setResult(data);
+    } catch (error) {
+      setResult({ error: String(error) });
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6">Debug Filters</h1>
+    <div className="container py-8 space-y-6">
+      <h1 className="text-2xl font-bold">Database Debug Page</h1>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-1">
-          <FilterSidebar onFiltersChange={setActiveFilters} />
-        </div>
+      <div className="flex gap-4">
+        <Button 
+          onClick={checkTable} 
+          disabled={loading}
+        >
+          Check Table Structure
+        </Button>
         
-        <div className="md:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Filter Debug Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4">
-                <h3 className="text-lg font-medium mb-2">Active Filters</h3>
-                <pre className="bg-muted p-4 rounded-md overflow-auto">
-                  {JSON.stringify(activeFilters, null, 2)}
-                </pre>
-              </div>
-              
-              <Button onClick={handleCheckData} disabled={isLoading}>
-                {isLoading ? "Checking..." : "Check Database Records"}
-              </Button>
-              
-              {debugResult && (
-                <div className="mt-6">
-                  <h3 className="text-lg font-medium mb-2">Database Check Results</h3>
-                  {debugResult.error ? (
-                    <div className="text-red-500">Error: {debugResult.error}</div>
-                  ) : (
-                    <>
-                      <div className="mb-2">
-                        Found <span className="font-bold">{debugResult.data?.count || 0}</span> records
-                      </div>
-                      {debugResult.data?.count > 0 && (
-                        <pre className="bg-muted p-4 rounded-md overflow-auto">
-                          {JSON.stringify(debugResult.data?.sample, null, 2)}
-                        </pre>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <Button 
+          onClick={runQuery} 
+          disabled={loading}
+          variant="outline"
+        >
+          Run Direct Query
+        </Button>
       </div>
+      
+      {loading && <p>Loading...</p>}
+      
+      {result && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Result</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <pre className="bg-muted p-4 rounded overflow-auto max-h-[600px]">
+              {JSON.stringify(result, null, 2)}
+            </pre>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 } 

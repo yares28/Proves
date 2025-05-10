@@ -12,10 +12,12 @@ import { motion, AnimatePresence } from "framer-motion"
 import { ViewToggle } from "@/components/view-toggle"
 import { ExamListView } from "@/components/exam-list-view"
 import { getExams } from "@/actions/exam-actions"
+import { formatDateString, getCurrentYear } from "@/utils/date-utils"
+import styles from "@/styles/tooltip.module.css"
 
 // Generate month data dynamically
 const generateMonths = () => {
-  const currentYear = new Date().getFullYear();
+  const currentYear = getCurrentYear();
   const months = [];
   
   for (let month = 0; month < 12; month++) {
@@ -37,44 +39,84 @@ const generateMonths = () => {
   return months;
 };
 
-export function CalendarDisplay() {
+export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record<string, string[]> }) {
   const [selectedDay, setSelectedDay] = useState<{ month: string; day: number } | null>(null)
   const [selectedExams, setSelectedExams] = useState<any[]>([])
-  const [visibleMonths, setVisibleMonths] = useState<number[]>([0, 1, 2])
+  const [visibleMonths, setVisibleMonths] = useState<number[]>([8, 9, 10, 11, 0, 1, 2, 3, 4, 5, 6, 7])
   const [view, setView] = useState<"calendar" | "list">("calendar")
   const [exams, setExams] = useState<any[]>([])
-  const [months, setMonths] = useState(generateMonths().slice(0, 6)) // First 6 months by default
+  const [months, setMonths] = useState(generateMonths()) // Show all 12 months
   
+  // Check if ETSINF is in the schools filter
+  const hasETSINFFilter = activeFilters?.school?.includes("ETSINF")
+  
+  // Log the active filters to debug
+  useEffect(() => {
+    console.log("CalendarDisplay - Active Filters:", activeFilters);
+    console.log("ETSINF Filter Active:", hasETSINFFilter);
+  }, [activeFilters, hasETSINFFilter]);
+
+  // Fetch exams when filters change
   useEffect(() => {
     const fetchExams = async () => {
-      const data = await getExams()
-      setExams(data)
+      try {
+        console.log("CalendarDisplay - Fetching exams with filters:", activeFilters);
+        // Pass filters directly to getExams
+        const data = await getExams(activeFilters)
+        console.log(`CalendarDisplay - Fetched ${data.length} exams. Sample:`, data.slice(0, 2)); 
+        
+        // For debugging - log all unique dates in the exam data
+        if (data.length > 0) {
+          const uniqueDates = [...new Set(data.map(exam => exam.date))].sort();
+          console.log("CalendarDisplay - Unique exam dates:", uniqueDates);
+          
+          // Automatically select the first exam date
+          if (uniqueDates.length > 0) {
+            const firstDate = new Date(uniqueDates[0]);
+            const month = firstDate.toLocaleString('default', { month: 'long' });
+            const day = firstDate.getDate();
+            
+            // Use setTimeout to avoid state updates interfering with each other
+            setTimeout(() => {
+              setSelectedDay({ month, day });
+              
+              // Find exams for this day
+              const examDate = uniqueDates[0];
+              const dayExams = data.filter((exam) => exam.date === examDate);
+              setSelectedExams(dayExams);
+            }, 0);
+          }
+        }
+        
+        setExams(data)
+      } catch (error) {
+        console.error("CalendarDisplay - Error fetching exams:", error);
+        setExams([])
+      }
     }
     
     fetchExams()
-  }, [])
+  }, [activeFilters])
 
   const handleDayClick = (month: string, day: number) => {
     const newSelection = { month, day }
     setSelectedDay(newSelection)
 
     // Find exams for this day
-    const formattedDay = day.toString().padStart(2, "0")
     const monthIndex = months.findIndex((m) => m.name === month) + 1
-    const formattedMonth = monthIndex.toString().padStart(2, "0")
-    const dateString = `${new Date().getFullYear()}-${formattedMonth}-${formattedDay}`
+    const dateString = formatDateString(getCurrentYear(), monthIndex, day);
 
     const dayExams = exams.filter((exam) => exam.date === dateString)
+    console.log(`CalendarDisplay - Found ${dayExams.length} exams for ${dateString}:`, dayExams);
     setSelectedExams(dayExams)
   }
 
   const hasExam = (month: string, day: number) => {
     const monthIndex = months.findIndex((m) => m.name === month) + 1
-    const formattedMonth = monthIndex.toString().padStart(2, "0")
-    const formattedDay = day.toString().padStart(2, "0")
-    const dateString = `${new Date().getFullYear()}-${formattedMonth}-${formattedDay}`
+    const dateString = formatDateString(getCurrentYear(), monthIndex, day);
 
-    return exams.some((exam) => exam.date === dateString)
+    const hasExamsForDay = exams.some((exam) => exam.date === dateString)
+    return hasExamsForDay
   }
 
   const showPreviousMonths = () => {
@@ -154,29 +196,9 @@ export function CalendarDisplay() {
             transition={{ duration: 0.3 }}
           >
             <div className="flex items-center justify-between rounded-lg border bg-card p-3 shadow-sm">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={showPreviousMonths}
-                disabled={visibleMonths[0] === 0}
-                className="h-8 w-8 rounded-full"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                <span className="sr-only">Previous months</span>
-              </Button>
               <div className="text-sm font-medium">
-                {months[visibleMonths[0]].name} - {months[visibleMonths[visibleMonths.length - 1]].name} 2024
+                Academic Year Calendar (September - August)
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={showNextMonths}
-                disabled={visibleMonths[visibleMonths.length - 1] === months.length - 1}
-                className="h-8 w-8 rounded-full"
-              >
-                <ChevronRight className="h-4 w-4" />
-                <span className="sr-only">Next months</span>
-              </Button>
             </div>
 
             <div className="mt-6 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
@@ -207,11 +229,11 @@ export function CalendarDisplay() {
                             const dayHasExam = hasExam(month.name, day)
 
                             return (
-                              <Tooltip key={`day-${day}`}>
+                              <Tooltip key={`day-${day}`} delayDuration={150}>
                                 <TooltipTrigger asChild>
-                                  <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
+                                  <motion.div
+                                    whileHover={{ scale: 1.02 }}
+                                    transition={{ duration: 0.1 }}
                                     className={`relative rounded-md p-2 transition-all ${
                                       isSelected
                                         ? "bg-primary text-primary-foreground shadow-md"
@@ -219,37 +241,49 @@ export function CalendarDisplay() {
                                           ? "bg-primary/10 font-medium text-primary"
                                           : "hover:bg-accent"
                                     }`}
-                                    onClick={() => handleDayClick(month.name, day)}
+                                    title={`${month.name} ${day}, ${getCurrentYear()}${dayHasExam ? ' - Has exams' : ''}`}
                                   >
                                     {day}
                                     {dayHasExam && (
                                       <span className="absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-primary"></span>
                                     )}
-                                  </motion.button>
+                                  </motion.div>
                                 </TooltipTrigger>
                                 {dayHasExam && (
                                   <TooltipContent
                                     side="top"
                                     align="center"
-                                    className="max-w-xs border-primary/20 p-0 shadow-lg"
-                                    sideOffset={5}
+                                    className={styles.examTooltip}
+                                    sideOffset={8}
+                                    avoidCollisions={true}
                                   >
-                                    <div className="max-h-64 space-y-1 overflow-y-auto p-1">
-                                      <div className="rounded-t-md bg-primary/10 px-3 py-2 text-xs font-medium text-primary">
-                                        {month.name} {day}, 2024
+                                    <div className="max-h-64 space-y-1 overflow-y-auto p-2">
+                                      <div className="rounded-t-md bg-primary/10 px-3 py-2 text-xs font-medium text-primary flex items-center justify-between">
+                                        <span>{month.name} {day}, {getCurrentYear()}</span>
+                                        {exams.filter(exam => {
+                                          const monthIndex = months.findIndex(m => m.name === month.name) + 1;
+                                          const dateString = formatDateString(getCurrentYear(), monthIndex, day);
+                                          return exam.date === dateString;
+                                        }).length > 0 && (
+                                          <span className={styles.examCount}>
+                                            {exams.filter(exam => {
+                                              const monthIndex = months.findIndex(m => m.name === month.name) + 1;
+                                              const dateString = formatDateString(getCurrentYear(), monthIndex, day);
+                                              return exam.date === dateString;
+                                            }).length} exams
+                                          </span>
+                                        )}
                                       </div>
                                       {exams
                                         .filter((exam) => {
-                                          const monthIndex = months.findIndex((m) => m.name === month.name) + 1
-                                          const formattedMonth = monthIndex.toString().padStart(2, "0")
-                                          const formattedDay = day.toString().padStart(2, "0")
-                                          const dateString = `${new Date().getFullYear()}-${formattedMonth}-${formattedDay}`
-                                          return exam.date === dateString
+                                          const monthIndex = months.findIndex((m) => m.name === month.name) + 1;
+                                          const dateString = formatDateString(getCurrentYear(), monthIndex, day);
+                                          return exam.date === dateString;
                                         })
                                         .map((exam) => (
                                           <div
                                             key={exam.id}
-                                            className="rounded-md border border-border/50 bg-card p-3 text-left shadow-sm"
+                                            className={styles.examCard}
                                           >
                                             <div className="mb-1 font-medium">{exam.subject}</div>
                                             <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
@@ -259,19 +293,43 @@ export function CalendarDisplay() {
                                               </span>
                                               <span className="flex items-center gap-1">
                                                 <MapPin className="h-3 w-3" />
-                                                {exam.location}
+                                                {exam.location || 'No location'}
                                               </span>
                                             </div>
                                             <div className="flex flex-wrap gap-1">
+                                              {exam.school && (
+                                                <Badge variant="outline" className="text-xs">
+                                                  {exam.school}
+                                                </Badge>
+                                              )}
+                                              {exam.degree && (
+                                                <Badge variant="outline" className="text-xs">
+                                                  {exam.degree}
+                                                </Badge>
+                                              )}
                                               <Badge variant="outline" className="text-xs">
-                                                {exam.year}
+                                                {exam.year || '?'} Year
                                               </Badge>
                                               <Badge variant="outline" className="text-xs">
-                                                {exam.semester}
+                                                Sem. {exam.semester || '?'}
                                               </Badge>
+                                              {exam.code && (
+                                                <Badge variant="secondary" className="text-xs">
+                                                  Code: {exam.code}
+                                                </Badge>
+                                              )}
                                             </div>
                                           </div>
                                         ))}
+                                      {exams.filter(exam => {
+                                        const monthIndex = months.findIndex(m => m.name === month.name) + 1;
+                                        const dateString = formatDateString(getCurrentYear(), monthIndex, day);
+                                        return exam.date === dateString;
+                                      }).length === 0 && (
+                                        <div className="px-3 py-2 text-xs text-muted-foreground">
+                                          No exam details available
+                                        </div>
+                                      )}
                                     </div>
                                   </TooltipContent>
                                 )}
@@ -289,6 +347,65 @@ export function CalendarDisplay() {
                 })}
               </TooltipProvider>
             </div>
+
+            <div className="mt-8 rounded-lg border bg-card p-5 shadow-sm">
+              <h3 className="mb-4 text-lg font-medium">Upcoming Exams Summary</h3>
+              
+              {exams.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {exams
+                      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // Sort by date ascending
+                      .slice(0, 6) // Show first 6 upcoming exams
+                      .map(exam => (
+                        <div key={exam.id} className={styles.examCard}>
+                          <div className="flex justify-between mb-1">
+                            <span className="font-medium">{exam.subject}</span>
+                            <Badge variant="outline">{new Date(exam.date).toLocaleDateString()}</Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {exam.time}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {exam.location || 'No location'}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="secondary" className="text-xs">
+                              {exam.year} Year
+                            </Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              Sem. {exam.semester}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                  
+                  {exams.length > 6 && (
+                    <div className="flex justify-center">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setView("list")}
+                        className="mt-2"
+                      >
+                        View All {exams.length} Exams
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+                  <Calendar className="h-12 w-12 mb-4 opacity-20" />
+                  <p>No exams found for the selected filters.</p>
+                  <p className="text-sm mt-2">Try adjusting your filter criteria to see exams.</p>
+                </div>
+              )}
+            </div>
           </motion.div>
         ) : (
           <motion.div
@@ -298,7 +415,7 @@ export function CalendarDisplay() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <ExamListView />
+            <ExamListView activeFilters={activeFilters} />
           </motion.div>
         )}
       </AnimatePresence>
