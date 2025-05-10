@@ -11,7 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { getExams } from "@/actions/exam-actions"
 
 type Exam = {
-  id: number;
+  id: number | string;
   date: string;
   subject: string;
   code: string;
@@ -26,29 +26,35 @@ type Exam = {
 type SortField = "date" | "subject" | "time" | "location" | "year" | "semester"
 type SortDirection = "asc" | "desc"
 
-export function ExamListView() {
+export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<string, string[]> }) {
   const [exams, setExams] = useState<Exam[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [sortField, setSortField] = useState<SortField>("date")
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
-  const [expandedExam, setExpandedExam] = useState<number | null>(null)
+  const [expandedExam, setExpandedExam] = useState<number | string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Check if ETSINF is in the schools filter
+  const hasETSINFFilter = activeFilters?.school?.includes("ETSINF")
 
   useEffect(() => {
     const fetchExams = async () => {
       try {
         setIsLoading(true)
-        const data = await getExams()
+        console.log("ExamListView - Fetching with filters:", activeFilters)
+        const data = await getExams(activeFilters)
+        console.log(`ExamListView - Fetched ${data.length} exams:`, data.slice(0, 2)) // Log the first 2 exams
         setExams(data || [])
       } catch (error) {
         console.error("Error fetching exams:", error)
+        setExams([])
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchExams()
-  }, [])
+  }, [activeFilters])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -64,7 +70,7 @@ export function ExamListView() {
     const query = searchQuery.toLowerCase()
     return (
       exam.subject.toLowerCase().includes(query) ||
-      exam.code.toLowerCase().includes(query) ||
+      (exam.code && exam.code.toLowerCase().includes(query)) ||
       exam.location.toLowerCase().includes(query) ||
       exam.school.toLowerCase().includes(query) ||
       exam.degree.toLowerCase().includes(query)
@@ -88,17 +94,17 @@ export function ExamListView() {
         comparison = a.location.localeCompare(b.location)
         break
       case "year":
-        comparison = a.year.localeCompare(b.year)
+        comparison = String(a.year).localeCompare(String(b.year))
         break
       case "semester":
-        comparison = a.semester.localeCompare(b.semester)
+        comparison = String(a.semester).localeCompare(String(b.semester))
         break
     }
 
     return sortDirection === "asc" ? comparison : -comparison
   })
 
-  const toggleExamDetails = (examId: number) => {
+  const toggleExamDetails = (examId: number | string) => {
     setExpandedExam(expandedExam === examId ? null : examId)
   }
 
@@ -225,7 +231,13 @@ export function ExamListView() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedExams.length > 0 ? (
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center">
+                    Loading exams...
+                  </TableCell>
+                </TableRow>
+              ) : sortedExams.length > 0 ? (
                 sortedExams.map((exam) => (
                   <TableRow key={exam.id} className="group">
                     <TableCell className="font-medium">
@@ -237,7 +249,7 @@ export function ExamListView() {
                     <TableCell>
                       <div className="flex flex-col">
                         <span>{exam.subject}</span>
-                        <span className="text-xs text-muted-foreground">{exam.code}</span>
+                        <span className="text-xs text-muted-foreground">{exam.code || "-"}</span>
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{exam.time}</TableCell>
@@ -278,7 +290,10 @@ export function ExamListView() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={7} className="h-24 text-center">
-                    No exams found.
+                    {Object.keys(activeFilters).length > 0 ? 
+                      "No exams found for the selected filters." :
+                      "No exams found. Try selecting some filters."
+                    }
                   </TableCell>
                 </TableRow>
               )}

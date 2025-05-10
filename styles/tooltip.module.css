@@ -1,0 +1,54 @@
+.examTooltip {
+  max-width: 350px;
+  border-radius: 6px;
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  animation: fadeIn 0.1s ease-out forwards;
+  transform-origin: top center;
+  pointer-events: none;
+  will-change: opacity, transform;
+}
+
+.examTooltip[data-state="open"] {
+  pointer-events: auto;
+}
+
+.examCard {
+  border-radius: 6px;
+  border: 1px solid hsl(var(--border));
+  padding: 12px;
+  margin-bottom: 8px;
+  background-color: hsl(var(--card));
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.examCard:hover {
+  background-color: hsl(var(--accent) / 0.2);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.examCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background-color: hsl(var(--primary) / 0.2);
+  color: hsl(var(--primary));
+  font-size: 0.6rem;
+  padding: 0.1rem 0.5rem;
+  margin-left: 0.5rem;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+} 

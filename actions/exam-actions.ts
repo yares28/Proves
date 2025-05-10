@@ -2,6 +2,7 @@
 
 import { supabase } from "@/lib/supabase"
 import type { ExamFilters } from "@/types/exam"
+import { mapExamData } from "@/utils/exam-mapper"
 
 // Cache for database results to prevent excessive queries
 const cache = {
@@ -47,12 +48,13 @@ export async function getExams(filters: ExamFilters = {}) {
     let query = supabase
       .from('ETSINF')
       .select('*')
-      .order('date', { ascending: true })
+      .order('exam_date', { ascending: true })
 
     // Apply filters if they exist
     if (filters.school) {
       // Handle both string and array formats for backward compatibility
       const schools = Array.isArray(filters.school) ? filters.school : [filters.school];
+      console.log('Filtering by schools:', schools);
       
       if (schools.length === 1) {
         query = query.eq('school', schools[0]);
@@ -64,6 +66,7 @@ export async function getExams(filters: ExamFilters = {}) {
     if (filters.degree) {
       // Handle both string and array formats for backward compatibility
       const degrees = Array.isArray(filters.degree) ? filters.degree : [filters.degree];
+      console.log('Filtering by degrees:', degrees);
       
       if (degrees.length === 1) {
         query = query.eq('degree', degrees[0]);
@@ -73,26 +76,58 @@ export async function getExams(filters: ExamFilters = {}) {
     }
     
     if (filters.year) {
-      query = query.eq('year', filters.year)
+      // Handle both string and array formats
+      const years = Array.isArray(filters.year) ? filters.year : [filters.year];
+      console.log('Filtering by years:', years);
+      
+      if (years.length === 1) {
+        query = query.eq('year', years[0]);
+      } else if (years.length > 1) {
+        query = query.in('year', years);
+      }
     }
     
     if (filters.semester) {
-      query = query.eq('semester', filters.semester)
+      // Handle both string and array formats
+      const semesters = Array.isArray(filters.semester) ? filters.semester : [filters.semester];
+      console.log('Filtering by semesters:', semesters);
+      
+      if (semesters.length === 1) {
+        query = query.eq('semester', semesters[0]);
+      } else if (semesters.length > 1) {
+        query = query.in('semester', semesters);
+      }
     }
     
     if (filters.subject) {
-      // For subject, we need to check both subject and acronym fields
-      // since the subject may be in "Subject (ACRONYM)" format
-      if (filters.subject.includes('(') && filters.subject.includes(')')) {
-        // Extract acronym from "Subject (ACRONYM)" format
-        const acronymMatch = filters.subject.match(/\(([^)]+)\)/)
-        if (acronymMatch && acronymMatch[1]) {
-          const acronym = acronymMatch[1]
-          query = query.eq('acronym', acronym)
+      // Handle both string and array formats
+      const subjects = Array.isArray(filters.subject) ? filters.subject : [filters.subject];
+      console.log('Filtering by subjects:', subjects);
+      
+      // Simple direct filtering approach to avoid 400 errors
+      if (subjects.length === 1) {
+        const subject = subjects[0];
+        
+        // Extract just the subject name if it contains an acronym in parentheses
+        let searchTerm = subject;
+        if (subject.includes('(')) {
+          searchTerm = subject.split('(')[0].trim();
         }
-      } else {
-        // Simple subject name search
-        query = query.ilike('subject', `%${filters.subject}%`)
+        
+        // Use a simple exact match instead of ilike to avoid PostgREST syntax issues
+        query = query.eq('subject', searchTerm);
+        console.log(`Using simple exact match for subject: "${searchTerm}"`);
+      } else if (subjects.length > 1) {
+        // For multiple subjects, use in operator instead of or
+        const subjectNames = subjects.map(s => {
+          if (s.includes('(')) {
+            return s.split('(')[0].trim();
+          }
+          return s;
+        });
+        
+        query = query.in('subject', subjectNames);
+        console.log(`Using in operator for subjects:`, subjectNames);
       }
     }
     
@@ -102,7 +137,7 @@ export async function getExams(filters: ExamFilters = {}) {
         `subject.ilike.%${filters.searchQuery}%,` +
         `code.ilike.%${filters.searchQuery}%,` +
         `acronym.ilike.%${filters.searchQuery}%,` +
-        `location.ilike.%${filters.searchQuery}%`
+        `place.ilike.%${filters.searchQuery}%`
       )
     }
 
@@ -114,7 +149,14 @@ export async function getExams(filters: ExamFilters = {}) {
     }
     
     console.log(`Found ${data.length} exams matching filters`)
-    return data
+    
+    // Transform the data to match what frontend expects
+    const transformedData = data.map(mapExamData);
+    
+    console.log('Transformed data example:', transformedData.length > 0 ? transformedData[0] : 'No data');
+    
+    return transformedData;
+    
   } catch (error) {
     console.error('Error fetching exams:', error)
     return []
@@ -603,4 +645,4 @@ export async function debugCheckDataExists(
       data: null 
     };
   }
-}
+} 

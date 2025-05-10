@@ -67,7 +67,7 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
     selectedSchoolsForData,
     selectedDegrees,
     selectedSemesters,
-    selectedYears  // Add selectedYears here to ensure they're passed to useFilterData
+    selectedYears
   )
   
   // Add debugging console logs
@@ -205,7 +205,8 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
         };
       }
       
-      onFiltersChange(newFilters);
+      // Call onFiltersChange after state update
+      setTimeout(() => onFiltersChange(newFilters), 0);
       return newFilters;
     });
   };
@@ -264,14 +265,16 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
         };
       }
       
-      onFiltersChange(newFilters);
+      // Call onFiltersChange after state update
+      setTimeout(() => onFiltersChange(newFilters), 0);
       return newFilters;
     });
   };
 
   const clearAllFilters = () => {
     setActiveFilters({});
-    onFiltersChange({});
+    // Call onFiltersChange after state update is complete
+    setTimeout(() => onFiltersChange({}), 0);
     
     // Reset all auto-expand flags
     expandedCategoriesRef.current = {

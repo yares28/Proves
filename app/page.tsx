@@ -5,6 +5,7 @@ import { Header } from "@/components/header"
 import { HeroSection } from "@/components/hero-section"
 import { ThemeProvider } from "@/components/theme-provider"
 import { getDegrees } from "@/actions/exam-actions"
+import { FilterConnection } from "@/components/filter-connection"
 
 export default async function Home() {
   // Fetch degrees data
@@ -21,10 +22,7 @@ export default async function Home() {
             <h2 className="mb-12 text-center text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl">
               Find Your <span className="text-primary">Exams</span>
             </h2>
-            <div className="grid grid-cols-1 gap-10 md:grid-cols-[350px_1fr]">
-              <FilterSidebar />
-              <CalendarDisplay />
-            </div>
+            <FilterConnection />
           </section>
           <section className="relative overflow-hidden bg-gradient-to-br from-emerald-900 to-emerald-950 py-24 text-white">
             <div className="absolute inset-0 -z-10 opacity-10">
