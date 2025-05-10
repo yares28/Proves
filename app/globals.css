@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 144 30% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 144 30% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 144 30% 10%;
+
+    --primary: 144 55% 25%;
+    --primary-foreground: 144 40% 97%;
+
+    --secondary: 144 30% 96%;
+    --secondary-foreground: 144 50% 15%;
+
+    --muted: 144 20% 96%;
+    --muted-foreground: 144 20% 40%;
+
+    --accent: 144 30% 96%;
+    --accent-foreground: 144 50% 15%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 144 20% 88%;
+    --input: 144 20% 88%;
+    --ring: 144 55% 25%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 144 30% 6%;
+    --foreground: 144 20% 96%;
+
+    --card: 144 30% 8%;
+    --card-foreground: 144 20% 96%;
+
+    --popover: 144 30% 8%;
+    --popover-foreground: 144 20% 96%;
+
+    --primary: 144 55% 40%;
+    --primary-foreground: 144 40% 97%;
+
+    --secondary: 144 30% 15%;
+    --secondary-foreground: 144 20% 96%;
+
+    --muted: 144 30% 15%;
+    --muted-foreground: 144 20% 70%;
+
+    --accent: 144 30% 15%;
+    --accent-foreground: 144 20% 96%;
+
+    --destructive: 0 74% 50%;
+    --destructive-foreground: 144 20% 96%;
+
+    --border: 144 30% 18%;
+    --input: 144 30% 18%;
+    --ring: 144 55% 40%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply tracking-tight;
+  }
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark .glass-card {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.05) 20%,
+    rgba(255, 255, 255, 0.1) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.dark .shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.03) 20%,
+    rgba(255, 255, 255, 0.06) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
