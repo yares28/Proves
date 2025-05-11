@@ -2,31 +2,66 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { Search } from "lucide-react"
+import { Search, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { getSchools } from "@/actions/exam-actions"
 
-interface FindExamCardProps {
-  degrees: string[]
-}
-
-export function FindExamCard({ degrees }: FindExamCardProps) {
+export function FindExamCard() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
-  const [degree, setDegree] = useState("")
+  const [school, setSchool] = useState("")
+  const [schools, setSchools] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [fetchError, setFetchError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchSchools() {
+      try {
+        setLoading(true)
+        const schoolsData = await getSchools()
+        console.log("Fetched schools:", schoolsData)
+        setSchools(schoolsData)
+        setFetchError(null)
+      } catch (error) {
+        console.error("Error fetching schools:", error)
+        setFetchError("Failed to load schools. Please try again.")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSchools()
+  }, [])
+
+  const validateAcronym = (value: string) => {
+    return value.trim().length > 0 && value.trim().length <= 10;
+  }
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
+    
+    const trimmedQuery = searchQuery.trim().toUpperCase();
+    
+    // Validate acronym
+    if (!validateAcronym(trimmedQuery)) {
+      setError("Please enter a valid acronym (1-10 characters)");
+      return;
+    }
+    
+    setError("");
     const params = new URLSearchParams()
 
-    if (searchQuery) params.append("q", searchQuery)
-    if (degree) params.append("degree", degree)
+    // Change parameter name from 'q' to 'acronym' to be more specific
+    params.append("acronym", trimmedQuery)
+    if (school && school !== "all") params.append("school", school)
 
     router.push(`/exams?${params.toString()}`)
   }
@@ -44,49 +79,84 @@ export function FindExamCard({ degrees }: FindExamCardProps) {
             Find Your Exam
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-6">
-          <form onSubmit={handleSearch} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="search" className="text-sm font-medium">
-                Search by subject or code
-              </Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="search"
-                  placeholder="e.g. Calculus, CAL101..."
-                  className="pl-9"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+        <form onSubmit={handleSearch}>
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="search" className="text-sm font-medium">
+                  Search by acronym
+                </Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="search"
+                    placeholder="e.g. MAD, IIP, ..."
+                    className="pl-9"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value)
+                      setError("")
+                    }}
+                  />
+                </div>
+                {error && (
+                  <p className="text-sm font-medium text-destructive">{error}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="school" className="text-sm font-medium">
+                  School
+                </Label>
+                <Select value={school} onValueChange={setSchool} disabled={loading}>
+                  <SelectTrigger id="school" className="w-full">
+                    <SelectValue placeholder={loading ? "Loading schools..." : "Select school"} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    <SelectItem value="all">All Schools</SelectItem>
+                    {loading ? (
+                      <div className="flex items-center justify-center py-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary mr-2" />
+                        <span>Loading schools...</span>
+                      </div>
+                    ) : fetchError ? (
+                      <div className="p-2 text-sm text-destructive">{fetchError}</div>
+                    ) : schools.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground">No schools found</div>
+                    ) : (
+                      schools.map((schoolName) => (
+                        <SelectItem key={schoolName} value={schoolName}>
+                          {schoolName}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {!loading && (
+                  <p className="text-xs text-muted-foreground">
+                    {schools.length} schools available
+                  </p>
+                )}
               </div>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="degree" className="text-sm font-medium">
-                Degree
-              </Label>
-              <Select value={degree} onValueChange={setDegree}>
-                <SelectTrigger id="degree" className="w-full">
-                  <SelectValue placeholder="Select degree" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Degrees</SelectItem>
-                  {degrees.map((degree) => (
-                    <SelectItem key={degree} value={degree}>
-                      {degree}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </form>
-        </CardContent>
-        <CardFooter className="bg-primary/5 px-6 py-4">
-          <Button type="submit" className="w-full shadow-md transition-all hover:shadow-lg" onClick={handleSearch}>
-            Search Exams
-          </Button>
-        </CardFooter>
+          </CardContent>
+          <CardFooter className="bg-primary/5 px-6 py-4">
+            <Button 
+              type="submit" 
+              className="w-full shadow-md transition-all hover:shadow-lg" 
+              disabled={loading || !searchQuery.trim()}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                "Search Exams"
+              )}
+            </Button>
+          </CardFooter>
+        </form>
       </Card>
     </motion.div>
   )

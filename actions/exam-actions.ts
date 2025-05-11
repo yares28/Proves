@@ -131,14 +131,10 @@ export async function getExams(filters: ExamFilters = {}) {
       }
     }
     
-    if (filters.searchQuery) {
-      // Search across multiple fields with OR condition
-      query = query.or(
-        `subject.ilike.%${filters.searchQuery}%,` +
-        `code.ilike.%${filters.searchQuery}%,` +
-        `acronym.ilike.%${filters.searchQuery}%,` +
-        `place.ilike.%${filters.searchQuery}%`
-      )
+    if (filters.acronym) {
+      // Search specifically by acronym
+      console.log('Filtering by acronym:', filters.acronym);
+      query = query.ilike('acronym', filters.acronym);
     }
 
     const { data, error } = await query
@@ -221,6 +217,12 @@ export async function getSchools() {
   // Check cache expiry
   cache.checkExpiry();
   
+  // Force cache refresh on each call for development purposes
+  if (true) {
+    console.log('Forcing schools cache refresh');
+    cache.schools = null;
+  }
+  
   // Return cached results if available
   if (cache.schools) {
     console.log('Using cached schools');
@@ -233,15 +235,20 @@ export async function getSchools() {
       .from('ETSINF')
       .select('school')
       .order('school', { ascending: true })
-      .limit(1000) // Add a reasonable limit
+      // No limit to ensure all schools are fetched
 
     if (error) {
       console.error('Supabase error fetching schools:', error)
       throw error
     }
 
+    console.log('Raw school data count:', data.length);
+    
     const schools = [...new Set(data.map(row => row.school))]
       .filter(school => school && school.trim() !== '') // Filter out empty values
+    
+    console.log('Unique schools count after filtering:', schools.length);
+    console.log('Schools:', schools);
     
     // Cache the results
     cache.schools = schools;

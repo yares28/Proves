@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { ViewToggle } from "@/components/view-toggle"
 import { ExamListView } from "@/components/exam-list-view"
 import { getExams } from "@/actions/exam-actions"
-import { formatDateString, getCurrentYear } from "@/utils/date-utils"
+import { formatDateString, getCurrentYear, getAcademicYearForMonth } from "@/utils/date-utils"
 import styles from "@/styles/tooltip.module.css"
 
 // Generate month data dynamically
@@ -70,22 +70,7 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
           const uniqueDates = [...new Set(data.map(exam => exam.date))].sort();
           console.log("CalendarDisplay - Unique exam dates:", uniqueDates);
           
-          // Automatically select the first exam date
-          if (uniqueDates.length > 0) {
-            const firstDate = new Date(uniqueDates[0]);
-            const month = firstDate.toLocaleString('default', { month: 'long' });
-            const day = firstDate.getDate();
-            
-            // Use setTimeout to avoid state updates interfering with each other
-            setTimeout(() => {
-              setSelectedDay({ month, day });
-              
-              // Find exams for this day
-              const examDate = uniqueDates[0];
-              const dayExams = data.filter((exam) => exam.date === examDate);
-              setSelectedExams(dayExams);
-            }, 0);
-          }
+          // No longer automatically select the first exam date
         }
         
         setExams(data)
@@ -104,7 +89,8 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
 
     // Find exams for this day
     const monthIndex = months.findIndex((m) => m.name === month) + 1
-    const dateString = formatDateString(getCurrentYear(), monthIndex, day);
+    const year = getAcademicYearForMonth(monthIndex)
+    const dateString = formatDateString(year, monthIndex, day);
 
     const dayExams = exams.filter((exam) => exam.date === dateString)
     console.log(`CalendarDisplay - Found ${dayExams.length} exams for ${dateString}:`, dayExams);
@@ -113,7 +99,8 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
 
   const hasExam = (month: string, day: number) => {
     const monthIndex = months.findIndex((m) => m.name === month) + 1
-    const dateString = formatDateString(getCurrentYear(), monthIndex, day);
+    const year = getAcademicYearForMonth(monthIndex)
+    const dateString = formatDateString(year, monthIndex, day);
 
     const hasExamsForDay = exams.some((exam) => exam.date === dateString)
     return hasExamsForDay
@@ -195,12 +182,6 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <div className="flex items-center justify-between rounded-lg border bg-card p-3 shadow-sm">
-              <div className="text-sm font-medium">
-                Academic Year Calendar (September - August)
-              </div>
-            </div>
-
             <div className="mt-6 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
               <TooltipProvider>
                 {visibleMonths.map((monthIndex) => {
@@ -241,7 +222,7 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                                           ? "bg-primary/10 font-medium text-primary"
                                           : "hover:bg-accent"
                                     }`}
-                                    title={`${month.name} ${day}, ${getCurrentYear()}${dayHasExam ? ' - Has exams' : ''}`}
+                                    title={`${month.name} ${day}, ${getAcademicYearForMonth(months.findIndex(m => m.name === month.name) + 1)}${dayHasExam ? ' - Has exams' : ''}`}
                                   >
                                     {day}
                                     {dayHasExam && (
@@ -257,79 +238,82 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                                     sideOffset={8}
                                     avoidCollisions={true}
                                   >
-                                    <div className="max-h-64 space-y-1 overflow-y-auto p-2">
-                                      <div className="rounded-t-md bg-primary/10 px-3 py-2 text-xs font-medium text-primary flex items-center justify-between">
-                                        <span>{month.name} {day}, {getCurrentYear()}</span>
-                                        {exams.filter(exam => {
-                                          const monthIndex = months.findIndex(m => m.name === month.name) + 1;
-                                          const dateString = formatDateString(getCurrentYear(), monthIndex, day);
-                                          return exam.date === dateString;
-                                        }).length > 0 && (
-                                          <span className={styles.examCount}>
-                                            {exams.filter(exam => {
-                                              const monthIndex = months.findIndex(m => m.name === month.name) + 1;
-                                              const dateString = formatDateString(getCurrentYear(), monthIndex, day);
-                                              return exam.date === dateString;
-                                            }).length} exams
-                                          </span>
-                                        )}
+                                    <div className="p-0">
+                                      <div className="bg-primary/10 px-3 py-2 text-xs font-medium text-primary flex items-center justify-between border-b border-primary/10">
+                                        <span>{month.name} {day}, {getAcademicYearForMonth(months.findIndex(m => m.name === month.name) + 1)}</span>
+                                        <span className={styles.examCount}>
+                                          {exams.filter(exam => {
+                                            const monthIndex = months.findIndex(m => m.name === month.name) + 1;
+                                            const year = getAcademicYearForMonth(monthIndex);
+                                            const dateString = formatDateString(year, monthIndex, day);
+                                            return exam.date === dateString;
+                                          }).length} exams
+                                        </span>
                                       </div>
-                                      {exams
-                                        .filter((exam) => {
-                                          const monthIndex = months.findIndex((m) => m.name === month.name) + 1;
-                                          const dateString = formatDateString(getCurrentYear(), monthIndex, day);
-                                          return exam.date === dateString;
-                                        })
-                                        .map((exam) => (
-                                          <div
-                                            key={exam.id}
-                                            className={styles.examCard}
-                                          >
-                                            <div className="mb-1 font-medium">{exam.subject}</div>
-                                            <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-                                              <span className="flex items-center gap-1">
-                                                <Clock className="h-3 w-3" />
-                                                {exam.time}
-                                              </span>
-                                              <span className="flex items-center gap-1">
-                                                <MapPin className="h-3 w-3" />
-                                                {exam.location || 'No location'}
-                                              </span>
+                                      
+                                      <div className={styles.scrollArea}>
+                                        <div className="p-2">
+                                          {exams
+                                            .filter(exam => {
+                                              const monthIndex = months.findIndex(m => m.name === month.name) + 1;
+                                              const year = getAcademicYearForMonth(monthIndex);
+                                              const dateString = formatDateString(year, monthIndex, day);
+                                              return exam.date === dateString;
+                                            })
+                                            .map(exam => (
+                                              <div
+                                                key={exam.id}
+                                                className={styles.examCard}
+                                              >
+                                                <div className="mb-1 font-medium">{exam.subject}</div>
+                                                <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+                                                  <span className="flex items-center gap-1">
+                                                    <Clock className="h-3 w-3" />
+                                                    {exam.time}
+                                                  </span>
+                                                  <span className="flex items-center gap-1">
+                                                    <MapPin className="h-3 w-3" />
+                                                    {exam.location || 'No location'}
+                                                  </span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-1">
+                                                  {exam.school && (
+                                                    <Badge variant="outline" className="text-xs">
+                                                      {exam.school}
+                                                    </Badge>
+                                                  )}
+                                                  {exam.degree && (
+                                                    <Badge variant="outline" className="text-xs">
+                                                      {exam.degree}
+                                                    </Badge>
+                                                  )}
+                                                  <Badge variant="outline" className="text-xs">
+                                                    {exam.year || '?'} Year
+                                                  </Badge>
+                                                  <Badge variant="outline" className="text-xs">
+                                                    Sem. {exam.semester || '?'}
+                                                  </Badge>
+                                                  {exam.code && (
+                                                    <Badge variant="secondary" className="text-xs">
+                                                      Code: {exam.code}
+                                                    </Badge>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            ))}
+                                            
+                                          {exams.filter(exam => {
+                                            const monthIndex = months.findIndex(m => m.name === month.name) + 1;
+                                            const year = getAcademicYearForMonth(monthIndex);
+                                            const dateString = formatDateString(year, monthIndex, day);
+                                            return exam.date === dateString;
+                                          }).length === 0 && (
+                                            <div className="px-3 py-2 text-xs text-muted-foreground">
+                                              No exam details available
                                             </div>
-                                            <div className="flex flex-wrap gap-1">
-                                              {exam.school && (
-                                                <Badge variant="outline" className="text-xs">
-                                                  {exam.school}
-                                                </Badge>
-                                              )}
-                                              {exam.degree && (
-                                                <Badge variant="outline" className="text-xs">
-                                                  {exam.degree}
-                                                </Badge>
-                                              )}
-                                              <Badge variant="outline" className="text-xs">
-                                                {exam.year || '?'} Year
-                                              </Badge>
-                                              <Badge variant="outline" className="text-xs">
-                                                Sem. {exam.semester || '?'}
-                                              </Badge>
-                                              {exam.code && (
-                                                <Badge variant="secondary" className="text-xs">
-                                                  Code: {exam.code}
-                                                </Badge>
-                                              )}
-                                            </div>
-                                          </div>
-                                        ))}
-                                      {exams.filter(exam => {
-                                        const monthIndex = months.findIndex(m => m.name === month.name) + 1;
-                                        const dateString = formatDateString(getCurrentYear(), monthIndex, day);
-                                        return exam.date === dateString;
-                                      }).length === 0 && (
-                                        <div className="px-3 py-2 text-xs text-muted-foreground">
-                                          No exam details available
+                                          )}
                                         </div>
-                                      )}
+                                      </div>
                                     </div>
                                   </TooltipContent>
                                 )}

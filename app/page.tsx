@@ -4,20 +4,15 @@ import { Footer } from "@/components/footer"
 import { Header } from "@/components/header"
 import { HeroSection } from "@/components/hero-section"
 import { ThemeProvider } from "@/components/theme-provider"
-import { getDegrees } from "@/actions/exam-actions"
 import { FilterConnection } from "@/components/filter-connection"
 
 export default async function Home() {
-  // Fetch degrees data
-  const degrees = await getDegrees()
-
   return (
     <ThemeProvider defaultTheme="light" storageKey="upv-theme">
       <div className="flex min-h-screen flex-col bg-background">
         <Header />
         <main className="flex-1">
-          {/* Pass pre-fetched data to client components */}
-          <HeroSection initialDegrees={degrees} />
+          <HeroSection />
           <section className="container mx-auto px-4 py-16 md:px-6 md:py-24 lg:py-32">
             <h2 className="mb-12 text-center text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl">
               Find Your <span className="text-primary">Exams</span>
