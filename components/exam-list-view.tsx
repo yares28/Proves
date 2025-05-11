@@ -126,179 +126,136 @@ export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<st
         />
       </div>
 
+      {/* Table with sticky header */}
       <div className="rounded-lg border shadow-sm">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[100px]">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex items-center gap-1 px-0 font-medium"
-                    onClick={() => handleSort("date")}
-                  >
-                    Date
-                    {sortField === "date" &&
-                      (sortDirection === "asc" ? (
-                        <ChevronUp className="h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4" />
-                      ))}
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex items-center gap-1 px-0 font-medium"
-                    onClick={() => handleSort("subject")}
-                  >
-                    Subject
-                    {sortField === "subject" &&
-                      (sortDirection === "asc" ? (
-                        <ChevronUp className="h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4" />
-                      ))}
-                  </Button>
-                </TableHead>
-                <TableHead className="hidden md:table-cell">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex items-center gap-1 px-0 font-medium"
-                    onClick={() => handleSort("time")}
-                  >
-                    Time
-                    {sortField === "time" &&
-                      (sortDirection === "asc" ? (
-                        <ChevronUp className="h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4" />
-                      ))}
-                  </Button>
-                </TableHead>
-                <TableHead className="hidden lg:table-cell">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex items-center gap-1 px-0 font-medium"
-                    onClick={() => handleSort("location")}
-                  >
-                    Location
-                    {sortField === "location" &&
-                      (sortDirection === "asc" ? (
-                        <ChevronUp className="h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4" />
-                      ))}
-                  </Button>
-                </TableHead>
-                <TableHead className="hidden xl:table-cell">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex items-center gap-1 px-0 font-medium"
-                    onClick={() => handleSort("year")}
-                  >
-                    Year
-                    {sortField === "year" &&
-                      (sortDirection === "asc" ? (
-                        <ChevronUp className="h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4" />
-                      ))}
-                  </Button>
-                </TableHead>
-                <TableHead className="hidden xl:table-cell">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex items-center gap-1 px-0 font-medium"
-                    onClick={() => handleSort("semester")}
-                  >
-                    Semester
-                    {sortField === "semester" &&
-                      (sortDirection === "asc" ? (
-                        <ChevronUp className="h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4" />
-                      ))}
-                  </Button>
-                </TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
-                    Loading exams...
-                  </TableCell>
-                </TableRow>
-              ) : sortedExams.length > 0 ? (
-                sortedExams.map((exam) => (
-                  <TableRow key={exam.id} className="group">
-                    <TableCell className="font-medium">
-                      {new Date(exam.date).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span>{exam.subject}</span>
-                        <span className="text-xs text-muted-foreground">{exam.code || "-"}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">{exam.time}</TableCell>
-                    <TableCell className="hidden lg:table-cell">{exam.location}</TableCell>
-                    <TableCell className="hidden xl:table-cell">{exam.year}</TableCell>
-                    <TableCell className="hidden xl:table-cell">{exam.semester}</TableCell>
-                    <TableCell>
-                      <div className="flex justify-end">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 md:hidden"
-                          onClick={() => toggleExamDetails(exam.id)}
-                        >
-                          {expandedExam === exam.id ? (
-                            <ChevronUp className="h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4" />
-                          )}
-                          <span className="sr-only">Toggle details</span>
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hidden md:flex">
-                              <ChevronDown className="h-4 w-4" />
-                              <span className="sr-only">Open menu</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>View Details</DropdownMenuItem>
-                            <DropdownMenuItem>Add to Calendar</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
-                    {Object.keys(activeFilters).length > 0 ? 
-                      "No exams found for the selected filters." :
-                      "No exams found. Try selecting some filters."
-                    }
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+        {/* Table container with fixed height and overflow */}
+        <div className="overflow-hidden">
+          <div className={sortedExams.length > 100 ? "max-h-[600px] overflow-y-auto" : ""}>
+            <table className="w-full border-collapse">
+              {/* Sticky header */}
+              <thead className="sticky top-0 z-10 bg-background">
+                <tr className="border-b m-0">
+                  <th className="p-4 text-left font-medium w-[120px]">
+                    <button 
+                      className="flex items-center text-sm font-medium hover:text-primary"
+                      onClick={() => handleSort("date")}
+                    >
+                      Date
+                      {sortField === "date" && (
+                        sortDirection === "asc" ? 
+                          <ChevronUp className="ml-1 h-4 w-4" /> : 
+                          <ChevronDown className="ml-1 h-4 w-4" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="p-4 text-left font-medium">
+                    <button 
+                      className="flex items-center text-sm font-medium hover:text-primary"
+                      onClick={() => handleSort("subject")}
+                    >
+                      Subject
+                      {sortField === "subject" && (
+                        sortDirection === "asc" ? 
+                          <ChevronUp className="ml-1 h-4 w-4" /> : 
+                          <ChevronDown className="ml-1 h-4 w-4" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="p-4 text-left font-medium hidden md:table-cell">
+                    <button 
+                      className="flex items-center text-sm font-medium hover:text-primary"
+                      onClick={() => handleSort("time")}
+                    >
+                      Time
+                      {sortField === "time" && (
+                        sortDirection === "asc" ? 
+                          <ChevronUp className="ml-1 h-4 w-4" /> : 
+                          <ChevronDown className="ml-1 h-4 w-4" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="p-4 text-left font-medium hidden lg:table-cell">
+                    <button 
+                      className="flex items-center text-sm font-medium hover:text-primary"
+                      onClick={() => handleSort("location")}
+                    >
+                      Location
+                      {sortField === "location" && (
+                        sortDirection === "asc" ? 
+                          <ChevronUp className="ml-1 h-4 w-4" /> : 
+                          <ChevronDown className="ml-1 h-4 w-4" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="p-4 text-left font-medium hidden xl:table-cell">
+                    <button 
+                      className="flex items-center text-sm font-medium hover:text-primary"
+                      onClick={() => handleSort("year")}
+                    >
+                      Year
+                      {sortField === "year" && (
+                        sortDirection === "asc" ? 
+                          <ChevronUp className="ml-1 h-4 w-4" /> : 
+                          <ChevronDown className="ml-1 h-4 w-4" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="p-4 text-left font-medium hidden xl:table-cell">
+                    <button 
+                      className="flex items-center text-sm font-medium hover:text-primary"
+                      onClick={() => handleSort("semester")}
+                    >
+                      Semester
+                      {sortField === "semester" && (
+                        sortDirection === "asc" ? 
+                          <ChevronUp className="ml-1 h-4 w-4" /> : 
+                          <ChevronDown className="ml-1 h-4 w-4" />
+                      )}
+                    </button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={6} className="h-24 text-center border-b p-4">
+                      Loading exams...
+                    </td>
+                  </tr>
+                ) : sortedExams.length > 0 ? (
+                  sortedExams.map((exam) => (
+                    <tr key={exam.id} className="border-b hover:bg-muted/50">
+                      <td className="p-4 font-medium">
+                        {new Date(exam.date).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col">
+                          <span>{exam.subject}</span>
+                          <span className="text-xs text-muted-foreground">{exam.code || "-"}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 hidden md:table-cell">{exam.time}</td>
+                      <td className="p-4 hidden lg:table-cell">{exam.location}</td>
+                      <td className="p-4 hidden xl:table-cell">{exam.year}</td>
+                      <td className="p-4 hidden xl:table-cell">{exam.semester}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="h-24 text-center border-b p-4">
+                      {Object.keys(activeFilters).length > 0 ? 
+                        "No exams found for the selected filters." :
+                        "No exams found. Try selecting some filters."
+                      }
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </motion.div>

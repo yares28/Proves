@@ -5,11 +5,7 @@ import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
 import { FindExamCard } from "@/components/find-exam-card"
 
-interface HeroSectionProps {
-  initialDegrees: string[]
-}
-
-export function HeroSection({ initialDegrees }: HeroSectionProps) {
+export function HeroSection() {
   const scrollToFilters = () => {
     const filtersSection = document.querySelector("#filters-section")
     if (filtersSection) {
@@ -109,7 +105,7 @@ export function HeroSection({ initialDegrees }: HeroSectionProps) {
           </motion.div>
 
           {/* Find Your Exam Card */}
-          <FindExamCard degrees={initialDegrees} />
+          <FindExamCard />
         </div>
       </div>
 

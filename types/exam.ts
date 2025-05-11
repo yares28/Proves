@@ -18,5 +18,5 @@ export interface ExamFilters {
   year?: string
   semester?: string
   subject?: string
-  searchQuery?: string
+  acronym?: string
 }

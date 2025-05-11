@@ -13,7 +13,7 @@ export default async function ExamsPage({
   searchParams: { [key: string]: string | string[] | undefined }
 }) {
   const filters: ExamFilters = {
-    searchQuery: typeof searchParams.q === "string" ? searchParams.q : undefined,
+    acronym: typeof searchParams.acronym === "string" ? searchParams.acronym : undefined,
     school: typeof searchParams.school === "string" && searchParams.school !== "all" ? searchParams.school : undefined,
     degree: typeof searchParams.degree === "string" && searchParams.degree !== "all" ? searchParams.degree : undefined,
     year: typeof searchParams.year === "string" ? searchParams.year : undefined,
@@ -32,9 +32,9 @@ export default async function ExamsPage({
             <h1 className="mb-8 text-3xl font-bold tracking-tight md:text-4xl">Exam Results</h1>
 
             <div className="mb-6 flex flex-wrap gap-2">
-              {filters.searchQuery && (
+              {filters.acronym && (
                 <Badge variant="secondary" className="text-sm">
-                  Search: {filters.searchQuery}
+                  Acronym: {filters.acronym}
                 </Badge>
               )}
               {filters.school && (

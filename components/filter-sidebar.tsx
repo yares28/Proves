@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Search, X, Info } from "lucide-react"
+import { Search, X, Info, CheckCircle } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -286,6 +286,32 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
     };
   };
 
+  // Add "Select All" function for a category
+  const selectAllFilters = (category: FilterCategory) => {
+    if (!hasRequiredDependencies(category)) return;
+    
+    const searchQuery = searchQueries[category.field]?.toLowerCase() || "";
+    const filteredOptions = category.options.filter(option => 
+      option.toLowerCase().includes(searchQuery)
+    );
+    
+    // Apply global search if any
+    const options = allFiltersSearch 
+      ? filteredOptions.filter(option => option.toLowerCase().includes(allFiltersSearch.toLowerCase())) 
+      : filteredOptions;
+    
+    setActiveFilters(prev => {
+      const newFilters = { ...prev };
+      
+      // Set all filtered options as selected
+      newFilters[category.field] = options;
+      
+      // Call onFiltersChange after state update
+      setTimeout(() => onFiltersChange(newFilters), 0);
+      return newFilters;
+    });
+  };
+
   const filteredOptions = (category: FilterCategory) => {
     // If category has dependencies and not all are selected, return empty array
     if (!hasRequiredDependencies(category)) {
@@ -300,13 +326,16 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
     );
     
     // Also filter options globally if allFiltersSearch is set
-    if (allFiltersSearch) {
-      return filtered.filter(option => 
-        option.toLowerCase().includes(allFiltersSearch.toLowerCase())
-      );
+    const finalFiltered = allFiltersSearch 
+      ? filtered.filter(option => option.toLowerCase().includes(allFiltersSearch.toLowerCase())) 
+      : filtered;
+    
+    // Debug: Logging for School category specifically
+    if (category.field === 'school') {
+      console.log(`School options available: ${finalFiltered.length}`, finalFiltered);
     }
     
-    return filtered;
+    return finalFiltered;
   };
 
   const handleAccordionChange = (value: string[]) => {
@@ -346,6 +375,69 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
       const lastDep = missingNames.pop();
       return `Select ${missingNames.join(', ')} and ${lastDep} first`;
     }
+  };
+
+  // Add this new function after the selectAllFilters function
+  const clearCategoryFilters = (category: string, e?: React.MouseEvent<HTMLButtonElement>) => {
+    if (e) e.stopPropagation();
+    
+    setActiveFilters(prev => {
+      const newFilters = { ...prev };
+      
+      // Remove this category's filters
+      delete newFilters[category];
+      
+      // Clear dependent filters if needed
+      if (category === "school") {
+        delete newFilters.degree;
+        delete newFilters.semester;
+        delete newFilters.year;
+        delete newFilters.subject;
+        
+        // Reset auto-expand flags
+        expandedCategoriesRef.current = {
+          ...expandedCategoriesRef.current,
+          degree: false,
+          semester: false,
+          year: false,
+          subject: false
+        };
+      } else if (category === "degree") {
+        delete newFilters.semester;
+        delete newFilters.year;
+        delete newFilters.subject;
+        
+        // Reset auto-expand flags
+        expandedCategoriesRef.current = {
+          ...expandedCategoriesRef.current,
+          semester: false,
+          year: false,
+          subject: false
+        };
+      } else if (category === "semester") {
+        delete newFilters.year;
+        delete newFilters.subject;
+        
+        // Reset auto-expand flags
+        expandedCategoriesRef.current = {
+          ...expandedCategoriesRef.current,
+          year: false,
+          subject: false
+        };
+      } else if (category === "year") {
+        delete newFilters.subject;
+        
+        // Reset auto-expand flags
+        expandedCategoriesRef.current = {
+          ...expandedCategoriesRef.current,
+          subject: false
+        };
+      }
+      
+      // Call onFiltersChange after state update
+      setTimeout(() => onFiltersChange(newFilters), 0);
+      return newFilters;
+    });
   };
 
   if (isLoading) {
@@ -401,6 +493,34 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
         )}
       </div>
 
+      {/* Active Filters section moved to the top */}
+      {Object.keys(activeFilters).length > 0 && (
+        <div className="mt-4">
+          <h3 className="text-sm font-medium mb-2">Active Filters</h3>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(activeFilters).map(([category, values]) =>
+              values.map((value) => (
+                <Badge
+                  key={`${category}-${value}`}
+                  variant="secondary"
+                  className="flex items-center gap-1"
+                >
+                  {value}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-4 w-4 p-0"
+                    onClick={() => removeFilter(category, value)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </Badge>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="relative">
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
@@ -420,30 +540,43 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
         {filterCategories.map((category) => (
           <AccordionItem key={category.field} value={category.field}>
             <AccordionTrigger className="text-sm font-medium">
-              {category.name}
-              {activeFilters[category.field]?.length > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {activeFilters[category.field].length}
-                </Badge>
-              )}
+              <span className="flex-1">{category.name}</span>
+              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                {/* Only show Select All button if the accordion is expanded */}
+                {expandedItems.includes(category.field) && filteredOptions(category).length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      selectAllFilters(category);
+                    }}
+                    className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Select all
+                  </Button>
+                )}
+                {activeFilters[category.field]?.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => clearCategoryFilters(category.field, e)}
+                    className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Clear all
+                  </Button>
+                )}
+              </div>
             </AccordionTrigger>
             <AccordionContent>
+              {/* Keep the amber card but use a fixed message */}
               {category.dependsOn && !hasRequiredDependencies(category) && (
                 <Card className="mb-3 border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
                   <CardContent className="p-3 flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300">
                     <Info className="h-4 w-4" />
-                    <span>{getDependencyMessage(category)}</span>
+                    <span>Select one of the options above.</span>
                   </CardContent>
                 </Card>
-              )}
-              
-              {category.dependsOn && hasRequiredDependencies(category) && (
-                <div className="mb-3 text-sm text-muted-foreground">
-                  {category.field === 'degree' && `Showing degrees for ${getFilterDisplay('school', selectedSchools)}`}
-                  {category.field === 'semester' && `Showing semesters for ${getFilterDisplay('degree', selectedDegrees)}`}
-                  {category.field === 'year' && `Showing course years for ${getFilterDisplay('semester', selectedSemesters)}`}
-                  {category.field === 'subject' && 'Showing subjects for selected filters'}
-                </div>
               )}
               
               {category.searchable && hasRequiredDependencies(category) && (
@@ -482,7 +615,7 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
                 ) : (
                   <div className="text-sm text-muted-foreground py-2">
                     {!hasRequiredDependencies(category)
-                      ? getDependencyMessage(category)
+                      ? "" // Remove the dependency message text
                       : `No ${category.name.toLowerCase()} available for the selected filters`}
                   </div>
                 )}
@@ -491,33 +624,6 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
           </AccordionItem>
         ))}
       </Accordion>
-
-      {Object.keys(activeFilters).length > 0 && (
-        <div className="mt-4">
-          <h3 className="text-sm font-medium mb-2">Active Filters</h3>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(activeFilters).map(([category, values]) =>
-              values.map((value) => (
-                <Badge
-                  key={`${category}-${value}`}
-                  variant="secondary"
-                  className="flex items-center gap-1"
-                >
-                  {value}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-4 w-4 p-0"
-                    onClick={() => removeFilter(category, value)}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </Badge>
-              ))
-            )}
-          </div>
-        </div>
-      )}
     </motion.aside>
   )
 }
