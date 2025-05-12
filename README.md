@@ -147,5 +147,10 @@ You can use the provided `start-services.bat` script on Windows, or run the serv
 The primary data interaction is with Supabase. The `APIdocs.md` file in the repository provides detailed information about the Supabase tables:
 
 
+# 🗒️ Project Todo List
 
-
+## 🔮 Upcoming
+- [ ] Task 1: Support for more languages
+- [ ] Task 2: Login upgrades
+- [ ] Task 3: Export API Integration
+- [ ] Task 4: ...
