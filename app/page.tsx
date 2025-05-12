@@ -1,3 +1,7 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { CalendarDisplay } from "@/components/calendar-display"
 import { FilterSidebar } from "@/components/filter-sidebar"
 import { Footer } from "@/components/footer"
@@ -5,8 +9,30 @@ import { Header } from "@/components/header"
 import { HeroSection } from "@/components/hero-section"
 import { ThemeProvider } from "@/components/theme-provider"
 import { FilterConnection } from "@/components/filter-connection"
+import { AuthDialog } from "@/components/auth/auth-dialog"
+import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/context/auth-context"
 
-export default async function Home() {
+export default function Home() {
+  const [showAuthDialog, setShowAuthDialog] = useState(false)
+  const searchParams = useSearchParams()
+  const { toast } = useToast()
+  const { user } = useAuth()
+  
+  useEffect(() => {
+    // Check if auth_required is in the URL
+    if (searchParams.get("auth_required") === "true" && !user) {
+      // Don't automatically show authentication dialog
+      
+      // Show a toast message instead
+      toast({
+        title: "Authentication Required",
+        description: "Please click the user icon in the top-right corner to log in.",
+        variant: "destructive",
+      })
+    }
+  }, [searchParams, toast, user])
+  
   return (
     <ThemeProvider defaultTheme="light" storageKey="upv-theme">
       <div className="flex min-h-screen flex-col bg-background">
@@ -18,6 +44,16 @@ export default async function Home() {
               Find Your <span className="text-primary">Exams</span>
             </h2>
             <FilterConnection />
+            
+            {/* Test Links for Debugging */}
+            <div className="mt-8 text-center">
+              <p className="mb-2 text-muted-foreground">Testing Pages:</p>
+              <div className="flex justify-center gap-4">
+                <a href="/test" className="text-primary underline">Test Page</a>
+                <a href="/saved-calendars" className="text-primary underline">Saved Calendars</a>
+                <a href="/my-calendars" className="text-primary underline">My Calendars</a>
+              </div>
+            </div>
           </section>
           <section className="relative overflow-hidden bg-gradient-to-br from-emerald-900 to-emerald-950 py-24 text-white">
             <div className="absolute inset-0 -z-10 opacity-10">
@@ -57,6 +93,9 @@ export default async function Home() {
           </section>
         </main>
         <Footer />
+        
+        {/* Authentication Dialog */}
+        <AuthDialog open={showAuthDialog} onOpenChange={setShowAuthDialog} />
       </div>
     </ThemeProvider>
   )

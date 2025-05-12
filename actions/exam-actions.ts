@@ -11,6 +11,9 @@ const cache = {
   semesters: new Map<string, string[]>(),
   years: new Map<string, number[]>(),
   subjects: new Map<string, string[]>(),
+  // Add exams cache with 2-minute TTL (shorter than metadata to refresh more often)
+  exams: new Map<string, { data: any[], timestamp: number }>(),
+  examsTTL: 2 * 60 * 1000, // 2 minutes in milliseconds
   // Reset cache after 5 minutes
   lastUpdated: Date.now(),
   TTL: 5 * 60 * 1000, // 5 minutes in milliseconds
@@ -21,11 +24,54 @@ const cache = {
     return [...schools].sort().join(',');
   },
   
+  // Generate a cache key for exam filters
+  getExamsKey(filters: ExamFilters): string {
+    const parts = [];
+    
+    if (filters.school) {
+      const schools = Array.isArray(filters.school) ? [...filters.school].sort() : [filters.school];
+      parts.push(`school=${schools.join(',')}`);
+    }
+    
+    if (filters.degree) {
+      const degrees = Array.isArray(filters.degree) ? [...filters.degree].sort() : [filters.degree];
+      parts.push(`degree=${degrees.join(',')}`);
+    }
+    
+    if (filters.year) {
+      const years = Array.isArray(filters.year) ? [...filters.year].sort() : [filters.year];
+      parts.push(`year=${years.join(',')}`);
+    }
+    
+    if (filters.semester) {
+      const semesters = Array.isArray(filters.semester) ? [...filters.semester].sort() : [filters.semester];
+      parts.push(`semester=${semesters.join(',')}`);
+    }
+    
+    if (filters.subject) {
+      const subjects = Array.isArray(filters.subject) ? [...filters.subject].sort() : [filters.subject];
+      parts.push(`subject=${subjects.join(',')}`);
+    }
+    
+    if (filters.acronym) {
+      parts.push(`acronym=${filters.acronym}`);
+    }
+    
+    return parts.length ? parts.join('&') : 'all';
+  },
+  
   // Check if cache needs reset due to TTL
   checkExpiry() {
     const now = Date.now();
     if (now - this.lastUpdated > this.TTL) {
       this.resetCache();
+    }
+    
+    // Also clear any expired exam cache entries
+    for (const [key, entry] of this.exams.entries()) {
+      if (now - entry.timestamp > this.examsTTL) {
+        this.exams.delete(key);
+      }
     }
   },
   
@@ -36,23 +82,40 @@ const cache = {
     this.semesters.clear();
     this.years.clear();
     this.subjects.clear();
+    this.exams.clear();
     this.lastUpdated = Date.now();
     console.log('Cache reset due to TTL expiry');
   }
 };
 
 export async function getExams(filters: ExamFilters = {}) {
+  // Check cache expiry first
+  cache.checkExpiry();
+  
+  // Generate cache key for this query
+  const cacheKey = cache.getExamsKey(filters);
+  
+  // Check if we have cached results for this exact query
+  if (cache.exams.has(cacheKey)) {
+    console.log('Using cached exams for:', cacheKey);
+    return cache.exams.get(cacheKey)?.data || [];
+  }
+  
   try {
-    console.log('Fetching exams with filters:', filters)
+    console.log('Fetching exams with filters:', filters);
+    const startTime = performance.now();
     
+    // Only select needed columns for better network performance
     let query = supabase
       .from('ETSINF')
-      .select('*')
-      .order('exam_date', { ascending: true })
+      .select('exam_instance_id, exam_date, exam_time, duration_minutes, code, subject, acronym, degree, year, semester, place, comment, school')
+      .order('exam_date', { ascending: true });
 
-    // Apply filters if they exist
+    // Apply filters using a strategy that leverages indexes
+    // Order filters from most selective to least selective for best index usage
+    
+    // School filter (usually most selective at top level)
     if (filters.school) {
-      // Handle both string and array formats for backward compatibility
       const schools = Array.isArray(filters.school) ? filters.school : [filters.school];
       console.log('Filtering by schools:', schools);
       
@@ -63,8 +126,8 @@ export async function getExams(filters: ExamFilters = {}) {
       }
     }
     
+    // Degree filter (second level in hierarchy)
     if (filters.degree) {
-      // Handle both string and array formats for backward compatibility
       const degrees = Array.isArray(filters.degree) ? filters.degree : [filters.degree];
       console.log('Filtering by degrees:', degrees);
       
@@ -75,20 +138,22 @@ export async function getExams(filters: ExamFilters = {}) {
       }
     }
     
+    // Year filter (third level)
     if (filters.year) {
-      // Handle both string and array formats
       const years = Array.isArray(filters.year) ? filters.year : [filters.year];
       console.log('Filtering by years:', years);
       
       if (years.length === 1) {
-        query = query.eq('year', years[0]);
+        query = query.eq('year', parseInt(years[0], 10)); // Ensure numeric comparison
       } else if (years.length > 1) {
-        query = query.in('year', years);
+        // Convert to integers for proper comparison
+        const numericYears = years.map(y => parseInt(y, 10));
+        query = query.in('year', numericYears);
       }
     }
     
+    // Semester filter (fourth level)
     if (filters.semester) {
-      // Handle both string and array formats
       const semesters = Array.isArray(filters.semester) ? filters.semester : [filters.semester];
       console.log('Filtering by semesters:', semesters);
       
@@ -99,12 +164,11 @@ export async function getExams(filters: ExamFilters = {}) {
       }
     }
     
+    // Subject filter (most specific - using our text search index)
     if (filters.subject) {
-      // Handle both string and array formats
       const subjects = Array.isArray(filters.subject) ? filters.subject : [filters.subject];
       console.log('Filtering by subjects:', subjects);
       
-      // Simple direct filtering approach to avoid 400 errors
       if (subjects.length === 1) {
         const subject = subjects[0];
         
@@ -114,48 +178,54 @@ export async function getExams(filters: ExamFilters = {}) {
           searchTerm = subject.split('(')[0].trim();
         }
         
-        // Use a simple exact match instead of ilike to avoid PostgREST syntax issues
-        query = query.eq('subject', searchTerm);
-        console.log(`Using simple exact match for subject: "${searchTerm}"`);
+        // Use ilike for partial matches which can use our index
+        query = query.ilike('subject', `%${searchTerm}%`);
+        console.log(`Using ilike for subject search: "%${searchTerm}%"`);
       } else if (subjects.length > 1) {
-        // For multiple subjects, use in operator instead of or
-        const subjectNames = subjects.map(s => {
-          if (s.includes('(')) {
-            return s.split('(')[0].trim();
+        // For multiple subjects, use a more complex approach
+        const conditions = subjects.map(subject => {
+          let searchTerm = subject;
+          if (subject.includes('(')) {
+            searchTerm = subject.split('(')[0].trim();
           }
-          return s;
+          return `subject.ilike.%${searchTerm}%`;
         });
         
-        query = query.in('subject', subjectNames);
-        console.log(`Using in operator for subjects:`, subjectNames);
+        query = query.or(conditions.join(','));
+        console.log(`Using OR conditions for subjects:`, conditions);
       }
     }
     
+    // Acronym filter
     if (filters.acronym) {
-      // Search specifically by acronym
       console.log('Filtering by acronym:', filters.acronym);
-      query = query.ilike('acronym', filters.acronym);
+      query = query.ilike('acronym', `%${filters.acronym}%`);
     }
 
-    const { data, error } = await query
+    // Add pagination to limit result size if needed
+    const { data, error } = await query;
 
     if (error) {
-      console.error('Supabase error fetching exams:', error)
-      throw error
+      console.error('Supabase error fetching exams:', error);
+      throw error;
     }
-    
-    console.log(`Found ${data.length} exams matching filters`)
     
     // Transform the data to match what frontend expects
     const transformedData = data.map(mapExamData);
     
-    console.log('Transformed data example:', transformedData.length > 0 ? transformedData[0] : 'No data');
+    // Cache the results
+    cache.exams.set(cacheKey, { 
+      data: transformedData, 
+      timestamp: Date.now() 
+    });
+    
+    const duration = performance.now() - startTime;
+    console.log(`Found ${data.length} exams matching filters in ${duration.toFixed(2)}ms`);
     
     return transformedData;
-    
   } catch (error) {
-    console.error('Error fetching exams:', error)
-    return []
+    console.error('Error fetching exams:', error);
+    return [];
   }
 }
 
@@ -179,13 +249,16 @@ export async function getDegrees(schools?: string | string[]) {
   
   try {
     console.log('Fetching degrees from Supabase for schools:', schools ? schoolArray : 'all');
+    const startTime = performance.now();
     
+    // Only select what we need
     let query = supabase
       .from('ETSINF')
       .select('degree')
-      .order('degree', { ascending: true })
+      .order('degree', { ascending: true });
 
     // If schools are specified, filter degrees for those schools
+    // This leverages the school index or school+degree composite index
     if (schools && schoolArray.length > 0) {
       if (schoolArray.length === 1) {
         query = query.eq('school', schoolArray[0]);
@@ -194,34 +267,32 @@ export async function getDegrees(schools?: string | string[]) {
       }
     }
 
-    const { data, error } = await query
+    const { data, error } = await query;
 
     if (error) {
-      console.error('Supabase error fetching degrees:', error)
-      throw error
+      console.error('Supabase error fetching degrees:', error);
+      throw error;
     }
 
+    // Extract unique degrees
     const degrees = [...new Set(data.map(row => row.degree))];
     
     // Cache the results
     cache.degrees.set(cacheKey, degrees);
     
-    return degrees
+    const duration = performance.now() - startTime;
+    console.log(`Fetched ${degrees.length} degrees in ${duration.toFixed(2)}ms`);
+    
+    return degrees;
   } catch (error) {
-    console.error('Error fetching degrees:', error)
-    return []
+    console.error('Error fetching degrees:', error);
+    return [];
   }
 }
 
 export async function getSchools() {
   // Check cache expiry
   cache.checkExpiry();
-  
-  // Force cache refresh on each call for development purposes
-  if (true) {
-    console.log('Forcing schools cache refresh');
-    cache.schools = null;
-  }
   
   // Return cached results if available
   if (cache.schools) {
@@ -230,33 +301,33 @@ export async function getSchools() {
   }
   
   try {
-    console.log('Fetching schools from Supabase...')
+    console.log('Fetching schools from Supabase...');
+    const startTime = performance.now();
+    
+    // Use a more efficient query that leverages indexes
+    // Only select distinct school column, which should use an index
     const { data, error } = await supabase
       .from('ETSINF')
       .select('school')
-      .order('school', { ascending: true })
-      // No limit to ensure all schools are fetched
+      .limit(100) // Safety limit, we don't expect more than this many schools
+      .order('school', { ascending: true });
 
     if (error) {
-      console.error('Supabase error fetching schools:', error)
-      throw error
+      console.error('Supabase error fetching schools:', error);
+      throw error;
     }
 
-    console.log('Raw school data count:', data.length);
-    
-    const schools = [...new Set(data.map(row => row.school))]
-      .filter(school => school && school.trim() !== '') // Filter out empty values
-    
-    console.log('Unique schools count after filtering:', schools.length);
-    console.log('Schools:', schools);
-    
-    // Cache the results
+    // Extract unique school names
+    const schools = [...new Set(data.map(row => row.school))];
     cache.schools = schools;
     
-    return schools
+    const duration = performance.now() - startTime;
+    console.log(`Fetched ${schools.length} schools in ${duration.toFixed(2)}ms`);
+    
+    return schools;
   } catch (error) {
-    console.error('Error fetching schools:', error)
-    return []
+    console.error('Error fetching schools:', error);
+    return [];
   }
 }
 
@@ -274,58 +345,62 @@ export async function getSemesters(
   // Check cache expiry
   cache.checkExpiry();
   
-  // Normalize schools parameter
+  // Normalize parameters
   const schoolArray = schools ? (Array.isArray(schools) ? schools : [schools]) : [];
   const degreeArray = degrees ? (Array.isArray(degrees) ? degrees : [degrees]) : [];
   
-  // Generate a composite cache key
-  const schoolsKey = cache.getSchoolsKey(schoolArray);
-  const degreesKey = degreeArray.length > 0 ? degreeArray.sort().join(',') : 'all';
-  const cacheKey = `${schoolsKey}-${degreesKey}`;
+  // Generate a cache key
+  const key = `${cache.getSchoolsKey(schoolArray)}_${degreeArray.sort().join(',')}`;
   
-  // Check if we have cached results
-  if (cache.semesters.has(cacheKey)) {
-    console.log('Using cached semesters for:', cacheKey);
-    return cache.semesters.get(cacheKey) || [];
+  // Check for cached results
+  if (cache.semesters.has(key)) {
+    console.log('Using cached semesters for:', key);
+    return cache.semesters.get(key) || [];
   }
   
   try {
-    console.log('Fetching semesters with filters:', { schools: schoolArray, degrees: degreeArray });
+    console.log('Fetching semesters from Supabase with filters:', { schools: schoolArray, degrees: degreeArray });
+    const startTime = performance.now();
+    
+    // Only select what we need
     let query = supabase
       .from('ETSINF')
-      .select('semester')
-      .order('semester', { ascending: true });
-
-    // Apply filters if they exist
-    // First filter by schools
-    if (schools && schoolArray.length > 0) {
+      .select('semester');
+    
+    // Apply filters to leverage indexes - ordered from most selective to least
+    // School filter (top level)
+    if (schoolArray.length > 0) {
       if (schoolArray.length === 1) {
         query = query.eq('school', schoolArray[0]);
-      } else if (schoolArray.length > 1) {
+      } else {
         query = query.in('school', schoolArray);
       }
     }
     
-    // Then filter by degrees
-    if (degrees && degreeArray.length > 0) {
+    // Degree filter (second level)
+    if (degreeArray.length > 0) {
       if (degreeArray.length === 1) {
         query = query.eq('degree', degreeArray[0]);
-      } else if (degreeArray.length > 1) {
+      } else {
         query = query.in('degree', degreeArray);
       }
     }
-
+    
     const { data, error } = await query;
-
+    
     if (error) {
-      console.error('Supabase error fetching semesters:', error);
+      console.error('Error fetching semesters:', error);
       throw error;
     }
-
-    const semesters = [...new Set(data.map(row => row.semester))];
+    
+    // Extract unique semesters and sort them
+    const semesters = [...new Set(data.map(row => row.semester))].sort();
     
     // Cache the results
-    cache.semesters.set(cacheKey, semesters);
+    cache.semesters.set(key, semesters);
+    
+    const duration = performance.now() - startTime;
+    console.log(`Fetched ${semesters.length} semesters in ${duration.toFixed(2)}ms`);
     
     return semesters;
   } catch (error) {
@@ -353,69 +428,71 @@ export async function getYears(
   const degreeArray = degrees ? (Array.isArray(degrees) ? degrees : [degrees]) : [];
   const semesterArray = semesters ? (Array.isArray(semesters) ? semesters : [semesters]) : [];
   
-  // Generate a composite cache key
-  const schoolsKey = cache.getSchoolsKey(schoolArray);
-  const degreesKey = degreeArray.length > 0 ? degreeArray.sort().join(',') : 'all';
-  const semestersKey = semesterArray.length > 0 ? semesterArray.sort().join(',') : 'all';
-  const cacheKey = `${schoolsKey}-${degreesKey}-${semestersKey}`;
+  // Generate a cache key
+  const key = `${cache.getSchoolsKey(schoolArray)}_${degreeArray.sort().join(',')}_${semesterArray.sort().join(',')}`;
   
-  // Check if we have cached results
-  if (cache.years.has(cacheKey)) {
-    console.log('Using cached years for:', cacheKey);
-    return cache.years.get(cacheKey) || [];
+  // Check for cached results
+  if (cache.years.has(key)) {
+    console.log('Using cached years for:', key);
+    return cache.years.get(key) || [];
   }
   
   try {
-    console.log('Fetching years with filters:', { 
+    console.log('Fetching years from Supabase with filters:', { 
       schools: schoolArray, 
       degrees: degreeArray,
       semesters: semesterArray 
     });
+    const startTime = performance.now();
     
+    // Only select what we need
     let query = supabase
       .from('ETSINF')
-      .select('year')
-      .order('year', { ascending: true });
-
-    // Apply filters if they exist
-    // First filter by schools
-    if (schools && schoolArray.length > 0) {
+      .select('year');
+    
+    // Apply filters to leverage indexes - ordered from most selective to least
+    // School filter (top level)
+    if (schoolArray.length > 0) {
       if (schoolArray.length === 1) {
         query = query.eq('school', schoolArray[0]);
-      } else if (schoolArray.length > 1) {
+      } else {
         query = query.in('school', schoolArray);
       }
     }
     
-    // Then filter by degrees
-    if (degrees && degreeArray.length > 0) {
+    // Degree filter (second level)
+    if (degreeArray.length > 0) {
       if (degreeArray.length === 1) {
         query = query.eq('degree', degreeArray[0]);
-      } else if (degreeArray.length > 1) {
+      } else {
         query = query.in('degree', degreeArray);
       }
     }
     
-    // Then filter by semesters
-    if (semesters && semesterArray.length > 0) {
+    // Semester filter (third level)
+    if (semesterArray.length > 0) {
       if (semesterArray.length === 1) {
         query = query.eq('semester', semesterArray[0]);
-      } else if (semesterArray.length > 1) {
+      } else {
         query = query.in('semester', semesterArray);
       }
     }
-
+    
     const { data, error } = await query;
-
+    
     if (error) {
-      console.error('Supabase error fetching years:', error);
+      console.error('Error fetching years:', error);
       throw error;
     }
-
-    const years = [...new Set(data.map(row => row.year))];
+    
+    // Extract unique years, sort them numerically
+    const years = [...new Set(data.map(row => row.year))].sort((a, b) => a - b);
     
     // Cache the results
-    cache.years.set(cacheKey, years);
+    cache.years.set(key, years);
+    
+    const duration = performance.now() - startTime;
+    console.log(`Fetched ${years.length} years in ${duration.toFixed(2)}ms`);
     
     return years;
   } catch (error) {
@@ -446,119 +523,92 @@ export async function getSubjects(
   const semesterArray = semesters ? (Array.isArray(semesters) ? semesters : [semesters]) : [];
   const yearArray = years ? (Array.isArray(years) ? years : [years]) : [];
   
-  // ADDED: Debug logging for input parameters
-  console.log('DEBUG getSubjects - Raw input:', { schools, degrees, semesters, years });
-  console.log('DEBUG getSubjects - Normalized arrays:', { 
-    schoolArray, 
-    degreeArray,
-    semesterArray,
-    yearArray
-  });
+  // Generate a cache key
+  const key = `${cache.getSchoolsKey(schoolArray)}_${degreeArray.sort().join(',')}_${semesterArray.sort().join(',')}_${yearArray.sort().join(',')}`;
   
-  // Generate a composite cache key
-  const schoolsKey = cache.getSchoolsKey(schoolArray);
-  const degreesKey = degreeArray.length > 0 ? degreeArray.sort().join(',') : 'all';
-  const semestersKey = semesterArray.length > 0 ? semesterArray.sort().join(',') : 'all';
-  const yearsKey = yearArray.length > 0 ? yearArray.sort().join(',') : 'all';
-  const cacheKey = `${schoolsKey}-${degreesKey}-${semestersKey}-${yearsKey}`;
-  
-  // Check if we have cached results
-  if (cache.subjects.has(cacheKey)) {
-    console.log('Using cached subjects for:', cacheKey);
-    return cache.subjects.get(cacheKey) || [];
+  // Check for cached results
+  if (cache.subjects.has(key)) {
+    console.log('Using cached subjects for:', key);
+    return cache.subjects.get(key) || [];
   }
   
   try {
-    console.log('Fetching subjects with filters:', { 
+    console.log('Fetching subjects from Supabase with filters:', { 
       schools: schoolArray, 
       degrees: degreeArray,
       semesters: semesterArray,
       years: yearArray
     });
+    const startTime = performance.now();
     
+    // Select only the columns we need
     let query = supabase
       .from('ETSINF')
       .select('subject, acronym')
       .order('subject', { ascending: true });
-
-    // Apply filters if they exist
-    // First filter by schools
-    if (schools && schoolArray.length > 0) {
+    
+    // Apply filters to leverage indexes - ordered from most selective to least
+    // School filter (top level)
+    if (schoolArray.length > 0) {
       if (schoolArray.length === 1) {
         query = query.eq('school', schoolArray[0]);
-      } else if (schoolArray.length > 1) {
+      } else {
         query = query.in('school', schoolArray);
       }
     }
     
-    // Then filter by degrees
-    if (degrees && degreeArray.length > 0) {
+    // Degree filter (second level)
+    if (degreeArray.length > 0) {
       if (degreeArray.length === 1) {
         query = query.eq('degree', degreeArray[0]);
-      } else if (degreeArray.length > 1) {
+      } else {
         query = query.in('degree', degreeArray);
       }
     }
     
-    // Then filter by semesters
-    if (semesters && semesterArray.length > 0) {
+    // Year filter (third level)
+    if (yearArray.length > 0) {
+      if (yearArray.length === 1) {
+        query = query.eq('year', parseInt(yearArray[0], 10)); // Ensure numeric comparison
+      } else {
+        // Convert to integers for proper comparison
+        const numericYears = yearArray.map(y => parseInt(y, 10));
+        query = query.in('year', numericYears);
+      }
+    }
+    
+    // Semester filter (fourth level)
+    if (semesterArray.length > 0) {
       if (semesterArray.length === 1) {
         query = query.eq('semester', semesterArray[0]);
-      } else if (semesterArray.length > 1) {
+      } else {
         query = query.in('semester', semesterArray);
       }
     }
     
-    // Then filter by years
-    if (years && yearArray.length > 0) {
-      if (yearArray.length === 1) {
-        // ADDED: Type conversion check for year values
-        const yearValue = isNaN(Number(yearArray[0])) ? yearArray[0] : Number(yearArray[0]);
-        console.log('DEBUG - Using year value:', yearValue, 'Original:', yearArray[0]);
-        query = query.eq('year', yearValue);
-      } else if (yearArray.length > 1) {
-        // ADDED: Convert string years to numbers if they are numeric strings
-        const convertedYears = yearArray.map(y => isNaN(Number(y)) ? y : Number(y));
-        console.log('DEBUG - Using year values:', convertedYears, 'Original:', yearArray);
-        query = query.in('year', convertedYears);
-      }
-    }
-
-    // ADDED: Log query information without using toSQL
-    console.log('DEBUG - Query filters:', { 
-      schools: schoolArray,
-      degrees: degreeArray,
-      semesters: semesterArray,
-      years: yearArray.map(y => isNaN(Number(y)) ? y : Number(y))
-    });
-
     const { data, error } = await query;
-
+    
     if (error) {
-      console.error('Supabase error fetching subjects:', error);
+      console.error('Error fetching subjects:', error);
       throw error;
     }
     
-    // ADDED: Log the raw data returned from the database
-    console.log(`DEBUG - Raw data from DB (${data?.length || 0} records):`, data?.slice(0, 3));
+    // Format subjects with acronym if available
+    const subjects = data.map(row => {
+      if (row.acronym) {
+        return `${row.subject} (${row.acronym})`;
+      }
+      return row.subject;
+    });
     
-    // Create formatted subject strings with acronyms in parentheses
-    const subjectEntries = data.map(row => ({
-      value: `${row.subject} (${row.acronym})`,
-      subject: row.subject,
-      acronym: row.acronym
-    }));
-    
-    // Remove duplicates by checking both subject and acronym
-    const uniqueSubjects = Array.from(
-      new Map(subjectEntries.map(item => [`${item.subject}-${item.acronym}`, item])).values()
-    ).map(item => item.value);
-    
-    // ADDED: Log the final result
-    console.log(`DEBUG - Final uniqueSubjects (${uniqueSubjects.length}):`, uniqueSubjects.slice(0, 3));
+    // Remove duplicates and sort
+    const uniqueSubjects = [...new Set(subjects)].sort();
     
     // Cache the results
-    cache.subjects.set(cacheKey, uniqueSubjects);
+    cache.subjects.set(key, uniqueSubjects);
+    
+    const duration = performance.now() - startTime;
+    console.log(`Fetched ${uniqueSubjects.length} subjects in ${duration.toFixed(2)}ms`);
     
     return uniqueSubjects;
   } catch (error) {

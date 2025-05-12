@@ -80,38 +80,38 @@ export function FindExamCard() {
           </CardTitle>
         </CardHeader>
         <form onSubmit={handleSearch}>
-          <CardContent className="p-6">
+        <CardContent className="p-6">
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="search" className="text-sm font-medium">
+            <div className="space-y-2">
+              <Label htmlFor="search" className="text-sm font-medium">
                   Search by acronym
-                </Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="search"
+              </Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="search"
                     placeholder="e.g. MAD, IIP, ..."
-                    className="pl-9"
-                    value={searchQuery}
+                  className="pl-9"
+                  value={searchQuery}
                     onChange={(e) => {
                       setSearchQuery(e.target.value)
                       setError("")
                     }}
-                  />
-                </div>
+                />
+              </div>
                 {error && (
                   <p className="text-sm font-medium text-destructive">{error}</p>
                 )}
-              </div>
+            </div>
 
-              <div className="space-y-2">
+            <div className="space-y-2">
                 <Label htmlFor="school" className="text-sm font-medium">
                   School
-                </Label>
+              </Label>
                 <Select value={school} onValueChange={setSchool} disabled={loading}>
                   <SelectTrigger id="school" className="w-full">
                     <SelectValue placeholder={loading ? "Loading schools..." : "Select school"} />
-                  </SelectTrigger>
+                </SelectTrigger>
                   <SelectContent className="max-h-[300px]">
                     <SelectItem value="all">All Schools</SelectItem>
                     {loading ? (
@@ -127,11 +127,11 @@ export function FindExamCard() {
                       schools.map((schoolName) => (
                         <SelectItem key={schoolName} value={schoolName}>
                           {schoolName}
-                        </SelectItem>
+                    </SelectItem>
                       ))
                     )}
-                  </SelectContent>
-                </Select>
+                </SelectContent>
+              </Select>
                 {!loading && (
                   <p className="text-xs text-muted-foreground">
                     {schools.length} schools available
@@ -139,8 +139,8 @@ export function FindExamCard() {
                 )}
               </div>
             </div>
-          </CardContent>
-          <CardFooter className="bg-primary/5 px-6 py-4">
+        </CardContent>
+        <CardFooter className="bg-primary/5 px-6 py-4">
             <Button 
               type="submit" 
               className="w-full shadow-md transition-all hover:shadow-lg" 
@@ -154,8 +154,8 @@ export function FindExamCard() {
               ) : (
                 "Search Exams"
               )}
-            </Button>
-          </CardFooter>
+          </Button>
+        </CardFooter>
         </form>
       </Card>
     </motion.div>
