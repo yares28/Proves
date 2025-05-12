@@ -153,4 +153,5 @@ The primary data interaction is with Supabase. The `APIdocs.md` file in the repo
 - [ ] Task 1: Support for more languages
 - [ ] Task 2: Login upgrades
 - [ ] Task 3: Export API Integration
-- [ ] Task 4: ...
+- [ ] Task 4: Add more Schools
+- [ ] Task 5: ...
