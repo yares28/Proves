@@ -13,7 +13,18 @@ import { ViewToggle } from "@/components/view-toggle"
 import { ExamListView } from "@/components/exam-list-view"
 import { getExams } from "@/actions/exam-actions"
 import { formatDateString, getCurrentYear, getAcademicYearForMonth } from "@/utils/date-utils"
+import { SaveCalendarDialog } from "@/components/save-calendar-dialog"
+import { useAuth } from "@/context/auth-context"
+import { useToast } from "@/hooks/use-toast"
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu"
 import styles from "@/styles/tooltip.module.css"
+import { saveUserCalendar, getUserCalendarNames } from "@/actions/user-calendars"
+import { extractTokensFromStorage } from "@/lib/auth/token-manager"
 
 // Generate month data dynamically
 const generateMonths = () => {
@@ -46,6 +57,10 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
   const [view, setView] = useState<"calendar" | "list">("calendar")
   const [exams, setExams] = useState<any[]>([])
   const [months, setMonths] = useState(generateMonths()) // Show all 12 months
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
+  const [existingNames, setExistingNames] = useState<string[]>([])
+  const { user, syncToken } = useAuth()
+  const { toast } = useToast()
   
   // Check if ETSINF is in the schools filter
   const hasETSINFFilter = activeFilters?.school?.includes("ETSINF")
@@ -83,6 +98,22 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
     fetchExams()
   }, [activeFilters])
 
+  // Fetch existing calendar names when the component mounts or user changes
+  useEffect(() => {
+    const fetchCalendarNames = async () => {
+      if (user?.id) {
+        try {
+          const names = await getUserCalendarNames(user.id);
+          setExistingNames(names);
+        } catch (error) {
+          console.error("Error fetching calendar names:", error);
+        }
+      }
+    };
+    
+    fetchCalendarNames();
+  }, [user?.id]);
+
   const handleDayClick = (month: string, day: number) => {
     const newSelection = { month, day }
     setSelectedDay(newSelection)
@@ -118,6 +149,101 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
     }
   }
 
+  // Open save dialog if user is logged in, otherwise show login toast
+  const openSaveDialog = () => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to save calendars",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSaveDialogOpen(true);
+  };
+
+  // Save calendar view function
+  const handleSaveCalendar = async (name: string) => {
+    if (!user?.id) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to save calendars",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      console.log("Saving calendar with user ID:", user.id);
+      
+      // First, sync auth tokens to ensure we have the latest state
+      console.log("⏳ Synchronizing authentication state...");
+      await syncToken();
+      
+      // Get both auth tokens using the token manager
+      const { accessToken, refreshToken } = extractTokensFromStorage();
+      
+      // Verify tokens were found
+      if (!accessToken || !refreshToken) {
+        console.error("❌ Missing auth tokens:", {
+          accessToken: !!accessToken,
+          refreshToken: !!refreshToken
+        });
+        throw new Error("Authentication error: Missing tokens. Please log in again.");
+      }
+      
+      console.log("✅ Found auth tokens - preparing to save calendar");
+      
+      // Pass both tokens directly to the server action
+      const response = await saveUserCalendar({
+        name,
+        filters: activeFilters,
+        userId: user.id,
+        accessToken,
+        refreshToken
+      });
+      
+      if (!response) {
+        throw new Error("Failed to save calendar: Server returned empty response");
+      }
+      
+      console.log("✅ Server response:", response);
+      
+      // Update the list of existing names
+      setExistingNames(prev => [...prev, name]);
+      
+      toast({
+        title: "Calendar saved",
+        description: `Your calendar "${name}" has been saved successfully.`,
+      });
+    } catch (error: any) {
+      console.error("Error saving calendar:", error);
+      
+      // Get a more descriptive error message if available
+      const errorMessage = typeof error === 'string' ? error : 
+                          error?.message || 
+                          "An error occurred while saving your calendar. Please try again.";
+      
+      // If it's an authentication error, provide specific guidance
+      if (errorMessage.includes("authentication") || 
+          errorMessage.includes("log in") || 
+          errorMessage.includes("session") ||
+          errorMessage.includes("token")) {
+        toast({
+          title: "Authentication error",
+          description: "Please log out and log in again to refresh your session.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error saving calendar",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
+    }
+  };
+  
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -135,7 +261,12 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
           <ViewToggle view={view} onChange={setView} />
 
           <div className="hidden sm:flex sm:gap-2">
-            <Button variant="outline" size="sm" className="h-10 gap-1.5 rounded-md">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-10 gap-1.5 rounded-md"
+              onClick={openSaveDialog}
+            >
               <Save className="h-4 w-4" />
               <span>Save View</span>
             </Button>
@@ -156,7 +287,7 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={openSaveDialog}>
                 <Save className="mr-2 h-4 w-4" />
                 <span>Save View</span>
               </DropdownMenuItem>
@@ -172,6 +303,15 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
           </DropdownMenu>
         </div>
       </div>
+      
+      {/* Add SaveCalendarDialog component */}
+      <SaveCalendarDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        filters={activeFilters}
+        onSave={handleSaveCalendar}
+        existingNames={existingNames}
+      />
 
       <AnimatePresence mode="wait">
         {view === "calendar" ? (
@@ -427,5 +567,3 @@ function MoreHorizontal(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
-
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"

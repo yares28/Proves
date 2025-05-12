@@ -377,8 +377,8 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
     }
   };
 
-  // Add this new function after the selectAllFilters function
-  const clearCategoryFilters = (category: string, e?: React.MouseEvent<HTMLButtonElement>) => {
+  // Update the function signature to accept any MouseEvent
+  const clearCategoryFilters = (category: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     
     setActiveFilters(prev => {
@@ -541,34 +541,37 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
           <AccordionItem key={category.field} value={category.field}>
             <AccordionTrigger className="text-sm font-medium">
               <span className="flex-1">{category.name}</span>
-              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                {/* Only show Select All button if the accordion is expanded */}
-                {expandedItems.includes(category.field) && filteredOptions(category).length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
+              {/* Remove the buttons from inside the trigger */}
+              {activeFilters[category.field]?.length > 0 && (
+                <Badge variant="outline" className="mr-2 text-xs">
+                  {activeFilters[category.field].length}
+                </Badge>
+              )}
+            </AccordionTrigger>
+            <AccordionContent>
+              {/* Add the buttons at the top of content instead */}
+              <div className="flex items-center gap-2 mb-3">
+                {filteredOptions(category).length > 0 && (
+                  <span
                     onClick={(e) => {
                       e.stopPropagation();
                       selectAllFilters(category);
                     }}
-                    className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                    className="text-xs text-muted-foreground hover:text-foreground cursor-pointer underline"
                   >
                     Select all
-                  </Button>
+                  </span>
                 )}
                 {activeFilters[category.field]?.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                  <span
                     onClick={(e) => clearCategoryFilters(category.field, e)}
-                    className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                    className="text-xs text-muted-foreground hover:text-foreground cursor-pointer underline"
                   >
                     Clear all
-                  </Button>
+                  </span>
                 )}
               </div>
-            </AccordionTrigger>
-            <AccordionContent>
+
               {/* Keep the amber card but use a fixed message */}
               {category.dependsOn && !hasRequiredDependencies(category) && (
                 <Card className="mb-3 border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
