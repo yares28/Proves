@@ -35,7 +35,7 @@ This project utilizes a modern tech stack:
 *   [TypeScript](https://www.typescriptlang.org/)
 *   [Tailwind CSS](https://tailwindcss.com/)
 
-**Backend (Deduced from `backend` directory):**
+**Backend:**
 *   [Spring Boot](https://spring.io/projects/spring-boot) (Java)
 *   [Java](https://www.java.com/)
 *   [Maven](https://maven.apache.org/) (Build tool)
