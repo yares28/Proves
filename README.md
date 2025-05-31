@@ -34,13 +34,13 @@ This project utilizes a modern tech stack:
 *   [Next.js](https://nextjs.org/) (React Framework)
 *   [TypeScript](https://www.typescriptlang.org/)
 *   [Tailwind CSS](https://tailwindcss.com/)
-*   [Supabase](https://supabase.io/) (Backend as a Service - for auth and database)
 
 **Backend (Deduced from `backend` directory):**
-*   [Spring Boot](https://spring.io/projects/spring-boot) (Java Framework)
+*   [Spring Boot](https://spring.io/projects/spring-boot) (Java)
 *   [Java](https://www.java.com/)
 *   [Maven](https://maven.apache.org/) (Build tool)
-*   [PostgreSQL](https://www.postgresql.org/) (Database - likely via Supabase)
+*   [Supabase](https://supabase.io/) (Backend as a Service - for auth and database)
+*   [PostgreSQL](https://www.postgresql.org/) (Via Supabase)
 *   [JPA/Hibernate](https://hibernate.org/orm/) (Object-Relational Mapping)
 
 **Tools:**
