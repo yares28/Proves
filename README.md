@@ -24,6 +24,8 @@
 
 This project its a UPV (Universitat Politècnica de València) Exam Calendar application. It allows users to view, filter, and save exam schedules. It includes a frontend built with Next.js and a backend using Spring Boot . Users can authenticate, save their personalized calendars, and view exam details based on various filters like school, degree, year, semester, and subject.
 
+Access it here: https://upv-cal.vercel.app/
+
 ### <a name="built-with"></a>Built With
 
 This project utilizes a modern tech stack:
