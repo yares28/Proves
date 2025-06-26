@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Analytics } from '@vercel/analytics/react'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AuthProvider } from '@/context/auth-context'
 import { Toaster } from "@/components/ui/toaster"
@@ -28,6 +29,7 @@ export default function RootLayout({
             <Toaster />
           </AuthProvider>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   )
