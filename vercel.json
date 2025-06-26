@@ -1,5 +1,4 @@
 {
-  "_comment": "Force deployment from latest commit with React 19 fixes",
   "buildCommand": "npm run build",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "nextjs",
