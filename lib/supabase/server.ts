@@ -7,13 +7,39 @@ import { Database } from '@/types/database.types'
 /**
  * Creates a Supabase client for server-side use with robust authentication handling.
  * Attempts to extract authentication tokens from cookies in various formats.
+ * 
+ * @param useServiceRole - If true, uses the service role key for admin operations
  */
-export async function createClient() {
-  console.log('🔄 [SERVER] Creating server-side Supabase client...');
+export async function createClient(useServiceRole: boolean = false) {
+  console.log(`🔄 [SERVER] Creating server-side Supabase client${useServiceRole ? ' (Service Role)' : ' (User Auth)'}...`);
   
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   
+  // Use service role key for admin operations, anon key for user operations
+  const supabaseKey = useServiceRole 
+    ? process.env.SUPABASE_SERVICE_ROLE_KEY!
+    : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  
+  if (useServiceRole && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations')
+  }
+  
+  // If using service role, don't try to get user tokens
+  if (useServiceRole) {
+    console.log('✅ [SERVER] Using service role key for admin operations');
+    return createSupabaseClient<Database>(
+      supabaseUrl,
+      supabaseKey,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+  }
+  
+  // Continue with user authentication logic for regular operations
   // Normalize the base URL for cookie name matching
   const baseUrl = supabaseUrl.replace(/^https?:\/\//, '').replace(/\..*$/, '');
   
@@ -123,4 +149,12 @@ export async function createClient() {
   }
   
   return client;
+}
+
+/**
+ * Creates a Supabase admin client with service role key
+ * Use this for administrative operations that bypass RLS
+ */
+export async function createAdminClient() {
+  return await createClient(true);
 } 
