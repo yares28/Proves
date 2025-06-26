@@ -1,5 +1,4 @@
 {
-  "_comment": "Deployment with fixed React 19 dependencies",
   "buildCommand": "npm run build",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "nextjs",
