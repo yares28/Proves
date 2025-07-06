@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Search, X, Info, CheckCircle } from "lucide-react"
+import { Search, X, Info, CheckCircle, Save } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,11 @@ import { useFilterData } from "@/lib/hooks/use-filter-data"
 import { LoadingState } from "@/components/ui/loading-state"
 import { ErrorState } from "@/components/ui/error-state"
 import { Card, CardContent } from "@/components/ui/card"
+import { SaveCalendarDialog } from "@/components/save-calendar-dialog"
+import { useAuth } from "@/context/auth-context"
+import { useToast } from "@/hooks/use-toast"
+import { saveUserCalendar, getUserCalendarNames } from "@/actions/user-calendars"
+import { extractTokensFromStorage } from "@/lib/auth/token-manager"
 
 type FilterCategory = {
   name: string;
@@ -28,17 +33,13 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
   const [activeFilters, setActiveFilters] = useState<ActiveFilters>({})
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({})
   const [allFiltersSearch, setAllFiltersSearch] = useState("")
-  const [expandedItems, setExpandedItems] = useState<string[]>(["school"]) // Default to showing school filter
+  const [expandedItems, setExpandedItems] = useState<string[]>([]) // Start with nothing expanded
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
+  const [existingNames, setExistingNames] = useState<string[]>([])
   const prevSchoolsRef = useRef<string[]>([]);
-  
-  // Track if categories have been auto-expanded
-  const expandedCategoriesRef = useRef<Record<string, boolean>>({
-    school: true,
-    degree: false,
-    semester: false,
-    year: false,
-    subject: false
-  });
+
+  const { user, syncToken } = useAuth()
+  const { toast } = useToast()
 
   // Get the selected filters
   const selectedSchools = activeFilters.school || []
@@ -81,7 +82,7 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
     });
   }, [selectedSchools, selectedDegrees, selectedSemesters, selectedYears, subjects]);
   
-  // Define filter categories with dependencies
+  // Define filter categories with dependencies (memoized to prevent unnecessary re-renders)
   const filterCategories: FilterCategory[] = [
     { name: "Schools", field: "school", options: schools, searchable: true },
     { name: "Degrees", field: "degree", options: degrees, searchable: true, dependsOn: ["school"] },
@@ -90,52 +91,54 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
     { name: "Subjects", field: "subject", options: subjects, searchable: true, dependsOn: ["school", "degree", "semester", "year"] },
   ]
 
-  // When parent filter selections change, auto-expand child filters
+  // Auto-expansion logic: open categories with options, close empty ones
   useEffect(() => {
-    const autoExpandNext = (categoryField: string) => {
-      // Find the current category's index
-      const currentIndex = filterCategories.findIndex(c => c.field === categoryField);
-      
-      // If there's a next category and we have the necessary parent filters selected
-      if (currentIndex >= 0 && currentIndex < filterCategories.length - 1) {
-        const nextCategory = filterCategories[currentIndex + 1];
-        
-        // Check if next category should be expanded
-        if (
-          !expandedCategoriesRef.current[nextCategory.field] && 
-          hasRequiredDependencies(nextCategory)
-        ) {
-          // Mark this category as already expanded
-          expandedCategoriesRef.current[nextCategory.field] = true;
-          
-          // Add a small delay to make the UI flow more natural
-          setTimeout(() => {
-            setExpandedItems(prev => {
-              if (!prev.includes(nextCategory.field)) {
-                return [...prev, nextCategory.field];
-              }
-              return prev;
-            });
-          }, 300);
-        }
-      }
-    };
+    const newExpandedItems: string[] = [];
+    
+    console.log('🔍 Auto-expansion check based on available options');
 
-    // If we have schools selected, auto-expand degrees
-    if (hasSelectedSchools) {
-      autoExpandNext('school');
-    }
-    
-    // If we have degrees selected, auto-expand semesters
-    if (hasSelectedDegrees) {
-      autoExpandNext('degree');
-    }
-    
-    // If we have semesters selected, auto-expand years
-    if (hasSelectedSemesters) {
-      autoExpandNext('semester');
-    }
-  }, [hasSelectedSchools, hasSelectedDegrees, hasSelectedSemesters, filterCategories]);
+    filterCategories.forEach(category => {
+      const hasOptions = filteredOptions(category).length > 0;
+      const hasDependencies = hasRequiredDependencies(category);
+      
+      // Expand if category has options available
+      if (hasOptions && hasDependencies) {
+        console.log(`✅ Auto-expanding ${category.field} - has ${filteredOptions(category).length} options`);
+        newExpandedItems.push(category.field);
+      } else {
+        console.log(`❌ Closing ${category.field} - ${!hasDependencies ? 'missing dependencies' : 'no options available'}`);
+      }
+    });
+
+    // Update expanded items if there are changes
+    setExpandedItems(prev => {
+      const prevSet = new Set(prev);
+      const newSet = new Set(newExpandedItems);
+      
+      // Check if sets are different
+      if (prevSet.size !== newSet.size || [...prevSet].some(item => !newSet.has(item))) {
+        console.log('📋 Updating expanded items:', newExpandedItems);
+        return newExpandedItems;
+      }
+      
+      return prev;
+    });
+  }, [
+    // Watch for changes in available options for each category
+    schools.length,
+    degrees.length, 
+    semesters.length,
+    years.length,
+    subjects.length,
+    // Watch for changes in filter selections that affect dependencies
+    hasSelectedSchools,
+    hasSelectedDegrees,
+    hasSelectedSemesters,
+    hasSelectedYears,
+    // Watch for search queries that might filter options
+    JSON.stringify(searchQueries),
+    allFiltersSearch
+  ]);
   
   // Check if a category has all its required dependencies selected
   const hasRequiredDependencies = (category: FilterCategory): boolean => {
@@ -161,48 +164,18 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
         delete newFilters.semester;
         delete newFilters.year;
         delete newFilters.subject;
-        
-        // Reset auto-expand flags for child categories
-        expandedCategoriesRef.current = {
-          ...expandedCategoriesRef.current,
-          degree: false,
-          semester: false,
-          year: false,
-          subject: false
-        };
       } else if (category === "degree") {
         // When degree changes, clear semester, year and subject filters
         delete newFilters.semester;
         delete newFilters.year;
         delete newFilters.subject;
-        
-        // Reset auto-expand flags for child categories
-        expandedCategoriesRef.current = {
-          ...expandedCategoriesRef.current,
-          semester: false,
-          year: false,
-          subject: false
-        };
       } else if (category === "semester") {
         // When semester changes, clear year and subject filters
         delete newFilters.year;
         delete newFilters.subject;
-        
-        // Reset auto-expand flags for child categories
-        expandedCategoriesRef.current = {
-          ...expandedCategoriesRef.current,
-          year: false,
-          subject: false
-        };
       } else if (category === "year") {
         // When year changes, clear subject filters
         delete newFilters.subject;
-        
-        // Reset auto-expand flags for subject category
-        expandedCategoriesRef.current = {
-          ...expandedCategoriesRef.current,
-          subject: false
-        };
       }
       
       // Call onFiltersChange after state update
@@ -224,45 +197,15 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
         delete newFilters.semester;
         delete newFilters.year;
         delete newFilters.subject;
-        
-        // Reset auto-expand flags
-        expandedCategoriesRef.current = {
-          ...expandedCategoriesRef.current,
-          degree: false,
-          semester: false,
-          year: false,
-          subject: false
-        };
       } else if (category === "degree" && newFilters.degree.length === 0) {
         delete newFilters.semester;
         delete newFilters.year;
         delete newFilters.subject;
-        
-        // Reset auto-expand flags
-        expandedCategoriesRef.current = {
-          ...expandedCategoriesRef.current,
-          semester: false,
-          year: false,
-          subject: false
-        };
       } else if (category === "semester" && newFilters.semester.length === 0) {
         delete newFilters.year;
         delete newFilters.subject;
-        
-        // Reset auto-expand flags
-        expandedCategoriesRef.current = {
-          ...expandedCategoriesRef.current,
-          year: false,
-          subject: false
-        };
       } else if (category === "year" && newFilters.year.length === 0) {
         delete newFilters.subject;
-        
-        // Reset auto-expand flags
-        expandedCategoriesRef.current = {
-          ...expandedCategoriesRef.current,
-          subject: false
-        };
       }
       
       // Call onFiltersChange after state update
@@ -275,20 +218,13 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
     setActiveFilters({});
     // Call onFiltersChange after state update is complete
     setTimeout(() => onFiltersChange({}), 0);
-    
-    // Reset all auto-expand flags
-    expandedCategoriesRef.current = {
-      school: true,
-      degree: false,
-      semester: false,
-      year: false,
-      subject: false
-    };
   };
 
   // Add "Select All" function for a category
   const selectAllFilters = (category: FilterCategory) => {
     if (!hasRequiredDependencies(category)) return;
+    
+    console.log(`🔄 Select all for ${category.field}`);
     
     const searchQuery = searchQueries[category.field]?.toLowerCase() || "";
     const filteredOptions = category.options.filter(option => 
@@ -306,7 +242,9 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
       // Set all filtered options as selected
       newFilters[category.field] = options;
       
-      // Call onFiltersChange after state update
+      console.log(`📋 Updated filters for ${category.field}:`, options);
+      
+      // Call onFiltersChange after state update to avoid render conflicts
       setTimeout(() => onFiltersChange(newFilters), 0);
       return newFilters;
     });
@@ -393,51 +331,132 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
         delete newFilters.semester;
         delete newFilters.year;
         delete newFilters.subject;
-        
-        // Reset auto-expand flags
-        expandedCategoriesRef.current = {
-          ...expandedCategoriesRef.current,
-          degree: false,
-          semester: false,
-          year: false,
-          subject: false
-        };
       } else if (category === "degree") {
         delete newFilters.semester;
         delete newFilters.year;
         delete newFilters.subject;
-        
-        // Reset auto-expand flags
-        expandedCategoriesRef.current = {
-          ...expandedCategoriesRef.current,
-          semester: false,
-          year: false,
-          subject: false
-        };
       } else if (category === "semester") {
         delete newFilters.year;
         delete newFilters.subject;
-        
-        // Reset auto-expand flags
-        expandedCategoriesRef.current = {
-          ...expandedCategoriesRef.current,
-          year: false,
-          subject: false
-        };
       } else if (category === "year") {
         delete newFilters.subject;
-        
-        // Reset auto-expand flags
-        expandedCategoriesRef.current = {
-          ...expandedCategoriesRef.current,
-          subject: false
-        };
       }
       
       // Call onFiltersChange after state update
       setTimeout(() => onFiltersChange(newFilters), 0);
       return newFilters;
     });
+  };
+
+  // Fetch existing calendar names when the component mounts or user changes
+  useEffect(() => {
+    const fetchCalendarNames = async () => {
+      if (user?.id) {
+        try {
+          const names = await getUserCalendarNames(user.id);
+          setExistingNames(names);
+        } catch (error) {
+          console.error("Error fetching calendar names:", error);
+        }
+      }
+    };
+    
+    fetchCalendarNames();
+  }, [user?.id]);
+
+  // Open save dialog if user is logged in, otherwise show login toast
+  const openSaveDialog = () => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to save calendars",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSaveDialogOpen(true);
+  };
+
+  // Save calendar function
+  const handleSaveCalendar = async (name: string) => {
+    if (!user?.id) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to save calendars",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      console.log("Saving calendar with user ID:", user.id);
+      
+      // First, sync auth tokens to ensure we have the latest state
+      console.log("⏳ Synchronizing authentication state...");
+      await syncToken();
+      
+      // Get both auth tokens using the token manager
+      const { accessToken, refreshToken } = extractTokensFromStorage();
+      
+      // Verify tokens were found
+      if (!accessToken || !refreshToken) {
+        console.error("❌ Missing auth tokens:", {
+          accessToken: !!accessToken,
+          refreshToken: !!refreshToken
+        });
+        throw new Error("Authentication error: Missing tokens. Please log in again.");
+      }
+      
+      console.log("✅ Found auth tokens - preparing to save calendar");
+      
+      // Pass both tokens directly to the server action
+      const response = await saveUserCalendar({
+        name,
+        filters: activeFilters,
+        userId: user.id,
+        accessToken,
+        refreshToken
+      });
+      
+      if (!response) {
+        throw new Error("Failed to save calendar: Server returned empty response");
+      }
+      
+      console.log("✅ Server response:", response);
+      
+      // Update the list of existing names
+      setExistingNames(prev => [...prev, name]);
+      
+      toast({
+        title: "Calendar saved",
+        description: `Your calendar "${name}" has been saved successfully.`,
+      });
+    } catch (error: any) {
+      console.error("Error saving calendar:", error);
+      
+      // Get a more descriptive error message if available
+      const errorMessage = typeof error === 'string' ? error : 
+                          error?.message || 
+                          "An error occurred while saving your calendar. Please try again.";
+      
+      // If it's an authentication error, provide specific guidance
+      if (errorMessage.includes("authentication") || 
+          errorMessage.includes("log in") || 
+          errorMessage.includes("session") ||
+          errorMessage.includes("token")) {
+        toast({
+          title: "Authentication error",
+          description: "Please log out and log in again to refresh your session.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error saving calendar",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
+    }
   };
 
   if (isLoading) {
@@ -627,6 +646,28 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
           </AccordionItem>
         ))}
       </Accordion>
+
+      {/* Save Calendar Button */}
+      {Object.keys(activeFilters).length > 0 && (
+        <div className="mt-6 pt-4 border-t">
+          <Button
+            onClick={openSaveDialog}
+            className="w-full gap-2"
+            variant="default"
+          >
+            <Save className="h-4 w-4" />
+            Save Calendar
+          </Button>
+        </div>
+      )}
+
+      <SaveCalendarDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        filters={activeFilters}
+        onSave={handleSaveCalendar}
+        existingNames={existingNames}
+      />
     </motion.aside>
   )
 }

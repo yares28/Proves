@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Calendar, Eye, Trash2, Clock, MapPin } from "lucide-react"
+import { Calendar, Eye, Trash2, Clock, MapPin, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -13,7 +13,6 @@ import { getExams } from "@/actions/exam-actions"
 import { formatDateString, getAcademicYearForMonth, getCurrentYear } from "@/utils/date-utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase"
 
 // Add a custom window interface
 declare global {
@@ -22,194 +21,19 @@ declare global {
   }
 }
 
-// Direct query function that bypasses the problematic getExams function
-async function fetchExamsDirectly(filters: any) {
-  console.log("DIRECT QUERY: Fetching exams with filters:", filters);
-  
-  // Special problematic subjects that need extra care
-  const SPECIAL_SUBJECTS = ['LTP', 'DCE', 'AVD', 'TIA'];
+// Simplified data fetching function that uses the fixed getExams function
+
+// Simplified data fetching function
+async function fetchCalendarExams(filters: any) {
+  console.log("Fetching exams with filters:", filters);
   
   try {
-    // Start with a base query
-    let query = supabase
-      .from('ETSINF')
-      .select('exam_instance_id, exam_date, exam_time, duration_minutes, code, subject, acronym, degree, year, semester, place, comment, school')
-      .order('exam_date', { ascending: true });
-      
-    // Apply non-subject filters
-    if (filters.school && filters.school.length) {
-      query = query.in('school', filters.school);
-    }
-    
-    if (filters.degree && filters.degree.length) {
-      query = query.in('degree', filters.degree);
-    }
-    
-    if (filters.year && filters.year.length) {
-      const numericYears = filters.year.map((y: string) => parseInt(y, 10));
-      query = query.in('year', numericYears);
-    }
-    
-    if (filters.semester && filters.semester.length) {
-      query = query.in('semester', filters.semester);
-    }
-    
-    console.log("DIRECT QUERY: Executing database query for base filters");
-    // Execute the query without subject filters first to get all potential matches
-    const { data: baseData, error: baseError } = await query;
-    
-    if (baseError) {
-      console.error("Base query error:", baseError);
-      return [];
-    }
-    
-    console.log(`DIRECT QUERY: Found ${baseData.length} exams with base filters`);
-    
-    // Check if any of our problematic subjects are in the filters
-    const hasSpecialSubjects = filters.subject && 
-      filters.subject.some((s: string) => 
-        SPECIAL_SUBJECTS.some(special => 
-          s.includes(`(${special})`) || s.includes(special)));
-    
-    if (hasSpecialSubjects) {
-      console.log("DETECTED SPECIAL SUBJECTS - Using specialized filtering logic");
-      
-      // Log all the acronyms from the database for debugging
-      console.log("Available acronyms in database:", 
-        [...new Set(baseData.map((exam: any) => exam.acronym))].filter(Boolean).sort());
-      
-      // Debug log for LTP, DCE, AVD, TIA subjects in the database
-      SPECIAL_SUBJECTS.forEach(acronym => {
-        const matchingExams = baseData.filter((exam: any) => 
-          exam.acronym === acronym || exam.subject.includes(acronym));
-        console.log(`Exams with ${acronym}:`, matchingExams.length);
-        if (matchingExams.length > 0) {
-          console.log(`Example ${acronym} exam:`, {
-            subject: matchingExams[0].subject,
-            acronym: matchingExams[0].acronym
-          });
-        }
-      });
-    }
-    
-    // If we have subject filters, filter the results in memory
-    if (filters.subject && filters.subject.length) {
-      console.log("DIRECT QUERY: Filtering by subjects in memory:", filters.subject);
-      
-      // Extract just the acronyms from the subjects array for easier matching
-      const subjectAcronyms = filters.subject.map((s: string) => {
-        if (s.includes('(') && s.includes(')')) {
-          const match = s.match(/\(([^)]+)\)/);
-          return match && match[1] ? match[1] : null;
-        }
-        return null;
-      }).filter(Boolean);
-      
-      console.log("Extracted acronyms for matching:", subjectAcronyms);
-      
-      // Filter the results to include only exams that match any of the subjects
-      const filteredData = baseData.filter((exam: any) => {
-        // Special direct acronym matching for problematic subjects
-        if (exam.acronym && subjectAcronyms.includes(exam.acronym)) {
-          console.log(`Direct acronym match found: ${exam.acronym} for subject: ${exam.subject}`);
-          return true;
-        }
-        
-        // If no subjects match, we need to return false
-        if (!filters.subject || filters.subject.length === 0) {
-          return false;
-        }
-        
-        // Check if "Select all" was used - in this case, all 11 subjects would be selected
-        // In that case, we should just return true for any exam that made it through the base filters
-        if (filters.subject.length === 11) {
-          console.log("All subjects selected, bypassing subject filtering");
-          return true;
-        }
-        
-        return filters.subject.some((subject: string) => {
-          // For each subject, check if it matches
-          let searchSubject = subject;
-          let acronymFromFilter = null;
-          
-          // If subject has an acronym in parentheses, extract just the name and acronym
-          if (subject.includes('(') && subject.includes(')')) {
-            searchSubject = subject.split('(')[0].trim();
-            const match = subject.match(/\(([^)]+)\)/);
-            if (match && match[1]) {
-              acronymFromFilter = match[1];
-            }
-          }
-          
-          // Debug log for special subjects
-          if (acronymFromFilter && SPECIAL_SUBJECTS.includes(acronymFromFilter)) {
-            console.log(`Checking special subject: ${subject}`);
-            console.log(`  - Search subject: "${searchSubject}"`);
-            console.log(`  - Acronym from filter: "${acronymFromFilter}"`);
-            console.log(`  - Exam subject: "${exam.subject}"`);
-            console.log(`  - Exam acronym: "${exam.acronym}"`);
-          }
-          
-          // Check if the exam subject contains the search subject
-          const subjectMatches = exam.subject.toLowerCase().includes(searchSubject.toLowerCase());
-          
-          // Or if the acronym matches (if the subject has an acronym in parentheses)
-          let acronymMatches = false;
-          if (acronymFromFilter && exam.acronym) {
-            // For special problematic subjects, do exact matching
-            if (SPECIAL_SUBJECTS.includes(acronymFromFilter)) {
-              acronymMatches = exam.acronym === acronymFromFilter;
-            } else {
-              // For regular subjects, use more flexible matching
-              acronymMatches = exam.acronym.toLowerCase() === acronymFromFilter.toLowerCase();
-            }
-          }
-          
-          const matches = subjectMatches || acronymMatches;
-          
-          // Extra logging for special subjects
-          if (acronymFromFilter && SPECIAL_SUBJECTS.includes(acronymFromFilter)) {
-            console.log(`  - Subject matches: ${subjectMatches}`);
-            console.log(`  - Acronym matches: ${acronymMatches}`);
-            console.log(`  - Final result: ${matches}`);
-          }
-          
-          return matches;
-        });
-      });
-      
-      console.log(`DIRECT QUERY: Found ${filteredData.length} exams after subject filtering`);
-      
-      // Map the data to match the format expected by the frontend
-      return filteredData.map((exam: any) => ({
-        id: exam.exam_instance_id,
-        date: exam.exam_date,
-        time: exam.exam_time,
-        subject: exam.subject,
-        code: exam.code?.toString() || '',
-        location: exam.place || '',
-        year: exam.year?.toString() || '',
-        semester: exam.semester || '',
-        school: exam.school || '',
-        degree: exam.degree || '',
-      }));
-    }
-    
-    // If no subject filters, return all the results mapped to the expected format
-    return baseData.map((exam: any) => ({
-      id: exam.exam_instance_id,
-      date: exam.exam_date,
-      time: exam.exam_time,
-      subject: exam.subject,
-      code: exam.code?.toString() || '',
-      location: exam.place || '',
-      year: exam.year?.toString() || '',
-      semester: exam.semester || '',
-      school: exam.school || '',
-      degree: exam.degree || '',
-    }));
+    // Use the existing getExams function - the filtering issues have been fixed
+    const exams = await getExams(filters);
+    console.log(`Found ${exams.length} exams`);
+    return exams;
   } catch (error) {
-    console.error("Error in direct query:", error);
+    console.error("Error fetching exams:", error);
     return [];
   }
 }
@@ -221,6 +45,7 @@ export default function SavedCalendarsPage() {
   const [loading, setLoading] = useState(true)
   const [selectedCalendar, setSelectedCalendar] = useState<any | null>(null)
   const [calendarData, setCalendarData] = useState<Record<string, any[]>>({})
+  const [loadingCalendar, setLoadingCalendar] = useState<string | null>(null)
   const { toast } = useToast()
 
   // Generate array of months from September to August (academic year)
@@ -264,47 +89,29 @@ export default function SavedCalendarsPage() {
 
     // Set as selected
     setSelectedCalendar(calendar)
+    setLoadingCalendar(calendar.id)
     
-    // Log the calendar object to inspect its filters
     console.log("Selected calendar:", calendar)
     console.log("Saved filters:", calendar.filters)
 
     // Don't fetch again if we already have the data
     if (calendarData[calendar.id]) {
       console.log("Using cached data:", calendarData[calendar.id])
+      setLoadingCalendar(null)
       return
     }
 
     try {
-      // Use direct query approach that completely bypasses filter logic issues
-      console.log("Using direct query approach for more reliable results")
-      const exams = await fetchExamsDirectly(calendar.filters)
+      const exams = await fetchCalendarExams(calendar.filters)
       
-      console.log(`Direct query returned ${exams.length} exams`)
+      console.log(`Fetched ${exams.length} exams for calendar`)
       
       if (exams.length === 0) {
-        // If no exams found, try without subject filters as a fallback
-        console.log("No exams found, trying without subject filters")
-        const baseFilters = {
-          ...calendar.filters,
-          subject: undefined
-        }
-        
-        const baseExams = await fetchExamsDirectly(baseFilters)
-        console.log(`Found ${baseExams.length} exams without subject filters`)
-        
-        if (baseExams.length > 0) {
-          setCalendarData(prev => ({
-            ...prev,
-            [calendar.id]: baseExams
-          }))
-          
-          toast({
-            title: "Filter adjustment",
-            description: "Subject filters were too restrictive. Showing all matching exams.",
-          })
-          return
-        }
+        toast({
+          title: "No exams found",
+          description: "No exams match the saved filters for this calendar.",
+          variant: "default",
+        })
       }
       
       setCalendarData(prev => ({
@@ -318,6 +125,8 @@ export default function SavedCalendarsPage() {
         description: "There was an error loading the calendar data.",
         variant: "destructive",
       })
+    } finally {
+      setLoadingCalendar(null)
     }
   }
 
@@ -331,6 +140,13 @@ export default function SavedCalendarsPage() {
       if (selectedCalendar?.id === id) {
         setSelectedCalendar(null)
       }
+      
+      // Remove from calendar data cache
+      setCalendarData(prev => {
+        const newData = { ...prev }
+        delete newData[id]
+        return newData
+      })
       
       setCalendars(calendars.filter(cal => cal.id !== id))
       toast({
@@ -349,28 +165,21 @@ export default function SavedCalendarsPage() {
 
   // Helper function to check if a month has exams
   function monthHasExams(monthName: string, exams: any[]) {
+    if (!exams || exams.length === 0) return false
+    
     const monthIndex = getMonthIndex(monthName)
     
-    // Check if there are any exams for this month
-    const hasExams = exams.some(exam => {
-      // Log a few examples to debug date parsing
-      if (monthName === academicMonths[0] && !window._didLogExamDate) {
-        console.log("Example exam date:", exam.date);
-        console.log("Parsed date:", new Date(exam.date));
-        console.log("Month from parsed date:", new Date(exam.date).getMonth() + 1);
-        console.log("Expected month index:", monthIndex);
-        window._didLogExamDate = true;
-      }
+    return exams.some(exam => {
+      if (!exam.date) return false
       
+      // Parse the exam date
       const examDate = new Date(exam.date)
-      return examDate.getMonth() + 1 === monthIndex
+      if (isNaN(examDate.getTime())) return false
+      
+      // Get month (1-12)
+      const examMonth = examDate.getMonth() + 1
+      return examMonth === monthIndex
     })
-    
-    if (monthName === academicMonths[0]) {
-      console.log(`Month ${monthName} (index ${monthIndex}) has exams: ${hasExams}`);
-    }
-    
-    return hasExams
   }
 
   // Helper to get month index (1-12)
@@ -385,16 +194,25 @@ export default function SavedCalendarsPage() {
 
   // Get exams for a specific day
   function getExamsForDay(year: number, month: number, day: number, exams: any[]) {
-    const dateString = formatDateString(year, month, day)
-    return exams.filter(exam => exam.date === dateString)
+    const targetDate = new Date(year, month - 1, day)
+    const targetDateString = targetDate.toISOString().split('T')[0]
+    
+    return exams.filter(exam => {
+      if (!exam.date) return false
+      
+      // Normalize the exam date to YYYY-MM-DD format
+      const examDate = new Date(exam.date)
+      if (isNaN(examDate.getTime())) return false
+      
+      const examDateString = examDate.toISOString().split('T')[0]
+      return examDateString === targetDateString
+    })
   }
 
   // Generate calendar days for a month
   function generateCalendarDays(monthName: string, exams: any[]) {
     const monthIndex = getMonthIndex(monthName)
     const year = getAcademicYearForMonth(monthIndex)
-    
-    console.log(`Generating calendar for ${monthName} ${year} (month index: ${monthIndex})`);
     
     // Get first day of month and number of days
     const firstDay = new Date(year, monthIndex - 1, 1)
@@ -467,31 +285,42 @@ export default function SavedCalendarsPage() {
           </Button>
         </div>
       ) : (
-        <div className="space-y-10">
+        <div className="space-y-8">
           {/* Calendar Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {calendars.map((calendar) => (
-              <Card key={calendar.id} className={`overflow-hidden border-2 hover:shadow-md transition-all ${selectedCalendar?.id === calendar.id ? 'ring-2 ring-primary' : ''}`}>
+              <Card key={calendar.id} className={`overflow-hidden border-2 hover:shadow-md transition-all cursor-pointer ${selectedCalendar?.id === calendar.id ? 'ring-2 ring-primary' : ''}`}>
                 <CardContent className="p-0">
                   <div className="flex flex-col h-[200px]">
                     <div className="flex-1 flex items-center justify-center p-6">
-                      <h3 className="text-lg font-medium text-center">{calendar.name}</h3>
+                      <h3 className="text-lg font-medium text-center line-clamp-3">{calendar.name}</h3>
                     </div>
                     <div className="bg-muted/30 p-3 flex justify-between items-center">
                       <Button
                         variant="ghost"
                         size="sm"
                         className="text-destructive hover:text-destructive/80"
-                        onClick={() => handleDeleteCalendar(calendar.id)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteCalendar(calendar.id)
+                        }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => handleViewCalendar(calendar)}
+                        disabled={loadingCalendar === calendar.id}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleViewCalendar(calendar)
+                        }}
                       >
-                        <Eye className="h-4 w-4 mr-2" />
+                        {loadingCalendar === calendar.id ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Eye className="h-4 w-4 mr-2" />
+                        )}
                         {selectedCalendar?.id === calendar.id ? "Hide" : "View"}
                       </Button>
                     </div>
@@ -503,8 +332,8 @@ export default function SavedCalendarsPage() {
 
           {/* Calendar View Section */}
           {selectedCalendar && (
-            <div className="bg-background rounded-lg border shadow-sm p-6 mt-8">
-              <div className="flex justify-between items-center mb-6">
+            <div className="bg-background rounded-lg border shadow-sm p-6">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
                 <h4 className="text-xl font-medium">Academic Calendar: {selectedCalendar.name}</h4>
                 <Button 
                   variant="outline" 
@@ -515,119 +344,161 @@ export default function SavedCalendarsPage() {
                 </Button>
               </div>
               
-              {/* Show only months with exams in a 3-column grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <TooltipProvider>
-                  {academicMonths.map((month) => {
-                    const exams = calendarData[selectedCalendar.id] || []
-                    const hasExams = monthHasExams(month, exams)
-                    
-                    // Skip months without exams
-                    if (!hasExams) return null
-                    
-                    const calendarDays = generateCalendarDays(month, exams)
-                    const monthIndex = getMonthIndex(month)
-                    const year = getAcademicYearForMonth(monthIndex)
-                    
-                    return (
-                      <div key={month} className="border rounded-lg shadow-sm overflow-hidden">
-                        <div className="bg-muted/30 py-2 px-4">
-                          <h5 className="text-md font-medium text-center">{month}</h5>
-                        </div>
+              {loadingCalendar === selectedCalendar.id ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin mr-2" />
+                  <span className="text-muted-foreground">Loading calendar data...</span>
+                </div>
+              ) : (
+                <>
+                  {/* Show calendar data summary */}
+                  {calendarData[selectedCalendar.id] && (
+                    <div className="mb-6 p-4 bg-muted/30 rounded-lg">
+                      <p className="text-sm text-muted-foreground">
+                        Found <strong>{calendarData[selectedCalendar.id].length}</strong> exams in this calendar
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Show only months with exams in a responsive grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <TooltipProvider>
+                      {academicMonths.map((month) => {
+                        const exams = calendarData[selectedCalendar.id] || []
+                        const hasExams = monthHasExams(month, exams)
                         
-                        {/* Calendar Grid */}
-                        <div className="p-2">
-                          <div className="grid grid-cols-7 gap-0.5 text-center text-xs">
-                            {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(day => (
-                              <div key={day} className="font-medium py-1">
-                                {day}
-                              </div>
-                            ))}
+                        // Skip months without exams
+                        if (!hasExams) return null
+                        
+                        const calendarDays = generateCalendarDays(month, exams)
+                        const monthIndex = getMonthIndex(month)
+                        const year = getAcademicYearForMonth(monthIndex)
+                        
+                        return (
+                          <div key={month} className="border rounded-lg shadow-sm overflow-hidden bg-card">
+                            <div className="bg-muted/50 py-3 px-4 border-b">
+                              <h5 className="text-sm font-semibold text-center">{month} {year}</h5>
+                            </div>
                             
-                            {/* Calendar days */}
-                            {calendarDays.map((dayData, index) => {
-                              const dayHasExam = dayData.exams.length > 0
-                              
-                              return dayData.day ? (
-                                <Tooltip key={`${month}-${dayData.day}`} delayDuration={150}>
-                                  <TooltipTrigger asChild>
-                                    <div 
-                                      className={`
-                                        relative p-1.5 rounded-sm
-                                        ${!dayData.day ? 'bg-muted/30' : 'hover:bg-muted hover:cursor-pointer'}
-                                        ${dayHasExam ? 'bg-primary/10 text-primary font-medium' : ''}
-                                      `}
-                                    >
-                                      {dayData.day}
-                                      {dayHasExam && (
-                                        <span className="absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-primary"></span>
-                                      )}
-                                    </div>
-                                  </TooltipTrigger>
-                                  {dayHasExam && (
-                                    <TooltipContent 
-                                      side="top" 
-                                      align="center" 
-                                      className="w-64 p-0 max-h-80 overflow-y-auto" 
-                                      sideOffset={5}
-                                    >
-                                      <div className="bg-primary/10 px-3 py-2 text-xs font-medium border-b">
-                                        <div className="flex justify-between items-center">
-                                          <span>{month} {dayData.day}, {year}</span>
-                                          <span className="bg-primary/20 px-1.5 py-0.5 rounded text-[10px]">
-                                            {dayData.exams.length} exam{dayData.exams.length !== 1 ? 's' : ''}
-                                          </span>
+                            {/* Calendar Grid */}
+                            <div className="p-3">
+                              <div className="grid grid-cols-7 gap-1 text-center text-xs">
+                                {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(day => (
+                                  <div key={day} className="font-medium py-2 text-muted-foreground">
+                                    {day}
+                                  </div>
+                                ))}
+                                
+                                {/* Calendar days */}
+                                {calendarDays.map((dayData, index) => {
+                                  const dayHasExam = dayData.exams.length > 0
+                                  
+                                  return dayData.day ? (
+                                    <Tooltip key={`${month}-${dayData.day}`} delayDuration={300}>
+                                      <TooltipTrigger asChild>
+                                        <div 
+                                          className={`
+                                            relative p-2 rounded-md text-sm min-h-[32px] flex items-center justify-center
+                                            ${dayHasExam 
+                                              ? 'bg-primary/15 text-primary font-medium border border-primary/30 hover:bg-primary/25' 
+                                              : 'hover:bg-muted/50'
+                                            }
+                                            transition-colors cursor-pointer
+                                          `}
+                                        >
+                                          {dayData.day}
+                                          {dayHasExam && (
+                                            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary"></span>
+                                          )}
                                         </div>
-                                      </div>
-                                      <div className="p-2 space-y-2 max-h-64 overflow-y-auto">
-                                        {dayData.exams.map((exam: any) => (
-                                          <div 
-                                            key={exam.id}
-                                            className="bg-card p-2 rounded-sm border text-xs"
-                                          >
-                                            <div className="font-medium mb-1">{exam.subject}</div>
-                                            <div className="flex items-center gap-2 text-muted-foreground mb-1.5">
-                                              <span className="flex items-center gap-1">
-                                                <Clock className="h-3 w-3" />
-                                                {exam.time}
-                                              </span>
-                                              <span className="flex items-center gap-1">
-                                                <MapPin className="h-3 w-3" />
-                                                {exam.location || 'No location'}
-                                              </span>
-                                            </div>
-                                            <div className="flex flex-wrap gap-1">
-                                              {exam.school && (
-                                                <Badge variant="outline" className="text-[10px] h-4">
-                                                  {exam.school}
-                                                </Badge>
-                                              )}
-                                              {exam.degree && (
-                                                <Badge variant="outline" className="text-[10px] h-4">
-                                                  {exam.degree}
-                                                </Badge>
-                                              )}
+                                      </TooltipTrigger>
+                                      {dayHasExam && (
+                                        <TooltipContent 
+                                          side="top" 
+                                          align="center" 
+                                          className="w-72 p-0 max-h-80 overflow-hidden" 
+                                          sideOffset={8}
+                                        >
+                                          <div className="bg-primary/10 px-4 py-3 text-sm font-medium border-b">
+                                            <div className="flex justify-between items-center">
+                                              <span>{month} {dayData.day}, {year}</span>
+                                              <Badge variant="secondary" className="text-xs">
+                                                {dayData.exams.length} exam{dayData.exams.length !== 1 ? 's' : ''}
+                                              </Badge>
                                             </div>
                                           </div>
-                                        ))}
-                                      </div>
-                                    </TooltipContent>
-                                  )}
-                                </Tooltip>
-                              ) : (
-                                <div 
-                                  key={`${month}-empty-${index}`}
-                                  className="bg-muted/30 p-1.5 rounded-sm"
-                                ></div>
-                              )
-                            })}
+                                          <div className="p-3 space-y-3 max-h-64 overflow-y-auto">
+                                            {dayData.exams.map((exam: any) => (
+                                              <div 
+                                                key={exam.id}
+                                                className="bg-card p-3 rounded-md border text-sm space-y-2"
+                                              >
+                                                <div className="font-semibold text-foreground">{exam.subject}</div>
+                                                <div className="flex items-center gap-3 text-muted-foreground text-xs">
+                                                  <span className="flex items-center gap-1">
+                                                    <Clock className="h-3 w-3" />
+                                                    {exam.time || 'No time set'}
+                                                  </span>
+                                                  <span className="flex items-center gap-1">
+                                                    <MapPin className="h-3 w-3" />
+                                                    {exam.location || 'No location'}
+                                                  </span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-1">
+                                                  {exam.school && (
+                                                    <Badge variant="outline" className="text-xs">
+                                                      {exam.school}
+                                                    </Badge>
+                                                  )}
+                                                  {exam.degree && (
+                                                    <Badge variant="outline" className="text-xs">
+                                                      {exam.degree}
+                                                    </Badge>
+                                                  )}
+                                                  {exam.year && (
+                                                    <Badge variant="outline" className="text-xs">
+                                                      Year {exam.year}
+                                                    </Badge>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </TooltipContent>
+                                      )}
+                                    </Tooltip>
+                                  ) : (
+                                    <div 
+                                      key={`${month}-empty-${index}`}
+                                      className="p-2 min-h-[32px]"
+                                    ></div>
+                                  )
+                                })}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </TooltipProvider>
-              </div>
+                        )
+                      })}
+                    </TooltipProvider>
+                  </div>
+                  
+                  {/* Show message if no months have exams */}
+                  {calendarData[selectedCalendar.id] && 
+                   calendarData[selectedCalendar.id].length > 0 && 
+                   !academicMonths.some(month => monthHasExams(month, calendarData[selectedCalendar.id])) && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p>No exam dates found for the current academic year.</p>
+                    </div>
+                  )}
+                  
+                  {/* Show message if no exams at all */}
+                  {calendarData[selectedCalendar.id] && calendarData[selectedCalendar.id].length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p>No exams found matching the saved filters.</p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
         </div>
