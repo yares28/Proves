@@ -164,7 +164,7 @@ export async function getExams(filters: ExamFilters = {}) {
       }
     }
     
-    // Subject filter (most specific - using our text search index)
+    // Subject filter (most specific - using improved matching strategy)
     if (filters.subject) {
       const subjects = Array.isArray(filters.subject) ? filters.subject : [filters.subject];
       console.log('Filtering by subjects:', subjects);
@@ -172,27 +172,67 @@ export async function getExams(filters: ExamFilters = {}) {
       if (subjects.length === 1) {
         const subject = subjects[0];
         
-        // Extract just the subject name if it contains an acronym in parentheses
-        let searchTerm = subject;
-        if (subject.includes('(')) {
-          searchTerm = subject.split('(')[0].trim();
+        // Check if subject has an acronym in parentheses
+        if (subject.includes('(') && subject.includes(')')) {
+          // Extract the acronym from the parentheses
+          const match = subject.match(/\(([^)]+)\)/);
+          if (match && match[1]) {
+            const acronym = match[1];
+            // Use exact acronym matching for better precision
+            query = query.eq('acronym', acronym);
+            console.log(`Using exact acronym match for: "${acronym}"`);
+          } else {
+            // Fallback to subject name if acronym extraction fails
+            const subjectName = subject.split('(')[0].trim();
+            query = query.ilike('subject', `%${subjectName}%`);
+            console.log(`Using subject name search: "%${subjectName}%"`);
+          }
+        } else {
+          // No acronym present, use subject name
+          query = query.ilike('subject', `%${subject}%`);
+          console.log(`Using subject name search: "%${subject}%"`);
+        }
+      } else if (subjects.length > 1) {
+        // For multiple subjects, use PostgREST's array syntax for OR conditions
+        const acronyms = [];
+        const subjectNames = [];
+        
+        for (const subject of subjects) {
+          if (subject.includes('(') && subject.includes(')')) {
+            // Extract acronym and use exact matching
+            const match = subject.match(/\(([^)]+)\)/);
+            if (match && match[1]) {
+              const acronym = match[1];
+              acronyms.push(acronym);
+            } else {
+              // Fallback to subject name
+              const subjectName = subject.split('(')[0].trim();
+              subjectNames.push(subjectName);
+            }
+          } else {
+            // No acronym, use subject name
+            subjectNames.push(subject);
+          }
         }
         
-        // Use ilike for partial matches which can use our index
-        query = query.ilike('subject', `%${searchTerm}%`);
-        console.log(`Using ilike for subject search: "%${searchTerm}%"`);
-      } else if (subjects.length > 1) {
-        // For multiple subjects, use a more complex approach
-        const conditions = subjects.map(subject => {
-          let searchTerm = subject;
-          if (subject.includes('(')) {
-            searchTerm = subject.split('(')[0].trim();
-          }
-          return `subject.ilike.%${searchTerm}%`;
-        });
-        
-        query = query.or(conditions.join(','));
-        console.log(`Using OR conditions for subjects:`, conditions);
+        // Handle acronym-based filtering with .in() for better performance and reliability
+        if (acronyms.length > 0 && subjectNames.length === 0) {
+          // Only acronyms - use simple .in() operation
+          query = query.in('acronym', acronyms);
+          console.log(`Using IN operation for acronyms:`, acronyms);
+        } else if (acronyms.length === 0 && subjectNames.length > 0) {
+          // Only subject names - build OR conditions for ilike operations
+          const conditions = subjectNames.map(name => `subject.ilike.%${name}%`);
+          query = query.or(conditions.join(','));
+          console.log(`Using OR conditions for subject names:`, conditions);
+        } else if (acronyms.length > 0 && subjectNames.length > 0) {
+          // Mixed - need to combine acronym exact matches with subject name searches
+          const acronymConditions = acronyms.map(acronym => `acronym.eq.${encodeURIComponent(acronym)}`);
+          const nameConditions = subjectNames.map(name => `subject.ilike.%${name}%`);
+          const allConditions = [...acronymConditions, ...nameConditions];
+          query = query.or(allConditions.join(','));
+          console.log(`Using OR conditions for mixed subjects:`, allConditions);
+        }
       }
     }
     

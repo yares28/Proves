@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu"
-import { Calendar, Loader2 } from "lucide-react"
+import { Calendar, Loader2, Settings } from "lucide-react"
 
 export function UserButton() {
   const router = useRouter()
@@ -62,6 +62,16 @@ export function UserButton() {
             </a>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
+            <a 
+              href="/auth-status"
+              className="flex w-full items-center px-2 py-1.5 text-sm cursor-pointer"
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              Auth Status
+            </a>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
             <Button 
               variant="ghost" 
               className="w-full justify-start cursor-pointer"
@@ -75,17 +85,38 @@ export function UserButton() {
     )
   }
 
-  // If user is not logged in, show the login button
+  // If user is not logged in, show the login button with debug option
   return (
     <>
-      <Button 
-        variant="ghost" 
-        size="icon" 
-        onClick={() => setShowAuthDialog(true)}
-        className="rounded-full"
-      >
-        <Icons.user className="h-5 w-5" />
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="rounded-full">
+            <Icons.user className="h-5 w-5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start cursor-pointer"
+              onClick={() => setShowAuthDialog(true)}
+            >
+              <Icons.user className="mr-2 h-4 w-4" />
+              Sign In
+            </Button>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <a 
+              href="/auth-status"
+              className="flex w-full items-center px-2 py-1.5 text-sm cursor-pointer"
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              Debug Auth Issues
+            </a>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <AuthDialog 
         open={showAuthDialog} 
         onOpenChange={setShowAuthDialog} 

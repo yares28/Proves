@@ -24,12 +24,31 @@ public class Exam {
     @Column(name = "semester")
     private String semester;
 
-    @Column(name = "date")
+    @Column(name = "exam_date")
     private LocalDateTime date;
 
-    @Column(name = "room")
+    @Column(name = "place")
     private String room;
 
     @Column(name = "school")
     private String school;
+
+    // Additional fields that might exist in the ETSINF table
+    @Column(name = "exam_instance_id")
+    private String examInstanceId;
+
+    @Column(name = "exam_time")
+    private String examTime;
+
+    @Column(name = "code")
+    private String code;
+
+    @Column(name = "acronym")
+    private String acronym;
+
+    @Column(name = "duration_minutes")
+    private Integer durationMinutes;
+
+    @Column(name = "comment")
+    private String comment;
 }
