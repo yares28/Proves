@@ -1,43 +1,12 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState } from "react"
-import { createClient } from "@supabase/supabase-js"
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react"
+import { createClient } from "@/utils/supabase/client"
 import { useRouter } from "next/navigation"
-import { syncAuthState as syncTokenState } from "@/lib/auth/token-manager"
+import type { User } from "@supabase/supabase-js"
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      // Set session expiry to 30 days (in seconds)
-      storage: {
-        getItem: (key) => {
-          if (typeof window === "undefined") return null;
-          return window.localStorage.getItem(key);
-        },
-        setItem: (key, value) => {
-          if (typeof window === "undefined") return;
-          window.localStorage.setItem(key, value);
-        },
-        removeItem: (key) => {
-          if (typeof window === "undefined") return;
-          window.localStorage.removeItem(key);
-        }
-      }
-    }
-  }
-)
-
-type User = {
-  id: string
-  email?: string
-  user_metadata?: {
-    full_name?: string
-  }
-}
+// Use the SSR-compatible client
+const supabase = createClient()
 
 interface AuthContextProps {
   user: User | null
@@ -45,8 +14,9 @@ interface AuthContextProps {
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>
   signIn: (email: string, password: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
-  signInWithProvider: (provider: "google" | "github" | "facebook") => Promise<void>
+  signInWithProvider: (provider: "google") => Promise<void>
   syncToken: () => Promise<boolean>
+  refreshSession: () => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined)
@@ -55,166 +25,304 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        setUser(session.user as User)
-        
-        // Store session in localStorage when auth state changes
-        if (typeof window !== "undefined") {
-          localStorage.setItem('supabase.auth.token', JSON.stringify({
-            currentSession: session
-          }));
-          console.log('Session updated in localStorage on auth state change');
-        }
-      } else {
-        setUser(null)
+  // Enhanced session refresh with exponential backoff
+  const refreshSession = useCallback(async (): Promise<boolean> => {
+    try {
+      console.log('🔄 Refreshing auth session...')
+      const { data: { session }, error } = await supabase.auth.refreshSession()
+      
+      if (error) {
+        console.error('❌ Session refresh failed:', error.message)
+        return false
       }
-      setLoading(false)
-    })
-
-    // Initial session check
-    checkSession()
-
-    return () => {
-      subscription.unsubscribe()
+      
+      if (session?.user) {
+        console.log('✅ Session refresh successful')
+        setUser(session.user)
+        return true
+      }
+      
+      return false
+    } catch (error) {
+      console.error('❌ Unexpected refresh error:', error)
+      return false
     }
   }, [])
 
-  async function checkSession() {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session?.user) {
-      setUser(session.user as User)
+  // Schedule automatic token refresh
+  const scheduleTokenRefresh = useCallback((expiresAt: number) => {
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current)
+    }
+    
+    // Refresh 5 minutes before expiration
+    const refreshTime = (expiresAt * 1000) - Date.now() - (5 * 60 * 1000)
+    
+    if (refreshTime > 0) {
+      refreshTimeoutRef.current = setTimeout(async () => {
+        console.log('⏰ Auto-refreshing session...')
+        await refreshSession()
+      }, refreshTime)
+    }
+  }, [refreshSession])
+
+  // Clear authentication data
+  const clearAuthData = useCallback(async () => {
+    try {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current)
+        refreshTimeoutRef.current = null
+      }
       
-      // Ensure the session is properly stored in localStorage
+      // Clear localStorage data
       if (typeof window !== "undefined") {
-        const storedToken = localStorage.getItem('supabase.auth.token');
-        if (!storedToken || storedToken === 'true') {
-          localStorage.setItem('supabase.auth.token', JSON.stringify({
-            currentSession: session
-          }));
-          console.log('Session properly stored in localStorage during checkSession');
+        localStorage.removeItem('supabase.auth.token')
+        localStorage.removeItem('oauth_provider_token')
+        localStorage.removeItem('oauth_provider_refresh_token')
+      }
+    } catch (error) {
+      console.error('❌ Error clearing auth data:', error)
+    }
+  }, [])
+
+  const signInWithProvider = useCallback(async (provider: "google") => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          // Use PKCE flow with our application's callback route
+          redirectTo: `${window.location.origin}/auth/callback`,
+          // Add proper Google scopes for better compatibility
+          scopes: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid',
+          // Request refresh token for Google
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      })
+
+      if (error) {
+        console.error('❌ Provider sign-in error:', error)
+        throw error
+      }
+
+      // For PKCE flow, signInWithOAuth returns a URL to redirect to
+      if (data?.url) {
+        console.log('🔄 Redirecting to provider...')
+        window.location.href = data.url
+      }
+    } catch (error: any) {
+      console.error('❌ Sign-in with provider failed:', error)
+      throw error
+    }
+  }, [supabase.auth])
+
+  useEffect(() => {
+    let mounted = true
+    console.log('🔄 Setting up auth state listener')
+
+    // Enhanced auth state listener with provider token handling
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔄 Auth state changed:', event)
+      
+      if (!mounted) return
+
+      if (event === 'SIGNED_IN' && session) {
+        setUser(session.user)
+        
+        // Handle OAuth provider tokens
+        if (session.provider_token) {
+          console.log('✅ Provider token received, storing...')
+          localStorage.setItem('oauth_provider_token', session.provider_token)
+        }
+        
+        if (session.provider_refresh_token) {
+          localStorage.setItem('oauth_provider_refresh_token', session.provider_refresh_token)
+        }
+        
+        // Schedule automatic refresh
+        if (session.expires_at) {
+          scheduleTokenRefresh(session.expires_at)
+        }
+        
+        console.log('✅ User signed in:', session.user.email)
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null)
+        
+        // Clear stored provider tokens
+        localStorage.removeItem('oauth_provider_token')
+        localStorage.removeItem('oauth_provider_refresh_token')
+        
+        // Clear refresh timeout
+        if (refreshTimeoutRef.current) {
+          clearTimeout(refreshTimeoutRef.current)
+          refreshTimeoutRef.current = null
+        }
+        
+        console.log('✅ User signed out')
+      } else if (event === 'TOKEN_REFRESHED' && session) {
+        setUser(session.user)
+        console.log('✅ Token refreshed')
+        
+        // Update stored provider tokens if refreshed
+        if (session.provider_token) {
+          localStorage.setItem('oauth_provider_token', session.provider_token)
+        }
+        
+        if (session.provider_refresh_token) {
+          localStorage.setItem('oauth_provider_refresh_token', session.provider_refresh_token)
+        }
+      }
+      
+      setLoading(false)
+    })
+
+    // Initial session check with retry logic
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('❌ Error getting initial session:', error.message)
+          
+          // If it's a refresh token error, try to recover
+          if (error.message.includes('refresh_token_not_found') || 
+              error.message.includes('Invalid Refresh Token')) {
+            console.log('🔄 Attempting session recovery...')
+            const recovered = await refreshSession()
+            if (!recovered) {
+              await clearAuthData()
+              setUser(null)
+            }
+          } else {
+            setUser(null)
+          }
+        } else if (session?.user) {
+          setUser(session.user)
+          // Schedule automatic refresh for existing session
+          if (session.expires_at) {
+            scheduleTokenRefresh(session.expires_at)
+          }
+        } else {
+          setUser(null)
+        }
+      } catch (error) {
+        console.error('❌ Unexpected error during auth initialization:', error)
+        setUser(null)
+      } finally {
+        if (mounted) {
+          setLoading(false)
         }
       }
     }
-    setLoading(false)
-  }
+
+    initializeAuth()
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+      // Clear timeout on cleanup
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current)
+      }
+    }
+  }, [supabase.auth, refreshSession, clearAuthData, scheduleTokenRefresh])
+
+  // Cross-tab session synchronization
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key?.startsWith('sb-') && e.newValue !== e.oldValue) {
+        console.log('🔄 Auth state changed in another tab, syncing...')
+        // Trigger a session check when auth changes in another tab
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          setUser(session?.user ?? null)
+        })
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [])
 
   async function signUp(email: string, password: string, fullName: string) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
         },
-      },
-    })
-    
-    if (!error && data.session) {
-      localStorage.setItem('supabase.auth.token', JSON.stringify({
-        currentSession: data.session
-      }));
-      console.log('Session stored in localStorage after signup');
+      })
+      
+      return { error }
+    } catch (error) {
+      console.error('❌ Signup error:', error)
+      return { error }
     }
-    
-    return { error }
   }
 
   async function signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    })
-    
-    if (!error && data?.session) {
-      console.log('Sign-in successful, persisting session');
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
       
-      // Store the actual session object instead of just 'true'
-      localStorage.setItem('supabase.auth.token', JSON.stringify({
-        currentSession: data.session
-      }));
-      
-      // Set consistent cookie format for server-side auth
-      try {
-        // Get the base URL without protocol
-        const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/^https?:\/\//, '');
-        const domain = window.location.hostname;
-        
-        // Set cookies that server can recognize
-        document.cookie = `sb-access-token=${data.session.access_token}; path=/; domain=${domain}; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-        document.cookie = `sb-refresh-token=${data.session.refresh_token}; path=/; domain=${domain}; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-        document.cookie = `sb:token=${data.session.access_token}; path=/; domain=${domain}; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-        document.cookie = `sb-${baseUrl}-auth-token=${JSON.stringify(data.session)}; path=/; domain=${domain}; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-        
-        // Force a session refresh to ensure cookies are properly set
-        await supabase.auth.refreshSession();
-        
-        console.log('Authentication cookies set successfully');
-      } catch (e) {
-        console.error('Error setting auth cookies:', e);
+      if (error) {
+        console.error('❌ Sign in error:', error.message)
+        return { error }
       }
       
-      // Also update the user state
-      setUser(data.session.user as User);
+      console.log('✅ Sign in successful')
+      return { error: null }
+    } catch (error) {
+      console.error('❌ Unexpected sign in error:', error)
+      return { error }
     }
-    
-    return { error }
   }
 
   async function signOut() {
-    await supabase.auth.signOut()
-    // Clear manual storage items
-    if (typeof window !== "undefined") {
-      localStorage.removeItem('supabase.auth.token');
-    }
-    router.push("/")
-  }
-
-  async function signInWithProvider(provider: "google" | "github" | "facebook") {
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}`
-      }
-    })
-  }
-
-  // Add a utility function to synchronize auth state
-  async function syncAuthState() {
     try {
-      const { data } = await supabase.auth.getSession();
-      
-      if (data?.session) {
-        // Ensure localStorage has the correct token format
-        localStorage.setItem('supabase.auth.token', JSON.stringify({
-          currentSession: data.session
-        }));
-        
-        // Update cookies as well
-        const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/^https?:\/\//, '');
-        const domain = window.location.hostname;
-        
-        document.cookie = `sb-access-token=${data.session.access_token}; path=/; domain=${domain}; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-        document.cookie = `sb-refresh-token=${data.session.refresh_token}; path=/; domain=${domain}; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-        document.cookie = `sb:token=${data.session.access_token}; path=/; domain=${domain}; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-        document.cookie = `sb-${baseUrl}-auth-token=${JSON.stringify(data.session)}; path=/; domain=${domain}; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-        
-        return true;
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('❌ Sign out error:', error.message)
       }
-      return false;
+      
+      await clearAuthData()
+      router.push("/")
     } catch (error) {
-      console.error("Error synchronizing auth state:", error);
-      return false;
+      console.error('❌ Unexpected sign out error:', error)
     }
   }
 
-  // Function to manually sync token state before operations that need auth
-  async function syncToken() {
-    return await syncTokenState();
+  // Simplified sync token function
+  async function syncToken(): Promise<boolean> {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
+      if (error) {
+        console.error('❌ Token sync error:', error.message)
+        
+        // Try to recover from refresh token errors
+        if (error.message.includes('refresh_token_not_found') || 
+            error.message.includes('Invalid Refresh Token')) {
+          return await refreshSession()
+        }
+        return false
+      }
+      
+      return !!session
+    } catch (error) {
+      console.error('❌ Unexpected token sync error:', error)
+      return false
+    }
   }
 
   const value = {
@@ -224,10 +332,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signIn,
     signOut,
     signInWithProvider,
-    syncToken
+    syncToken,
+    refreshSession
   }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export const useAuth = () => {

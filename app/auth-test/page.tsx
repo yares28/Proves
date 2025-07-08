@@ -6,14 +6,15 @@ import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, CheckCircle2 } from "lucide-react"
+import { AlertCircle, CheckCircle2, RefreshCw } from "lucide-react"
 import { saveUserCalendar } from "@/actions/user-calendars"
-import { extractTokensFromStorage } from "@/lib/auth/token-manager"
+import { getCurrentSession } from "@/utils/auth-helpers"
 
 export default function AuthTestPage() {
-  const { user, syncToken } = useAuth()
+  const { user, syncToken, refreshSession } = useAuth()
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   const runSaveTest = async () => {
     setIsLoading(true)
@@ -21,16 +22,25 @@ export default function AuthTestPage() {
     
     try {
       // First, sync auth tokens to ensure fresh state
-      console.log("⏳ Synchronizing auth tokens...");
-      await syncToken();
+      console.log("⏳ Sincronizando tokens de autenticación...");
+      const syncSuccess = await syncToken();
       
-      // Get auth tokens using the token manager
-      const { accessToken, refreshToken } = extractTokensFromStorage();
-      
-      if (!accessToken || !refreshToken) {
+      if (!syncSuccess) {
         setTestResult({
           success: false,
-          message: "Failed to extract tokens from localStorage. Please log in again."
+          message: "Error al sincronizar tokens. Por favor inicia sesión nuevamente."
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      // Get current session
+      const session = await getCurrentSession();
+      
+      if (!session?.access_token) {
+        setTestResult({
+          success: false,
+          message: "No se encontró token de acceso válido. Por favor inicia sesión."
         });
         setIsLoading(false);
         return;
@@ -39,7 +49,7 @@ export default function AuthTestPage() {
       if (!user?.id) {
         setTestResult({
           success: false,
-          message: "No user ID found. Please log in."
+          message: "No se encontró ID de usuario. Por favor inicia sesión."
         });
         setIsLoading(false);
         return;
@@ -50,16 +60,16 @@ export default function AuthTestPage() {
         name: `Test Calendar ${new Date().toISOString()}`,
         filters: { test: ["true"] },
         userId: user.id,
-        accessToken,
-        refreshToken
+        accessToken: session.access_token,
+        refreshToken: session.refresh_token
       });
       
       setTestResult({
         success: true,
-        message: `Calendar saved successfully! Response: ${JSON.stringify(response)}`
+        message: `¡Calendario guardado exitosamente! Respuesta: ${JSON.stringify(response)}`
       });
     } catch (error) {
-      console.error("Save test error:", error);
+      console.error("Error en prueba de guardado:", error);
       setTestResult({
         success: false,
         message: error instanceof Error ? error.message : String(error)
@@ -69,11 +79,36 @@ export default function AuthTestPage() {
     }
   };
 
+  const handleRefreshSession = async () => {
+    setIsRefreshing(true)
+    try {
+      const success = await refreshSession()
+      if (success) {
+        setTestResult({
+          success: true,
+          message: "Sesión actualizada exitosamente"
+        })
+      } else {
+        setTestResult({
+          success: false,
+          message: "Error al actualizar la sesión"
+        })
+      }
+    } catch (error) {
+      setTestResult({
+        success: false,
+        message: "Error inesperado al actualizar la sesión"
+      })
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
   return (
     <div className="container py-8 space-y-8">
-      <h1 className="text-3xl font-bold">Authentication Test Page</h1>
+      <h1 className="text-3xl font-bold">Página de Prueba de Autenticación</h1>
       <p className="text-muted-foreground">
-        This page helps diagnose authentication issues with server actions.
+        Esta página ayuda a diagnosticar problemas de autenticación con acciones del servidor.
       </p>
       
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -84,24 +119,34 @@ export default function AuthTestPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Test Calendar Save</CardTitle>
+              <CardTitle>Prueba de Guardado de Calendario</CardTitle>
               <CardDescription>
-                Tests the token-based authentication flow for saving calendars
+                Prueba el flujo de autenticación basado en tokens para guardar calendarios
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
+              <div className="space-y-2">
                 <Button 
                   onClick={runSaveTest} 
                   disabled={isLoading || !user}
                   className="w-full"
                 >
-                  {isLoading ? "Testing..." : "Run Save Test"}
+                  {isLoading ? "Probando..." : "Ejecutar Prueba de Guardado"}
+                </Button>
+                
+                <Button 
+                  onClick={handleRefreshSession} 
+                  disabled={isRefreshing || !user}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  {isRefreshing ? "Actualizando..." : "Actualizar Sesión"}
                 </Button>
                 
                 {!user && (
                   <p className="text-sm text-muted-foreground mt-2">
-                    Please log in to run this test
+                    Por favor inicia sesión para ejecutar estas pruebas
                   </p>
                 )}
               </div>
@@ -114,7 +159,7 @@ export default function AuthTestPage() {
                     <AlertCircle className="h-4 w-4" />
                   )}
                   <AlertTitle>
-                    {testResult.success ? "Test Passed" : "Test Failed"}
+                    {testResult.success ? "Prueba Exitosa" : "Prueba Fallida"}
                   </AlertTitle>
                   <AlertDescription>
                     {testResult.message}
@@ -126,16 +171,17 @@ export default function AuthTestPage() {
           
           <Card>
             <CardHeader>
-              <CardTitle>Troubleshooting Tips</CardTitle>
+              <CardTitle>Consejos de Resolución de Problemas</CardTitle>
             </CardHeader>
             <CardContent>
-              <ul className="list-disc pl-5 space-y-2">
-                <li>Make sure you're logged in with a valid user account</li>
-                <li>Check that both access and refresh tokens are available</li>
-                <li>Verify the token expiration time hasn't passed</li>
-                <li>Try logging out and back in to refresh tokens</li>
-                <li>Clear browser cache/cookies if problems persist</li>
-                <li>Check server logs for more detailed error information</li>
+              <ul className="list-disc pl-5 space-y-2 text-sm">
+                <li>Asegúrate de estar conectado con una cuenta de usuario válida</li>
+                <li>Verifica que tanto los tokens de acceso como de actualización estén disponibles</li>
+                <li>Confirma que el tiempo de expiración del token no haya pasado</li>
+                <li>Intenta cerrar sesión y volver a conectarte para actualizar los tokens</li>
+                <li>Limpia el caché/cookies del navegador si los problemas persisten</li>
+                <li>Revisa los logs del servidor para información detallada de errores</li>
+                <li>Usa el botón "Actualizar Sesión" para forzar una actualización de tokens</li>
               </ul>
             </CardContent>
           </Card>

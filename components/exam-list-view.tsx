@@ -119,7 +119,7 @@ export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<st
       <div className="relative">
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search exams..."
+          placeholder="Buscar exámenes..."
           className="pl-9"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -140,7 +140,7 @@ export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<st
                       className="flex items-center text-sm font-medium hover:text-primary"
                       onClick={() => handleSort("date")}
                     >
-                      Date
+                      Fecha
                       {sortField === "date" && (
                         sortDirection === "asc" ? 
                           <ChevronUp className="ml-1 h-4 w-4" /> : 
@@ -153,7 +153,7 @@ export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<st
                       className="flex items-center text-sm font-medium hover:text-primary"
                       onClick={() => handleSort("subject")}
                     >
-                      Subject
+                      Asignatura
                       {sortField === "subject" && (
                         sortDirection === "asc" ? 
                           <ChevronUp className="ml-1 h-4 w-4" /> : 
@@ -166,7 +166,7 @@ export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<st
                       className="flex items-center text-sm font-medium hover:text-primary"
                       onClick={() => handleSort("time")}
                     >
-                      Time
+                      Hora
                       {sortField === "time" && (
                         sortDirection === "asc" ? 
                           <ChevronUp className="ml-1 h-4 w-4" /> : 
@@ -179,7 +179,7 @@ export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<st
                       className="flex items-center text-sm font-medium hover:text-primary"
                       onClick={() => handleSort("location")}
                     >
-                      Location
+                      Ubicación
                       {sortField === "location" && (
                         sortDirection === "asc" ? 
                           <ChevronUp className="ml-1 h-4 w-4" /> : 
@@ -192,7 +192,7 @@ export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<st
                       className="flex items-center text-sm font-medium hover:text-primary"
                       onClick={() => handleSort("year")}
                     >
-                      Year
+                      Año
                       {sortField === "year" && (
                         sortDirection === "asc" ? 
                           <ChevronUp className="ml-1 h-4 w-4" /> : 
@@ -205,7 +205,7 @@ export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<st
                       className="flex items-center text-sm font-medium hover:text-primary"
                       onClick={() => handleSort("semester")}
                     >
-                      Semester
+                      Semestre
                       {sortField === "semester" && (
                         sortDirection === "asc" ? 
                           <ChevronUp className="ml-1 h-4 w-4" /> : 
@@ -219,7 +219,7 @@ export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<st
                 {isLoading ? (
                   <tr>
                     <td colSpan={6} className="h-24 text-center border-b p-4">
-                      Loading exams...
+                      Cargando exámenes...
                     </td>
                   </tr>
                 ) : sortedExams.length > 0 ? (
@@ -247,8 +247,8 @@ export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<st
                   <tr>
                     <td colSpan={6} className="h-24 text-center border-b p-4">
                       {Object.keys(activeFilters).length > 0 ? 
-                        "No exams found for the selected filters." :
-                        "No exams found. Try selecting some filters."
+                        "No se encontraron exámenes para los filtros seleccionados." :
+                        "No se encontraron exámenes. Intenta seleccionar algunos filtros."
                       }
                     </td>
                   </tr>

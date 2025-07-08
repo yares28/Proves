@@ -1,4 +1,5 @@
 import Link from "next/link"
+import Image from "next/image"
 
 export function Footer() {
   return (
@@ -6,31 +7,18 @@ export function Footer() {
       <div className="container mx-auto px-4 py-16 md:px-6">
         <div className="grid grid-cols-1 gap-12 md:grid-cols-4">
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-primary"
-              >
-                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-                <path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z" />
-                <path d="M12 11h4" />
-                <path d="M12 16h4" />
-                <path d="M8 11h.01" />
-                <path d="M8 16h.01" />
-              </svg>
-              <span className="text-lg font-bold tracking-tight">UPV Exam Calendar</span>
+            <div className="flex items-center">
+              <Image 
+                src="/logo-full.png" 
+                alt="UPV Calendario de Exámenes" 
+                width={160} 
+                height={60}
+                className="h-8 w-auto"
+              />
             </div>
             <p className="text-sm text-muted-foreground">
-              Helping students organize their exam schedules and stay on top of their academic responsibilities with our
-              premium calendar solution.
+              Ayudando a los estudiantes a organizar sus horarios de exámenes y mantenerse al día con sus responsabilidades académicas 
+              con nuestra solución de calendario premium.
             </p>
             <div className="flex space-x-4">
               <Link href="#" className="text-muted-foreground hover:text-primary">
@@ -91,42 +79,42 @@ export function Footer() {
           </div>
 
           <div>
-            <h3 className="mb-6 text-sm font-semibold uppercase tracking-wider">Features</h3>
+            <h3 className="mb-6 text-sm font-semibold uppercase tracking-wider">Características</h3>
             <ul className="space-y-4 text-sm">
               <li>
                 <Link href="#" className="text-muted-foreground transition-colors hover:text-primary">
-                  Calendar View
+                  Vista de Calendario
                 </Link>
               </li>
               <li>
                 <Link href="#" className="text-muted-foreground transition-colors hover:text-primary">
-                  Advanced Filtering
+                  Filtrado Avanzado
                 </Link>
               </li>
               <li>
                 <Link href="#" className="text-muted-foreground transition-colors hover:text-primary">
-                  Export Options
+                  Opciones de Exportación
                 </Link>
               </li>
               <li>
                 <Link href="#" className="text-muted-foreground transition-colors hover:text-primary">
-                  Notifications
+                  Notificaciones
                 </Link>
               </li>
             </ul>
           </div>
 
           <div>
-            <h3 className="mb-6 text-sm font-semibold uppercase tracking-wider">Resources</h3>
+            <h3 className="mb-6 text-sm font-semibold uppercase tracking-wider">Recursos</h3>
             <ul className="space-y-4 text-sm">
               <li>
                 <Link href="#" className="text-muted-foreground transition-colors hover:text-primary">
-                  Help Center
+                  Centro de Ayuda
                 </Link>
               </li>
               <li>
                 <Link href="#" className="text-muted-foreground transition-colors hover:text-primary">
-                  Documentation
+                  Documentación
                 </Link>
               </li>
               <li>
@@ -136,18 +124,18 @@ export function Footer() {
               </li>
               <li>
                 <Link href="#" className="text-muted-foreground transition-colors hover:text-primary">
-                  Privacy Policy
+                  Política de Privacidad
                 </Link>
               </li>
             </ul>
           </div>
 
           <div>
-            <h3 className="mb-6 text-sm font-semibold uppercase tracking-wider">Contact</h3>
+            <h3 className="mb-6 text-sm font-semibold uppercase tracking-wider">Contacto</h3>
             <ul className="space-y-4 text-sm">
               <li>
                 <Link href="#" className="text-muted-foreground transition-colors hover:text-primary">
-                  Email Us
+                  Envíanos un Email
                 </Link>
               </li>
               <li>
@@ -170,7 +158,7 @@ export function Footer() {
         </div>
 
         <div className="mt-16 border-t border-border/40 pt-8 text-center text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} UPV Exam Calendar. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Calendario de Exámenes UPV. Todos los derechos reservados.</p>
         </div>
       </div>
     </footer>

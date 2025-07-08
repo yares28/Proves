@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { getUserCalendars, deleteUserCalendar } from "@/actions/user-calendars"
 import { useAuth } from "@/context/auth-context"
 import { getExams } from "@/actions/exam-actions"
-import { formatDateString, getAcademicYearForMonth, getCurrentYear } from "@/utils/date-utils"
+import { formatDateString, getAcademicYearForMonth, getCurrentYear, detectAcademicYearFromExams } from "@/utils/date-utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 
@@ -46,6 +46,7 @@ export default function SavedCalendarsPage() {
   const [selectedCalendar, setSelectedCalendar] = useState<any | null>(null)
   const [calendarData, setCalendarData] = useState<Record<string, any[]>>({})
   const [loadingCalendar, setLoadingCalendar] = useState<string | null>(null)
+  const [academicYear, setAcademicYear] = useState<{ startYear: number; endYear: number } | null>(null)
   const { toast } = useToast()
 
   // Generate array of months from September to August (academic year)
@@ -81,45 +82,50 @@ export default function SavedCalendarsPage() {
   }, [user?.id, toast])
 
   async function handleViewCalendar(calendar: any) {
-    if (selectedCalendar?.id === calendar.id) {
-      // If already selected, deselect it
-      setSelectedCalendar(null)
-      return
-    }
-
-    // Set as selected
-    setSelectedCalendar(calendar)
-    setLoadingCalendar(calendar.id)
+    if (loadingCalendar === calendar.id) return
     
-    console.log("Selected calendar:", calendar)
-    console.log("Saved filters:", calendar.filters)
-
-    // Don't fetch again if we already have the data
-    if (calendarData[calendar.id]) {
-      console.log("Using cached data:", calendarData[calendar.id])
-      setLoadingCalendar(null)
+    if (selectedCalendar?.id === calendar.id) {
+      // Hide the calendar
+      setSelectedCalendar(null)
+      setCalendarData({})
+      setAcademicYear(null)
       return
     }
+    
+    setLoadingCalendar(calendar.id)
+    setSelectedCalendar(calendar)
 
     try {
-      const exams = await fetchCalendarExams(calendar.filters)
+      console.log('📅 Loading calendar:', calendar.name, 'with filters:', calendar.filters);
+      const data = await fetchCalendarExams(calendar.filters)
+      console.log(`📊 Fetched ${data.length} exams for calendar:`, calendar.name);
       
-      console.log(`Fetched ${exams.length} exams for calendar`)
-      
-      if (exams.length === 0) {
-        toast({
-          title: "No exams found",
-          description: "No exams match the saved filters for this calendar.",
-          variant: "default",
-        })
+      // Detect academic year from exam dates
+      if (data.length > 0) {
+        const uniqueDates = [...new Set(data.map(exam => exam.date))].sort();
+        console.log("SavedCalendars - Unique exam dates:", uniqueDates);
+        
+        const detectedAcademicYear = detectAcademicYearFromExams(uniqueDates);
+        console.log("SavedCalendars - Detected academic year:", detectedAcademicYear);
+        
+        if (detectedAcademicYear) {
+          setAcademicYear(detectedAcademicYear);
+        } else {
+          // Fallback to current year if no academic year detected
+          console.log("SavedCalendars - No academic year detected, using current year fallback");
+          const currentYear = getCurrentYear();
+          setAcademicYear({ startYear: currentYear, endYear: currentYear + 1 });
+        }
+      } else {
+        // No exams, use current year as fallback
+        console.log("SavedCalendars - No exams found, using current year fallback");
+        const currentYear = getCurrentYear();
+        setAcademicYear({ startYear: currentYear, endYear: currentYear + 1 });
       }
       
-      setCalendarData(prev => ({
-        ...prev,
-        [calendar.id]: exams
-      }))
+      setCalendarData({ [calendar.id]: data })
     } catch (error) {
-      console.error("Error fetching calendar data:", error)
+      console.error("Error loading calendar data:", error)
       toast({
         title: "Failed to load calendar",
         description: "There was an error loading the calendar data.",
@@ -192,7 +198,7 @@ export default function SavedCalendarsPage() {
     return monthMap[monthName] || 1
   }
 
-  // Get exams for a specific day
+  // Get exams for a specific day with dynamic academic year
   function getExamsForDay(year: number, month: number, day: number, exams: any[]) {
     const targetDate = new Date(year, month - 1, day)
     const targetDateString = targetDate.toISOString().split('T')[0]
@@ -209,10 +215,14 @@ export default function SavedCalendarsPage() {
     })
   }
 
-  // Generate calendar days for a month
+  // Generate calendar days for a month with dynamic academic year
   function generateCalendarDays(monthName: string, exams: any[]) {
     const monthIndex = getMonthIndex(monthName)
-    const year = getAcademicYearForMonth(monthIndex)
+    
+    // Use detected academic year or fallback to current year logic
+    const year = academicYear 
+      ? getAcademicYearForMonth(monthIndex, academicYear.startYear)
+      : getAcademicYearForMonth(monthIndex)
     
     // Get first day of month and number of days
     const firstDay = new Date(year, monthIndex - 1, 1)
@@ -257,7 +267,14 @@ export default function SavedCalendarsPage() {
 
   return (
     <div className="container py-8">
-      <h1 className="text-center text-3xl font-bold tracking-tight mb-8">MY CALENDARS</h1>
+      <h1 className="text-center text-3xl font-bold tracking-tight mb-8">
+        MY CALENDARS
+        {academicYear && (
+          <span className="block text-lg font-normal text-muted-foreground mt-2">
+            Academic Year {academicYear.startYear}/{(academicYear.endYear).toString().slice(-2)}
+          </span>
+        )}
+      </h1>
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -372,7 +389,9 @@ export default function SavedCalendarsPage() {
                         
                         const calendarDays = generateCalendarDays(month, exams)
                         const monthIndex = getMonthIndex(month)
-                        const year = getAcademicYearForMonth(monthIndex)
+                        const year = academicYear 
+                          ? getAcademicYearForMonth(monthIndex, academicYear.startYear)
+                          : getAcademicYearForMonth(monthIndex)
                         
                         return (
                           <div key={month} className="border rounded-lg shadow-sm overflow-hidden bg-card">

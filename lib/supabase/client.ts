@@ -10,8 +10,12 @@ export function createClient() {
     supabaseKey,
     {
       auth: {
+        // When access tokens expire, automatically refresh them
         autoRefreshToken: true,
-        persistSession: true
+        // Keep your refresh token around (localStorage by default in the browser)
+        persistSession: true,
+        // (optional) detect auth state in URL hash after a redirect sign-in
+        detectSessionInUrl: true,
       }
     }
   )

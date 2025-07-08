@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
-import { Calendar, Download, Save, ChevronLeft, ChevronRight, Clock, MapPin } from "lucide-react"
+import { useState, useEffect, useMemo, Suspense } from "react"
+import { Calendar, Download, Save, ChevronLeft, ChevronRight, Clock, MapPin, List, Grid, Share2, Settings, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -12,8 +12,9 @@ import { motion, AnimatePresence } from "framer-motion"
 import { ViewToggle } from "@/components/view-toggle"
 import { ExamListView } from "@/components/exam-list-view"
 import { getExams } from "@/actions/exam-actions"
-import { formatDateString, getCurrentYear, getAcademicYearForMonth } from "@/utils/date-utils"
+import { formatDateString, getCurrentYear, getAcademicYearForMonth, detectAcademicYearFromExams, generateAcademicYearMonths } from "@/utils/date-utils"
 import { SaveCalendarDialog } from "@/components/save-calendar-dialog"
+import { GoogleCalendarExportDialog } from "@/components/export-google-calendar-dialog"
 import { useAuth } from "@/context/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { 
@@ -24,40 +25,18 @@ import {
 } from "@/components/ui/dropdown-menu"
 import styles from "@/styles/tooltip.module.css"
 import { saveUserCalendar, getUserCalendarNames } from "@/actions/user-calendars"
-import { extractTokensFromStorage } from "@/lib/auth/token-manager"
-
-// Generate month data dynamically
-const generateMonths = () => {
-  const currentYear = getCurrentYear();
-  const months = [];
-  
-  for (let month = 0; month < 12; month++) {
-    const firstDayOfMonth = new Date(currentYear, month, 1);
-    const daysInMonth = new Date(currentYear, month + 1, 0).getDate();
-    
-    // Get day of week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
-    // Convert to Monday-first format (0 = Monday, ..., 6 = Sunday)
-    let startDay = firstDayOfMonth.getDay() - 1;
-    if (startDay === -1) startDay = 6; // Sunday becomes 6 in Monday-first format
-    
-    months.push({
-      name: firstDayOfMonth.toLocaleString('default', { month: 'long' }),
-      days: daysInMonth,
-      startDay: startDay
-    });
-  }
-  
-  return months;
-};
+import { getCurrentSession, getFreshAuthTokens } from "@/utils/auth-helpers"
 
 export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record<string, string[]> }) {
   const [selectedDay, setSelectedDay] = useState<{ month: string; day: number } | null>(null)
   const [selectedExams, setSelectedExams] = useState<any[]>([])
-  const [visibleMonths, setVisibleMonths] = useState<number[]>([8, 9, 10, 11, 0, 1, 2, 3, 4, 5, 6, 7])
+  const [visibleMonths, setVisibleMonths] = useState<number[]>([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) // Show all 12 months by default
   const [view, setView] = useState<"calendar" | "list">("calendar")
   const [exams, setExams] = useState<any[]>([])
-  const [months, setMonths] = useState(generateMonths()) // Show all 12 months
+  const [months, setMonths] = useState<any[]>([])
+  const [academicYear, setAcademicYear] = useState<{ startYear: number; endYear: number } | null>(null)
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [existingNames, setExistingNames] = useState<string[]>([])
   const { user, syncToken } = useAuth()
   const { toast } = useToast()
@@ -85,13 +64,42 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
           const uniqueDates = [...new Set(data.map(exam => exam.date))].sort();
           console.log("CalendarDisplay - Unique exam dates:", uniqueDates);
           
-          // No longer automatically select the first exam date
+          // Detect academic year from exam dates
+          const detectedAcademicYear = detectAcademicYearFromExams(uniqueDates);
+          console.log("CalendarDisplay - Detected academic year:", detectedAcademicYear);
+          
+          if (detectedAcademicYear) {
+            setAcademicYear(detectedAcademicYear);
+            // Generate months for the detected academic year
+            const academicMonths = generateAcademicYearMonths(detectedAcademicYear.startYear);
+            console.log("CalendarDisplay - Generated academic months:", academicMonths.map(m => `${m.name} ${m.year}`));
+            setMonths(academicMonths);
+          } else {
+            // Fallback to current year if no academic year detected
+            console.log("CalendarDisplay - No academic year detected, using current year fallback");
+            const currentYear = getCurrentYear();
+            const fallbackMonths = generateAcademicYearMonths(currentYear);
+            setMonths(fallbackMonths);
+            setAcademicYear({ startYear: currentYear, endYear: currentYear + 1 });
+          }
+        } else {
+          // No exams, use current year as fallback
+          console.log("CalendarDisplay - No exams found, using current year fallback");
+          const currentYear = getCurrentYear();
+          const fallbackMonths = generateAcademicYearMonths(currentYear);
+          setMonths(fallbackMonths);
+          setAcademicYear({ startYear: currentYear, endYear: currentYear + 1 });
         }
         
         setExams(data)
       } catch (error) {
         console.error("CalendarDisplay - Error fetching exams:", error);
         setExams([])
+        // Set fallback months even on error
+        const currentYear = getCurrentYear();
+        const fallbackMonths = generateAcademicYearMonths(currentYear);
+        setMonths(fallbackMonths);
+        setAcademicYear({ startYear: currentYear, endYear: currentYear + 1 });
       }
     }
     
@@ -103,25 +111,53 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
     const fetchCalendarNames = async () => {
       if (user?.id) {
         try {
-          const names = await getUserCalendarNames(user.id);
-          setExistingNames(names);
+          // Get fresh auth tokens with automatic refresh
+          const tokens = await getFreshAuthTokens()
+          
+          if (!tokens) {
+            console.warn('No valid tokens available for fetching calendar names')
+            setExistingNames([])
+            return
+          }
+          
+          const names = await getUserCalendarNames(
+            user.id,
+            tokens.accessToken,
+            tokens.refreshToken
+          )
+          setExistingNames(names)
         } catch (error) {
-          console.error("Error fetching calendar names:", error);
+          console.error('Error fetching calendar names:', error)
+          setExistingNames([])
+          
+          // Show error toast for auth issues
+          if (error instanceof Error && error.message.includes('auth')) {
+            toast({
+              title: "Error de Autenticación",
+              description: "Por favor inicia sesión para guardar calendarios.",
+              variant: "destructive"
+            })
+          }
         }
       }
-    };
-    
-    fetchCalendarNames();
-  }, [user?.id]);
+    }
+
+    fetchCalendarNames()
+  }, [user?.id, toast])
 
   const handleDayClick = (month: string, day: number) => {
     const newSelection = { month, day }
     setSelectedDay(newSelection)
 
-    // Find exams for this day
-    const monthIndex = months.findIndex((m) => m.name === month) + 1
-    const year = getAcademicYearForMonth(monthIndex)
-    const dateString = formatDateString(year, monthIndex, day);
+    // Find the month data to get the correct year and month number
+    const monthData = months.find((m) => m.name === month);
+    if (!monthData) {
+      console.error("CalendarDisplay - Month data not found for:", month);
+      return;
+    }
+
+    const dateString = formatDateString(monthData.year, monthData.monthNumber, day);
+    console.log(`CalendarDisplay - Looking for exams on: ${dateString}`);
 
     const dayExams = exams.filter((exam) => exam.date === dateString)
     console.log(`CalendarDisplay - Found ${dayExams.length} exams for ${dateString}:`, dayExams);
@@ -129,10 +165,13 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
   }
 
   const hasExam = (month: string, day: number) => {
-    const monthIndex = months.findIndex((m) => m.name === month) + 1
-    const year = getAcademicYearForMonth(monthIndex)
-    const dateString = formatDateString(year, monthIndex, day);
+    // Find the month data to get the correct year and month number
+    const monthData = months.find((m) => m.name === month);
+    if (!monthData) {
+      return false;
+    }
 
+    const dateString = formatDateString(monthData.year, monthData.monthNumber, day);
     const hasExamsForDay = exams.some((exam) => exam.date === dateString)
     return hasExamsForDay
   }
@@ -166,81 +205,58 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
   const handleSaveCalendar = async (name: string) => {
     if (!user?.id) {
       toast({
-        title: "Authentication required",
-        description: "Please log in to save calendars",
-        variant: "destructive",
-      });
-      return;
+        title: "Error",
+        description: "Debes iniciar sesión para guardar calendarios.",
+        variant: "destructive"
+      })
+      return false
     }
-    
+
     try {
-      console.log("Saving calendar with user ID:", user.id);
+      // Get current session for authentication
+      const session = await getCurrentSession()
       
-      // First, sync auth tokens to ensure we have the latest state
-      console.log("⏳ Synchronizing authentication state...");
-      await syncToken();
-      
-      // Get both auth tokens using the token manager
-      const { accessToken, refreshToken } = extractTokensFromStorage();
-      
-      // Verify tokens were found
-      if (!accessToken || !refreshToken) {
-        console.error("❌ Missing auth tokens:", {
-          accessToken: !!accessToken,
-          refreshToken: !!refreshToken
-        });
-        throw new Error("Authentication error: Missing tokens. Please log in again.");
+      if (!session?.access_token) {
+        toast({
+          title: "Error de Autenticación",
+          description: "Por favor inicia sesión nuevamente.",
+          variant: "destructive"
+        })
+        return false
       }
+
+      const { saveUserCalendar } = await import("@/actions/user-calendars")
       
-      console.log("✅ Found auth tokens - preparing to save calendar");
-      
-      // Pass both tokens directly to the server action
-      const response = await saveUserCalendar({
+      await saveUserCalendar({
         name,
         filters: activeFilters,
         userId: user.id,
-        accessToken,
-        refreshToken
-      });
-      
-      if (!response) {
-        throw new Error("Failed to save calendar: Server returned empty response");
-      }
-      
-      console.log("✅ Server response:", response);
-      
-      // Update the list of existing names
-      setExistingNames(prev => [...prev, name]);
-      
+        accessToken: session.access_token,
+        refreshToken: session.refresh_token
+      })
+
       toast({
-        title: "Calendar saved",
-        description: `Your calendar "${name}" has been saved successfully.`,
-      });
-    } catch (error: any) {
-      console.error("Error saving calendar:", error);
+        title: "¡Éxito!",
+        description: `Calendario "${name}" guardado correctamente.`
+      })
+
+      // Refresh calendar names
+      const names = await getUserCalendarNames(
+        user.id,
+        session.access_token,
+        session.refresh_token
+      )
+      setExistingNames(names)
       
-      // Get a more descriptive error message if available
-      const errorMessage = typeof error === 'string' ? error : 
-                          error?.message || 
-                          "An error occurred while saving your calendar. Please try again.";
-      
-      // If it's an authentication error, provide specific guidance
-      if (errorMessage.includes("authentication") || 
-          errorMessage.includes("log in") || 
-          errorMessage.includes("session") ||
-          errorMessage.includes("token")) {
-        toast({
-          title: "Authentication error",
-          description: "Please log out and log in again to refresh your session.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Error saving calendar",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
+      return true
+    } catch (error) {
+      console.error('Error saving calendar:', error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Error al guardar el calendario.",
+        variant: "destructive"
+      })
+      return false
     }
   };
   
@@ -254,8 +270,15 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
     >
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Exam Calendar</h2>
-          <p className="text-sm text-muted-foreground">Found {exams.length} exams for the selected period</p>
+          <h2 className="text-2xl font-bold tracking-tight">
+            Calendario de Exámenes
+            {academicYear && (
+              <span className="text-lg font-normal text-muted-foreground ml-2">
+                ({academicYear.startYear}/{(academicYear.endYear).toString().slice(-2)})
+              </span>
+            )}
+          </h2>
+          <p className="text-sm text-muted-foreground">Se encontraron {exams.length} exámenes para el período seleccionado</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ViewToggle view={view} onChange={setView} />
@@ -270,7 +293,13 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               <Save className="h-4 w-4" />
               <span>Save View</span>
             </Button>
-            <Button variant="outline" size="sm" className="h-10 gap-1.5 rounded-md">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-10 gap-1.5 rounded-md"
+              onClick={() => setExportDialogOpen(true)}
+              disabled={exams.length === 0}
+            >
               <Calendar className="h-4 w-4" />
               <span>Google Calendar</span>
             </Button>
@@ -291,7 +320,10 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                 <Save className="mr-2 h-4 w-4" />
                 <span>Save View</span>
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => setExportDialogOpen(true)}
+                disabled={exams.length === 0}
+              >
                 <Calendar className="mr-2 h-4 w-4" />
                 <span>Google Calendar</span>
               </DropdownMenuItem>
@@ -313,6 +345,13 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
         existingNames={existingNames}
       />
 
+              {/* Add GoogleCalendarExportDialog component */}
+        <GoogleCalendarExportDialog
+          open={exportDialogOpen}
+          onOpenChange={setExportDialogOpen}
+        exams={exams}
+      />
+
       <AnimatePresence mode="wait">
         {view === "calendar" ? (
           <motion.div
@@ -326,10 +365,14 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               <TooltipProvider>
                 {visibleMonths.map((monthIndex) => {
                   const month = months[monthIndex]
+                  if (!month) return null;
+                  
                   return (
-                    <Card key={month.name} className="overflow-hidden transition-all duration-300 hover:shadow-lg">
+                    <Card key={`${month.name}-${month.year}`} className="overflow-hidden transition-all duration-300 hover:shadow-lg">
                       <CardHeader className="bg-muted/30 py-4">
-                        <CardTitle className="text-center text-lg font-medium tracking-tight">{month.name}</CardTitle>
+                        <CardTitle className="text-center text-lg font-medium tracking-tight">
+                          {month.name} {month.year}
+                        </CardTitle>
                       </CardHeader>
                       <CardContent className="p-4">
                         <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium">
@@ -355,14 +398,15 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                                   <motion.div
                                     whileHover={{ scale: 1.02 }}
                                     transition={{ duration: 0.1 }}
-                                    className={`relative rounded-md p-2 transition-all ${
+                                    className={`relative rounded-md p-2 transition-all cursor-pointer ${
                                       isSelected
                                         ? "bg-primary text-primary-foreground shadow-md"
                                         : dayHasExam
                                           ? "bg-primary/10 font-medium text-primary"
                                           : "hover:bg-accent"
                                     }`}
-                                    title={`${month.name} ${day}, ${getAcademicYearForMonth(months.findIndex(m => m.name === month.name) + 1)}${dayHasExam ? ' - Has exams' : ''}`}
+                                    onClick={() => handleDayClick(month.name, day)}
+                                    title={`${month.name} ${day}, ${month.year}${dayHasExam ? ' - Has exams' : ''}`}
                                   >
                                     {day}
                                     {dayHasExam && (
@@ -380,12 +424,10 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                                   >
                                     <div className="p-0">
                                       <div className="bg-primary/10 px-3 py-2 text-xs font-medium text-primary flex items-center justify-between border-b border-primary/10">
-                                        <span>{month.name} {day}, {getAcademicYearForMonth(months.findIndex(m => m.name === month.name) + 1)}</span>
+                                        <span>{month.name} {day}, {month.year}</span>
                                         <span className={styles.examCount}>
                                           {exams.filter(exam => {
-                                            const monthIndex = months.findIndex(m => m.name === month.name) + 1;
-                                            const year = getAcademicYearForMonth(monthIndex);
-                                            const dateString = formatDateString(year, monthIndex, day);
+                                            const dateString = formatDateString(month.year, month.monthNumber, day);
                                             return exam.date === dateString;
                                           }).length} exams
                                         </span>
@@ -395,9 +437,7 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                                         <div className="p-2">
                                           {exams
                                             .filter(exam => {
-                                              const monthIndex = months.findIndex(m => m.name === month.name) + 1;
-                                              const year = getAcademicYearForMonth(monthIndex);
-                                              const dateString = formatDateString(year, monthIndex, day);
+                                              const dateString = formatDateString(month.year, month.monthNumber, day);
                                               return exam.date === dateString;
                                             })
                                             .map(exam => (
@@ -443,9 +483,7 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                                             ))}
                                             
                                           {exams.filter(exam => {
-                                            const monthIndex = months.findIndex(m => m.name === month.name) + 1;
-                                            const year = getAcademicYearForMonth(monthIndex);
-                                            const dateString = formatDateString(year, monthIndex, day);
+                                            const dateString = formatDateString(month.year, month.monthNumber, day);
                                             return exam.date === dateString;
                                           }).length === 0 && (
                                             <div className="px-3 py-2 text-xs text-muted-foreground">

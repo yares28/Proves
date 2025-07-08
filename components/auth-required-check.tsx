@@ -15,8 +15,8 @@ export function AuthRequiredCheck() {
     if (searchParams.get("auth_required") === "true" && !user) {
       // Show a toast message
       toast({
-        title: "Authentication Required",
-        description: "Please click the user icon in the top-right corner to log in.",
+        title: "Autenticación Requerida",
+        description: "Por favor haz clic en el icono de usuario en la esquina superior derecha para iniciar sesión.",
         variant: "destructive",
       })
     }

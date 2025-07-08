@@ -6,8 +6,13 @@ import { Toaster } from "@/components/ui/toaster"
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'UPV Exam Calendar',
-  description: 'Manage and organize your university exams',
+  title: 'Calendario de Exámenes UPV',
+  description: 'Gestiona y organiza tus exámenes universitarios',
+  icons: {
+    icon: '/logo-icon.png',
+    shortcut: '/logo-icon.png',
+    apple: '/logo-icon.png',
+  },
 }
 
 export default function RootLayout({
@@ -16,7 +21,11 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
+      <head>
+        <link rel="icon" href="/logo-icon.png" sizes="any" />
+        <link rel="apple-touch-icon" href="/logo-icon.png" />
+      </head>
       <body suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
