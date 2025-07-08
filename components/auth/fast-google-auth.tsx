@@ -8,6 +8,7 @@ import { AlertCircle, Loader2 } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
+import { authPerformanceTracker } from "../auth-performance-monitor"
 
 const supabase = createClient()
 
@@ -44,6 +45,10 @@ export function FastGoogleAuth({
     try {
       console.log(`🔄 Initiating Google OAuth authentication (${mode} mode)...`)
       
+      // Start performance tracking
+      authPerformanceTracker.start(mode === "fast" ? "implicit" : "pkce")
+      authPerformanceTracker.stage(`Iniciando ${mode === "fast" ? "flujo implícito" : "flujo PKCE"}`)
+      
       const authOptions = mode === "fast" 
         ? {
             // Implicit flow - faster, direct to Supabase
@@ -73,6 +78,7 @@ export function FastGoogleAuth({
 
       if (error) {
         console.error('❌ Google authentication error:', error)
+        authPerformanceTracker.complete(false)
         
         // Provide user-friendly error messages
         let userMessage = 'Error en la autenticación con Google'
@@ -112,6 +118,7 @@ export function FastGoogleAuth({
       
       if (mode === "fast") {
         // For implicit flow, auth happens automatically on redirect
+        authPerformanceTracker.stage("Redirigiendo a Google (flujo implícito)", 1)
         toast({
           title: "Redirigiendo...",
           description: "Autenticando con Google...",
@@ -119,6 +126,7 @@ export function FastGoogleAuth({
       } else {
         // For PKCE flow, we get a URL to redirect to
         if (data?.url) {
+          authPerformanceTracker.stage("Redirigiendo a Google (flujo PKCE)", 1)
           toast({
             title: "Redirigiendo...",
             description: "Te estamos redirigiendo a Google...",
@@ -131,6 +139,7 @@ export function FastGoogleAuth({
       
     } catch (err: any) {
       console.error('❌ Unexpected error during Google sign in:', err)
+      authPerformanceTracker.complete(false)
       const errorMessage = 'Error inesperado durante la autenticación'
       setError(errorMessage)
       onError?.(errorMessage)
