@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { CheckCircle, Copy, ArrowLeft, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { createClient } from '@/utils/supabase/client'
+import { authPerformanceTracker } from '@/components/auth-performance-monitor'
 
 const supabase = createClient()
 
@@ -25,62 +26,116 @@ function AuthCallbackContent() {
       const code = searchParams.get('code')
       const errorParam = searchParams.get('error')
       const errorDescription = searchParams.get('error_description')
+      const state = searchParams.get('state')
       
-      // Check if this is a Supabase auth callback
-      if (searchParams.get('state') || searchParams.get('access_token') || searchParams.get('refresh_token')) {
+      // Handle OAuth errors immediately
+      if (errorParam) {
+        console.error('❌ OAuth error:', errorParam, errorDescription)
+        authPerformanceTracker.complete(false)
+        
+        const userFriendlyError = errorParam === 'access_denied' 
+          ? 'Acceso denegado. Necesitas otorgar permisos para continuar.'
+          : `Error de autorización: ${errorDescription || errorParam}`
+        
+        setError(userFriendlyError)
+        setIsProcessing(false)
+        return
+      }
+      
+      // Handle Google Calendar OAuth callback (has specific state parameter)
+      if (state && state.includes('google-calendar') && code) {
+        console.log('🔄 Processing Google Calendar OAuth callback...')
+        authPerformanceTracker.stage('Procesando Google Calendar OAuth')
+        setAuthCode(code)
+        setIsProcessing(false)
+        return
+      }
+      
+      // Handle Supabase auth callback (PKCE flow)
+      if (code && !state?.includes('google-calendar')) {
         setIsSupabaseAuth(true)
+        authPerformanceTracker.stage('Intercambiando código por sesión', 1)
         
         try {
-          console.log('🔄 Processing Supabase auth callback...')
+          console.log('🔄 Processing Supabase PKCE auth callback...')
           
-          // Handle Supabase OAuth callback
-          const { data, error: supabaseError } = await supabase.auth.exchangeCodeForSession(code || '')
+          // Set up timeout for better performance
+          const exchangePromise = supabase.auth.exchangeCodeForSession(code)
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('timeout')), 10000)
+          )
+          
+          const { data, error: supabaseError } = await Promise.race([
+            exchangePromise, 
+            timeoutPromise
+          ]) as any
           
           if (supabaseError) {
             console.error('❌ Supabase auth error:', supabaseError.message)
-            setError(`Autenticación fallida: ${supabaseError.message}`)
+            authPerformanceTracker.complete(false)
+            
+            // Provide user-friendly error messages
+            let userMessage = 'Error en la autenticación'
+            if (supabaseError.message.includes('invalid_grant')) {
+              userMessage = 'Código de autorización expirado. Intenta de nuevo.'
+            } else if (supabaseError.message.includes('network')) {
+              userMessage = 'Error de conexión. Verifica tu internet e intenta de nuevo.'
+            }
+            
+            setError(userMessage)
             setIsProcessing(false)
             return
           }
           
           if (data?.session) {
-            console.log('✅ Supabase auth successful')
+            console.log('✅ Supabase PKCE auth successful')
+            authPerformanceTracker.complete(true)
+            
+            // Store provider tokens if available for future use
+            if (data.session.provider_token) {
+              localStorage.setItem('oauth_provider_token', data.session.provider_token)
+            }
+            if (data.session.provider_refresh_token) {
+              localStorage.setItem('oauth_provider_refresh_token', data.session.provider_refresh_token)
+            }
+            
             toast({
               title: "¡Autenticación exitosa!",
               description: "Has iniciado sesión correctamente.",
             })
             
+            // Get redirect destination from URL params or default
+            const next = searchParams.get('next') || '/my-calendars'
+            const validNext = next.startsWith('/') ? next : '/my-calendars'
+            
             // Redirect immediately to intended page
-            router.push('/my-calendars')
+            router.push(validNext)
             return
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('❌ Unexpected auth error:', error)
-          setError('Error inesperado durante la autenticación')
+          authPerformanceTracker.complete(false)
+          
+          let errorMessage = 'Error inesperado durante la autenticación'
+          if (error.message === 'timeout') {
+            errorMessage = 'La autenticación tardó demasiado tiempo. Intenta de nuevo.'
+          }
+          
+          setError(errorMessage)
         }
       }
-      // Handle Google Calendar OAuth callback
-      else if (code && !errorParam) {
-        console.log('🔄 Processing Google Calendar OAuth callback...')
-        setAuthCode(code)
-      }
-      // Handle OAuth errors
-      else if (errorParam) {
-        console.error('❌ OAuth error:', errorParam, errorDescription)
-        setError(errorParam === 'access_denied' 
-          ? 'Acceso denegado. Necesitas otorgar permisos de calendario para exportar exámenes.'
-          : `Error de autorización: ${errorDescription || errorParam}`
-        )
-      }
       // No valid callback parameters
-      else {
-        console.warn('⚠️ No valid callback parameters found')
+      else if (!code) {
+        console.warn('⚠️ No authorization code received')
+        authPerformanceTracker.complete(false)
         setError('No se recibió código de autorización válido')
       }
       
       setIsProcessing(false)
     }
 
+    // Start performance tracking
+    authPerformanceTracker.stage('Iniciando procesamiento de callback')
     handleAuthCallback()
   }, [searchParams, router, toast])
 
