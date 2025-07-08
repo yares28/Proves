@@ -1,6 +1,7 @@
+"use client"
+
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { ThemeProvider } from "@/components/theme-provider"
 
 export default function MyCalendarsLayout({
   children,
@@ -8,14 +9,12 @@ export default function MyCalendarsLayout({
   children: React.ReactNode
 }) {
   return (
-    <ThemeProvider defaultTheme="light" storageKey="upv-theme">
-      <div className="flex min-h-screen flex-col bg-background">
-        <Header />
-        <main className="flex-1">
-          {children}
-        </main>
-        <Footer />
-      </div>
-    </ThemeProvider>
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main className="container mx-auto py-8 px-4">
+        {children}
+      </main>
+      <Footer />
+    </div>
   )
 } 
