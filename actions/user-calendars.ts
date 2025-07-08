@@ -151,13 +151,61 @@ export async function saveUserCalendar({ name, filters, userId, accessToken, ref
   }
 }
 
-export async function getUserCalendars(userId: string) {
+export async function getUserCalendars(userId: string, accessToken?: string, refreshToken?: string) {
+  console.log('🔄 [SERVER] getUserCalendars called with:', {
+    userId,
+    accessTokenProvided: !!accessToken,
+    refreshTokenProvided: !!refreshToken
+  });
+  
   try {
     if (!userId) {
+      console.log('⚠️ [SERVER] No userId provided, returning empty array');
       return []
     }
     
+    console.log('🔄 [SERVER] Creating Supabase client');
     const supabase = await createClient()
+    
+    // If auth tokens were provided, use them to set the session
+    if (accessToken && refreshToken) {
+      console.log('🔄 [SERVER] Setting session with provided auth tokens');
+      
+      try {
+        const { data, error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken
+        });
+        
+        if (error) {
+          console.error('❌ [SERVER] Error setting session:', error);
+          throw new Error(`Auth token error: ${error.message}`);
+        }
+        
+        console.log('✅ [SERVER] Session set successfully');
+      } catch (e) {
+        console.error('❌ [SERVER] Error setting session:', e);
+        throw e;
+      }
+    } else {
+      console.log('⚠️ [SERVER] No auth tokens provided, using existing session');
+    }
+    
+    // Verify session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error('❌ [SERVER] Session error:', sessionError);
+      throw new Error(`Session error: ${sessionError.message}`);
+    }
+    
+    if (!session) {
+      console.log('⚠️ [SERVER] No valid session found');
+      // Don't throw error, just return empty array for better UX
+      return []
+    }
+    
+    console.log('✅ [SERVER] Valid session found, fetching calendars');
     
     const { data, error } = await supabase
       .from('user_calendars')
@@ -166,24 +214,88 @@ export async function getUserCalendars(userId: string) {
       .order('created_at', { ascending: false })
     
     if (error) {
-      console.error('Error fetching calendars:', error)
+      console.error('❌ [SERVER] Error fetching calendars:', error)
+      
+      // Handle JWT expired error gracefully
+      if (error.code === 'PGRST301' || error.message.includes('JWT expired')) {
+        console.log('⚠️ [SERVER] JWT expired, returning empty array');
+        return []
+      }
+      
       throw new Error('Failed to fetch calendars')
     }
     
+    console.log('✅ [SERVER] Calendars fetched successfully:', data?.length || 0);
+    
     return data || []
   } catch (error) {
-    console.error('Error in getUserCalendars:', error)
+    console.error('❌ [SERVER] Error in getUserCalendars:', error)
+    
+    // Handle JWT expired error gracefully - return empty array instead of throwing
+    if (error instanceof Error && (error.message.includes('JWT expired') || error.message.includes('Auth token error'))) {
+      console.log('⚠️ [SERVER] JWT/Auth error detected, returning empty array for better UX');
+      return []
+    }
+    
     throw new Error('Failed to fetch calendars')
   }
 }
 
-export async function getUserCalendarNames(userId: string) {
+export async function getUserCalendarNames(userId: string, accessToken?: string, refreshToken?: string) {
+  console.log('🔄 [SERVER] getUserCalendarNames called with:', {
+    userId,
+    accessTokenProvided: !!accessToken,
+    refreshTokenProvided: !!refreshToken
+  });
+  
   try {
     if (!userId) {
+      console.log('⚠️ [SERVER] No userId provided, returning empty array');
       return []
     }
     
+    console.log('🔄 [SERVER] Creating Supabase client');
     const supabase = await createClient()
+    
+    // If auth tokens were provided, use them to set the session
+    if (accessToken && refreshToken) {
+      console.log('🔄 [SERVER] Setting session with provided auth tokens');
+      
+      try {
+        const { data, error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken
+        });
+        
+        if (error) {
+          console.error('❌ [SERVER] Error setting session:', error);
+          throw new Error(`Auth token error: ${error.message}`);
+        }
+        
+        console.log('✅ [SERVER] Session set successfully');
+      } catch (e) {
+        console.error('❌ [SERVER] Error setting session:', e);
+        throw e;
+      }
+    } else {
+      console.log('⚠️ [SERVER] No auth tokens provided, using existing session');
+    }
+    
+    // Verify session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error('❌ [SERVER] Session error:', sessionError);
+      throw new Error(`Session error: ${sessionError.message}`);
+    }
+    
+    if (!session) {
+      console.log('⚠️ [SERVER] No valid session found');
+      // Don't throw error, just return empty array for better UX
+      return []
+    }
+    
+    console.log('✅ [SERVER] Valid session found, fetching calendar names');
     
     const { data, error } = await supabase
       .from('user_calendars')
@@ -191,21 +303,89 @@ export async function getUserCalendarNames(userId: string) {
       .eq('user_id', userId)
     
     if (error) {
-      console.error('Error fetching calendar names:', error)
+      console.error('❌ [SERVER] Error fetching calendar names:', error)
+      
+      // Handle JWT expired error gracefully
+      if (error.code === 'PGRST301' || error.message.includes('JWT expired')) {
+        console.log('⚠️ [SERVER] JWT expired, returning empty array');
+        return []
+      }
+      
       throw new Error('Failed to fetch calendar names')
     }
+    
+    console.log('✅ [SERVER] Calendar names fetched successfully:', data?.length || 0);
     
     // Extract array of names from the result
     return (data || []).map(cal => cal.name as string)
   } catch (error) {
-    console.error('Error in getUserCalendarNames:', error)
+    console.error('❌ [SERVER] Error in getUserCalendarNames:', error)
+    
+    // Handle JWT expired error gracefully - return empty array instead of throwing
+    if (error instanceof Error && (error.message.includes('JWT expired') || error.message.includes('Auth token error'))) {
+      console.log('⚠️ [SERVER] JWT/Auth error detected, returning empty array for better UX');
+      return []
+    }
+    
     throw new Error('Failed to fetch calendar names')
   }
 }
 
-export async function deleteUserCalendar(calendarId: string, userId: string) {
+export async function deleteUserCalendar(calendarId: string, userId: string, accessToken?: string, refreshToken?: string) {
+  console.log('🔄 [SERVER] deleteUserCalendar called with:', {
+    calendarId,
+    userId,
+    accessTokenProvided: !!accessToken,
+    refreshTokenProvided: !!refreshToken
+  });
+  
   try {
+    if (!calendarId || !userId) {
+      console.log('❌ [SERVER] Missing required parameters');
+      throw new Error('Calendar ID and User ID are required');
+    }
+    
+    console.log('🔄 [SERVER] Creating Supabase client');
     const supabase = await createClient()
+    
+    // If auth tokens were provided, use them to set the session
+    if (accessToken && refreshToken) {
+      console.log('🔄 [SERVER] Setting session with provided auth tokens');
+      
+      try {
+        const { data, error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken
+        });
+        
+        if (error) {
+          console.error('❌ [SERVER] Error setting session:', error);
+          throw new Error(`Auth token error: ${error.message}`);
+        }
+        
+        console.log('✅ [SERVER] Session set successfully');
+      } catch (e) {
+        console.error('❌ [SERVER] Error setting session:', e);
+        throw e;
+      }
+    } else {
+      console.log('⚠️ [SERVER] No auth tokens provided, using existing session');
+    }
+    
+    // Verify session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error('❌ [SERVER] Session error:', sessionError);
+      throw new Error(`Session error: ${sessionError.message}`);
+    }
+    
+    if (!session) {
+      console.log('❌ [SERVER] No valid session found');
+      throw new Error('No valid session found. Please log in again.');
+    }
+    
+    console.log('✅ [SERVER] Valid session found, deleting calendar');
     
     const { error } = await supabase
       .from('user_calendars')
@@ -214,13 +394,29 @@ export async function deleteUserCalendar(calendarId: string, userId: string) {
       .eq('user_id', userId) // Security check to ensure users can only delete their own calendars
     
     if (error) {
-      console.error('Error deleting calendar:', error)
+      console.error('❌ [SERVER] Error deleting calendar:', error)
+      
+      // Handle JWT expired error gracefully
+      if (error.code === 'PGRST301' || error.message.includes('JWT expired')) {
+        console.log('⚠️ [SERVER] JWT expired');
+        throw new Error('Session expired. Please log in again.');
+      }
+      
       throw new Error('Failed to delete calendar')
     }
     
+    console.log('✅ [SERVER] Calendar deleted successfully');
+    
     return { success: true }
   } catch (error) {
-    console.error('Error in deleteUserCalendar:', error)
+    console.error('❌ [SERVER] Error in deleteUserCalendar:', error)
+    
+    // Handle JWT expired error gracefully
+    if (error instanceof Error && (error.message.includes('JWT expired') || error.message.includes('Auth token error'))) {
+      console.log('⚠️ [SERVER] JWT/Auth error detected');
+      throw new Error('Session expired. Please log in again.');
+    }
+    
     throw new Error('Failed to delete calendar')
   }
 } 

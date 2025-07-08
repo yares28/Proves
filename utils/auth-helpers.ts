@@ -1,101 +1,98 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/utils/supabase/client'
+import type { Session } from '@supabase/supabase-js'
 
-// Create direct client instance
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = createClient()
 
 /**
- * Helper function to check the current authentication state and fix any issues
- * with localStorage persistence.
- * 
- * @returns {Promise<boolean>} True if the token was fixed, false otherwise
+ * Gets the current session and ensures tokens are fresh
+ * Automatically refreshes tokens if they're close to expiring
  */
-export async function checkAndFixAuthState() {
-  // Check localStorage
-  console.log("Current localStorage auth token:", localStorage.getItem('supabase.auth.token'));
-  
-  // Check if there's a session with Supabase
-  const { data } = await supabase.auth.getSession();
-  console.log("Current Supabase session:", data?.session);
-  
-  // If we have a session but localStorage is wrong, fix it
-  if (data?.session && (!localStorage.getItem('supabase.auth.token') || 
-      localStorage.getItem('supabase.auth.token') === 'true')) {
-    localStorage.setItem('supabase.auth.token', JSON.stringify({
-      currentSession: data.session
-    }));
-    console.log("Fixed localStorage token");
-    return true;
-  }
-  
-  return false;
-}
-
-/**
- * Run this in the browser console to immediately fix authentication issues
- */
-export async function fixAuth() {
-  const { data } = await supabase.auth.getSession();
-  if (data?.session) {
-    localStorage.setItem('supabase.auth.token', JSON.stringify({
-      currentSession: data.session
-    }));
-    console.log("Session fixed, try the My Calendar button now");
-    return true;
-  } else {
-    console.log("No active session found, please log in first");
-    return false;
-  }
-}
-
-/**
- * Synchronizes the authentication state between client localStorage and server cookies.
- * This is important for server actions that require authentication.
- */
-export async function syncAuthState() {
+export async function getCurrentSession(): Promise<Session | null> {
   try {
-    // Get the current session from Supabase client
-    const { data } = await supabase.auth.getSession()
+    const { data: { session }, error } = await supabase.auth.getSession()
     
-    if (!data?.session) {
-      console.warn('No active session found when syncing auth state')
-      return false
+    if (error) {
+      console.error('❌ Error getting session:', error.message)
+      return null
     }
     
-    // Ensure localStorage has correct token format
-    localStorage.setItem('supabase.auth.token', JSON.stringify({
-      currentSession: data.session
-    }))
+    if (!session) {
+      console.log('⚠️ No session found')
+      return null
+    }
     
-    // Update cookies to ensure server can recognize auth
-    const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/^https?:\/\//, '')
-    const domain = window.location.hostname
+    // Check if token is expired or will expire in the next 5 minutes
+    const expiresAt = session.expires_at! * 1000 // Convert to milliseconds
+    const now = Date.now()
+    const fiveMinutesFromNow = now + (5 * 60 * 1000)
     
-    // Set all possible cookie formats that the server might check
-    document.cookie = `sb-access-token=${data.session.access_token}; path=/; domain=${domain}; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
-    document.cookie = `sb-refresh-token=${data.session.refresh_token}; path=/; domain=${domain}; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
-    document.cookie = `sb:token=${data.session.access_token}; path=/; domain=${domain}; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
-    document.cookie = `sb-${baseUrl}-auth-token=${JSON.stringify(data.session)}; path=/; domain=${domain}; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
+    if (expiresAt <= fiveMinutesFromNow) {
+      console.log('🔄 Token is expired or expiring soon, refreshing...')
+      
+      const { data: refreshedSession, error: refreshError } = await supabase.auth.refreshSession()
+      
+      if (refreshError) {
+        console.error('❌ Token refresh failed:', refreshError.message)
+        return null
+      }
+      
+      if (refreshedSession?.session) {
+        console.log('✅ Token refreshed successfully')
+        return refreshedSession.session
+      }
+      
+      console.error('❌ No session after refresh')
+      return null
+    }
     
-    console.log('Auth state synchronized successfully')
-    return true
+    console.log('✅ Using existing valid session')
+    return session
   } catch (error) {
-    console.error('Error synchronizing auth state:', error)
+    console.error('❌ Error in getCurrentSession:', error)
+    return null
+  }
+}
+
+/**
+ * Synchronizes the authentication state - simplified version
+ */
+export async function syncAuthState(): Promise<boolean> {
+  try {
+    const session = await getCurrentSession()
+    return !!session
+  } catch (error) {
+    console.error('❌ Error synchronizing auth state:', error)
     return false
   }
 }
 
 /**
- * Validates the current authentication state and returns true if authenticated
+ * Gets fresh auth tokens for server actions
+ * Ensures tokens are valid and refreshed if needed
  */
-export async function isAuthenticated() {
+export async function getFreshAuthTokens(): Promise<{ accessToken: string; refreshToken: string } | null> {
   try {
-    const { data } = await supabase.auth.getSession()
-    return !!data?.session
+    const session = await getCurrentSession()
+    
+    if (!session?.access_token || !session?.refresh_token) {
+      console.log('❌ No valid tokens available')
+      return null
+    }
+    
+    return {
+      accessToken: session.access_token,
+      refreshToken: session.refresh_token
+    }
   } catch (error) {
-    console.error('Error checking authentication state:', error)
-    return false
+    console.error('❌ Error getting fresh auth tokens:', error)
+    return null
   }
+}
+
+/**
+ * Checks if the user is authenticated with fresh tokens
+ */
+export async function isAuthenticatedWithFreshTokens(): Promise<boolean> {
+  const session = await getCurrentSession()
+  return !!session?.access_token
 } 

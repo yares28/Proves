@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CheckCircle2, XCircle, AlertTriangle, RefreshCw, Loader2 } from "lucide-react"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/utils/supabase/client"
 
 interface AuthStatus {
   isAuthenticated: boolean
@@ -29,10 +29,7 @@ interface AuthStatus {
   }
 }
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabase = createClient()
 
 export function AuthStatusChecker() {
   const { user, loading: contextLoading, syncToken } = useAuth()

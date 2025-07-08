@@ -5,8 +5,12 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
+    // Keep your refresh token around (localStorage by default in the browser)
     persistSession: true,
+    // When access tokens expire, automatically refresh them
     autoRefreshToken: true,
+    // (optional) detect auth state in URL hash after a redirect sign-in
+    detectSessionInUrl: true,
     // Store session data in localStorage for better persistence
     storage: {
       getItem: (key) => {

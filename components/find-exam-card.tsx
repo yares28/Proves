@@ -32,7 +32,7 @@ export function FindExamCard() {
         setFetchError(null)
       } catch (error) {
         console.error("Error fetching schools:", error)
-        setFetchError("Failed to load schools. Please try again.")
+        setFetchError("Error al cargar las escuelas. Por favor intenta de nuevo.")
       } finally {
         setLoading(false)
       }
@@ -52,7 +52,7 @@ export function FindExamCard() {
     
     // Validate acronym
     if (!validateAcronym(trimmedQuery)) {
-      setError("Please enter a valid acronym (1-10 characters)");
+      setError("Por favor ingresa un acrónimo válido (1-10 caracteres)");
       return;
     }
     
@@ -71,27 +71,28 @@ export function FindExamCard() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.2 }}
+      className="w-full max-w-md mx-auto"
     >
       <Card className="overflow-hidden border-none bg-white/90 shadow-xl backdrop-blur-sm dark:bg-emerald-950/80">
-        <CardHeader className="bg-primary/5 pb-4 pt-6">
-          <CardTitle className="flex items-center justify-center gap-2 text-xl font-medium">
-            <Search className="h-5 w-5 text-primary" />
-            Find Your Exam
+        <CardHeader className="bg-primary/5 pb-3 pt-4">
+          <CardTitle className="flex items-center justify-center gap-2 text-lg font-medium">
+            <Search className="h-4 w-4 text-primary" />
+            Encuentra tu Examen
           </CardTitle>
         </CardHeader>
         <form onSubmit={handleSearch}>
-        <CardContent className="p-6">
-            <div className="space-y-4">
-            <div className="space-y-2">
+        <CardContent className="p-4">
+            <div className="space-y-3">
+            <div className="space-y-1.5">
               <Label htmlFor="search" className="text-sm font-medium">
-                  Search by acronym
+                  Buscar por acrónimo
               </Label>
               <div className="relative">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="search"
-                    placeholder="e.g. MAD, IIP, ..."
-                  className="pl-9"
+                    placeholder="ej. MAD, IIP, ..."
+                  className="pl-9 h-9"
                   value={searchQuery}
                     onChange={(e) => {
                       setSearchQuery(e.target.value)
@@ -100,29 +101,29 @@ export function FindExamCard() {
                 />
               </div>
                 {error && (
-                  <p className="text-sm font-medium text-destructive">{error}</p>
+                  <p className="text-xs font-medium text-destructive">{error}</p>
                 )}
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
                 <Label htmlFor="school" className="text-sm font-medium">
-                  School
+                  Escuela
               </Label>
                 <Select value={school} onValueChange={setSchool} disabled={loading}>
-                  <SelectTrigger id="school" className="w-full">
-                    <SelectValue placeholder={loading ? "Loading schools..." : "Select school"} />
+                  <SelectTrigger id="school" className="w-full h-9">
+                    <SelectValue placeholder={loading ? "Cargando escuelas..." : "Seleccionar escuela"} />
                 </SelectTrigger>
                   <SelectContent className="max-h-[300px]">
-                    <SelectItem value="all">All Schools</SelectItem>
+                    <SelectItem value="all">Todas las Escuelas</SelectItem>
                     {loading ? (
                       <div className="flex items-center justify-center py-2">
                         <Loader2 className="h-4 w-4 animate-spin text-primary mr-2" />
-                        <span>Loading schools...</span>
+                        <span className="text-sm">Cargando...</span>
                       </div>
                     ) : fetchError ? (
-                      <div className="p-2 text-sm text-destructive">{fetchError}</div>
+                      <div className="p-2 text-xs text-destructive">{fetchError}</div>
                     ) : schools.length === 0 ? (
-                      <div className="p-2 text-sm text-muted-foreground">No schools found</div>
+                      <div className="p-2 text-xs text-muted-foreground">No se encontraron escuelas</div>
                     ) : (
                       schools.map((schoolName) => (
                         <SelectItem key={schoolName} value={schoolName}>
@@ -134,25 +135,25 @@ export function FindExamCard() {
               </Select>
                 {!loading && (
                   <p className="text-xs text-muted-foreground">
-                    {schools.length} schools available
+                    {schools.length} escuelas disponibles
                   </p>
                 )}
               </div>
             </div>
         </CardContent>
-        <CardFooter className="bg-primary/5 px-6 py-4">
+        <CardFooter className="bg-primary/5 px-4 py-3">
             <Button 
               type="submit" 
-              className="w-full shadow-md transition-all hover:shadow-lg" 
+              className="w-full h-9 shadow-md transition-all hover:shadow-lg" 
               disabled={loading || !searchQuery.trim()}
             >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading...
+                  Cargando...
                 </>
               ) : (
-                "Search Exams"
+                "Buscar Exámenes"
               )}
           </Button>
         </CardFooter>

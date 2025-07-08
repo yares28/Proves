@@ -9,6 +9,7 @@ export interface Exam {
   degree: string
   year: string
   semester: string
+  acronym?: string
   created_at?: string
 }
 

@@ -1,65 +1,65 @@
 import { createServerClient } from '@supabase/ssr'
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
-  
-  // Create a Supabase client configured to use cookies
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name) {
-          return req.cookies.get(name)?.value
-        },
-        set(name, value, options) {
-          req.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-          res.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-        },
-        remove(name, options) {
-          req.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
-          res.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
-        },
-      },
-    }
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
+
+  // Only process auth for specific routes to improve performance
+  const authRoutes = ['/my-calendars', '/saved-calendars', '/exams', '/auth']
+  const shouldProcessAuth = authRoutes.some(route => 
+    request.nextUrl.pathname.startsWith(route)
   )
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  if (shouldProcessAuth) {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              request.cookies.set(name, value)
+              response.cookies.set({ name, value, ...options })
+            })
+          },
+        },
+      }
+    )
 
-  // Check if the route is protected (currently only /my-calendars is protected)
-  const isProtectedRoute = req.nextUrl.pathname.startsWith('/my-calendars')
-
-  // If accessing a protected route and not signed in, redirect to home page
-  if (isProtectedRoute && !session) {
-    const redirectUrl = new URL('/', req.url)
-    // Add a query parameter to indicate auth is required
-    redirectUrl.searchParams.set('auth_required', 'true')
-    return NextResponse.redirect(redirectUrl)
+    // Refresh session if needed (with timeout for performance)
+    try {
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Session check timeout')), 3000)
+      )
+      
+      const sessionPromise = supabase.auth.getUser()
+      
+      await Promise.race([sessionPromise, timeoutPromise])
+    } catch (error) {
+      console.warn('Session refresh timeout or error:', error)
+      // Continue without blocking the request
+    }
   }
 
-  return res
+  return response
 }
 
 export const config = {
-  matcher: ['/my-calendars/:path*'],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - api routes that don't need auth
+     */
+    '/((?!_next/static|_next/image|favicon.ico|api/(?!auth)).*)',
+  ],
 } 

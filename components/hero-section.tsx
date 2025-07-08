@@ -4,17 +4,27 @@ import { ArrowDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
 import { FindExamCard } from "@/components/find-exam-card"
+import { useTheme } from "next-themes"
+import { useState, useEffect } from "react"
+import Image from "next/image"
 
 export function HeroSection() {
-  const scrollToFilters = () => {
-    const filtersSection = document.querySelector("#filters-section")
-    if (filtersSection) {
-      filtersSection.scrollIntoView({ behavior: "smooth" })
-    }
+  const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  // Only render after mounting to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Determine which logo to use based on theme
+  const getHeroLogo = () => {
+    if (!mounted) return "/logo-full2.png" // Default fallback during SSR
+    return theme === "light" ? "/logo-full-light.png" : "/logo-full2.png"
   }
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-emerald-100 px-4 py-32 dark:from-emerald-950 dark:to-emerald-900 md:py-40 lg:py-52">
+    <section className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-emerald-100 px-4 py-20 dark:from-emerald-950 dark:to-emerald-900 md:py-28 lg:py-36">
       {/* Enhanced background pattern */}
       <div className="absolute inset-0 -z-10">
         <svg
@@ -49,69 +59,157 @@ export function HeroSection() {
       <div className="absolute -left-16 -top-16 h-64 w-64 rounded-full bg-primary/10 blur-3xl"></div>
       <div className="absolute -bottom-32 -right-16 h-96 w-96 rounded-full bg-primary/10 blur-3xl"></div>
 
-      {/* Animated particles */}
+      {/* Floating logo icons as animated particles */}
       <div className="absolute inset-0 -z-5">
-        <div className="absolute left-1/4 top-1/4 h-2 w-2 animate-float rounded-full bg-primary/30 blur-sm"></div>
-        <div
-          className="absolute left-3/4 top-1/3 h-3 w-3 animate-float rounded-full bg-primary/20 blur-sm"
-          style={{ animationDelay: "1s" }}
-        ></div>
-        <div
-          className="absolute left-1/3 top-2/3 h-2 w-2 animate-float rounded-full bg-primary/30 blur-sm"
-          style={{ animationDelay: "2s" }}
-        ></div>
-        <div
-          className="absolute left-2/3 top-1/2 h-4 w-4 animate-float rounded-full bg-primary/20 blur-sm"
-          style={{ animationDelay: "3s" }}
-        ></div>
+        <motion.div 
+          className="absolute left-1/4 top-1/4 opacity-20"
+          animate={{ 
+            y: [0, -20, 0],
+            rotate: [0, 5, 0]
+          }}
+          transition={{ 
+            duration: 4,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        >
+          <Image 
+            src="/logo-icon.png" 
+            alt="UPV Logo" 
+            width={32} 
+            height={32}
+            className="blur-sm"
+          />
+        </motion.div>
+        <motion.div
+          className="absolute left-3/4 top-1/3 opacity-15"
+          animate={{ 
+            y: [0, -25, 0],
+            rotate: [0, -3, 0]
+          }}
+          transition={{ 
+            duration: 5,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 1
+          }}
+        >
+          <Image 
+            src="/logo-icon.png" 
+            alt="UPV Logo" 
+            width={28} 
+            height={28}
+            className="blur-sm"
+          />
+        </motion.div>
+        <motion.div
+          className="absolute left-1/3 top-2/3 opacity-25"
+          animate={{ 
+            y: [0, -15, 0],
+            rotate: [0, 4, 0]
+          }}
+          transition={{ 
+            duration: 6,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 2
+          }}
+        >
+          <Image 
+            src="/logo-icon.png" 
+            alt="UPV Logo" 
+            width={24} 
+            height={24}
+            className="blur-sm"
+          />
+        </motion.div>
+        <motion.div
+          className="absolute left-2/3 top-1/2 opacity-20"
+          animate={{ 
+            y: [0, -30, 0],
+            rotate: [0, -2, 0]
+          }}
+          transition={{ 
+            duration: 4.5,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 3
+          }}
+        >
+          <Image 
+            src="/logo-icon.png" 
+            alt="UPV Logo" 
+            width={36} 
+            height={36}
+            className="blur-sm"
+          />
+        </motion.div>
       </div>
 
-      <div className="container relative mx-auto max-w-6xl">
-        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
+      <div className="container relative mx-auto max-w-7xl">
+        <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-12 lg:gap-12">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7 }}
-            className="text-center lg:text-left"
+            className="text-center lg:col-span-7 lg:text-left"
           >
-            <h1 className="mb-6 text-5xl font-bold tracking-tight md:text-6xl lg:text-7xl">
-              Find Your{" "}
+            {/* Logo Section */}
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="mb-6 flex justify-center lg:justify-start"
+            >
+              <div className="relative">
+                <Image 
+                  src={getHeroLogo()}
+                  alt="UPV Calendario de Exámenes" 
+                  width={260} 
+                  height={110}
+                  className="h-auto w-auto max-w-[260px] drop-shadow-lg"
+                  priority
+                />
+                {/* Subtle glow effect behind logo */}
+                <div className="absolute inset-0 -z-10 scale-110 blur-xl bg-primary/20 rounded-lg"></div>
+              </div>
+            </motion.div>
+
+            <h1 className="mb-5 text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl xl:text-6xl">
+              Encuentra tu{" "}
               <span className="relative inline-block">
-                <span className="relative z-10">Exam Schedule</span>
+                <span className="relative z-10 text-primary">Calendario de Exámenes</span>
                 <span className="absolute bottom-2 left-0 z-0 h-4 w-full bg-primary/20"></span>
               </span>
             </h1>
-            <p className="mx-auto mb-10 max-w-2xl text-lg text-emerald-800/80 dark:text-emerald-100/80 md:text-xl lg:mx-0">
-              Elegantly discover, filter, and organize your university exam timetable in one sophisticated platform.
-              Never miss an important exam date again.
+            <p className="mx-auto mb-6 max-w-2xl text-base text-emerald-800/80 dark:text-emerald-100/80 md:text-lg lg:mx-0 lg:text-xl">
+              Descubre, filtra y organiza tu calendario de exámenes universitarios de la UPV.
+              Nunca más te pierdas una fecha importante de examen.
             </p>
 
-            <div className="flex flex-col items-center justify-center gap-4 sm:flex-row lg:justify-start">
-              <Button
-                size="lg"
-                className="h-12 rounded-md bg-primary px-8 text-primary-foreground shadow-lg transition-all hover:shadow-xl"
-                onClick={scrollToFilters}
-              >
-                Get Started
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-12 rounded-md border-primary/30 bg-white/50 text-primary backdrop-blur-sm transition-all hover:bg-white/70 dark:bg-emerald-950/50 dark:text-emerald-100 dark:hover:bg-emerald-950/70"
-              >
-                Learn More
-              </Button>
-            </div>
+            
           </motion.div>
 
           {/* Find Your Exam Card */}
-          <FindExamCard />
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.7, delay: 0.3 }}
+            className="lg:col-span-5"
+          >
+            <FindExamCard />
+          </motion.div>
         </div>
       </div>
 
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.7, delay: 1 }}
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce"
+      >
         <ArrowDown className="h-6 w-6 text-primary/70" />
-      </div>
+      </motion.div>
     </section>
   )
 }

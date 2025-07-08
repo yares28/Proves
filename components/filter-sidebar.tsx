@@ -17,7 +17,8 @@ import { SaveCalendarDialog } from "@/components/save-calendar-dialog"
 import { useAuth } from "@/context/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { saveUserCalendar, getUserCalendarNames } from "@/actions/user-calendars"
-import { extractTokensFromStorage } from "@/lib/auth/token-manager"
+import { getFreshAuthTokens } from "@/utils/auth-helpers"
+import Image from "next/image"
 
 type FilterCategory = {
   name: string;
@@ -84,11 +85,11 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
   
   // Define filter categories with dependencies (memoized to prevent unnecessary re-renders)
   const filterCategories: FilterCategory[] = [
-    { name: "Schools", field: "school", options: schools, searchable: true },
-    { name: "Degrees", field: "degree", options: degrees, searchable: true, dependsOn: ["school"] },
-    { name: "Semesters", field: "semester", options: semesters, searchable: false, dependsOn: ["school", "degree"] },
-    { name: "Course Years", field: "year", options: years.map(String), searchable: false, dependsOn: ["school", "degree", "semester"] },
-    { name: "Subjects", field: "subject", options: subjects, searchable: true, dependsOn: ["school", "degree", "semester", "year"] },
+    { name: "Escuelas", field: "school", options: schools, searchable: true },
+    { name: "Carreras", field: "degree", options: degrees, searchable: true, dependsOn: ["school"] },
+    { name: "Semestres", field: "semester", options: semesters, searchable: false, dependsOn: ["school", "degree"] },
+    { name: "Años del Curso", field: "year", options: years.map(String), searchable: false, dependsOn: ["school", "degree", "semester"] },
+    { name: "Asignaturas", field: "subject", options: subjects, searchable: true, dependsOn: ["school", "degree", "semester", "year"] },
   ]
 
   // Auto-expansion logic: open categories with options, close empty ones
@@ -308,10 +309,10 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
     });
     
     if (missingNames.length === 1) {
-      return `Select a ${missingNames[0]} first`;
+      return `Selecciona ${missingNames[0]} primero`;
     } else {
       const lastDep = missingNames.pop();
-      return `Select ${missingNames.join(', ')} and ${lastDep} first`;
+      return `Selecciona ${missingNames.join(', ')} y ${lastDep} primero`;
     }
   };
 
@@ -351,25 +352,51 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
   // Fetch existing calendar names when the component mounts or user changes
   useEffect(() => {
     const fetchCalendarNames = async () => {
-      if (user?.id) {
-        try {
-          const names = await getUserCalendarNames(user.id);
-          setExistingNames(names);
-        } catch (error) {
-          console.error("Error fetching calendar names:", error);
+      if (!user?.id) {
+        setExistingNames([])
+        return
+      }
+      
+      try {
+        // Get fresh auth tokens with automatic refresh
+        const tokens = await getFreshAuthTokens()
+        
+        if (!tokens) {
+          console.warn('No valid tokens available for fetching calendar names')
+          setExistingNames([])
+          return
+        }
+        
+        const names = await getUserCalendarNames(
+          user.id,
+          tokens.accessToken,
+          tokens.refreshToken
+        )
+        setExistingNames(names)
+      } catch (error) {
+        console.error('Error fetching calendar names:', error)
+        setExistingNames([])
+        
+        // Show error toast for auth issues
+        if (error instanceof Error && error.message.includes('auth')) {
+          toast({
+            title: "Error de Autenticación",
+            description: "Por favor inicia sesión para gestionar calendarios.",
+            variant: "destructive"
+          })
         }
       }
-    };
-    
-    fetchCalendarNames();
-  }, [user?.id]);
+    }
+
+    fetchCalendarNames()
+  }, [user?.id, toast])
 
   // Open save dialog if user is logged in, otherwise show login toast
   const openSaveDialog = () => {
     if (!user) {
       toast({
-        title: "Authentication required",
-        description: "Please log in to save calendars",
+        title: "Autenticación requerida",
+        description: "Por favor inicia sesión para guardar calendarios",
         variant: "destructive",
       });
       return;
@@ -379,32 +406,25 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
 
   // Save calendar function
   const handleSaveCalendar = async (name: string) => {
-    if (!user?.id) {
-      toast({
-        title: "Authentication required",
-        description: "Please log in to save calendars",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!user?.id) return false;
     
     try {
-      console.log("Saving calendar with user ID:", user.id);
+      console.log("🔄 Starting save calendar process:", { name, userId: user.id });
       
       // First, sync auth tokens to ensure we have the latest state
       console.log("⏳ Synchronizing authentication state...");
       await syncToken();
       
-      // Get both auth tokens using the token manager
-      const { accessToken, refreshToken } = extractTokensFromStorage();
+      // Get fresh auth tokens with automatic refresh
+      const tokens = await getFreshAuthTokens()
       
-      // Verify tokens were found
-      if (!accessToken || !refreshToken) {
-        console.error("❌ Missing auth tokens:", {
-          accessToken: !!accessToken,
-          refreshToken: !!refreshToken
-        });
-        throw new Error("Authentication error: Missing tokens. Please log in again.");
+      if (!tokens) {
+        toast({
+          title: "Error de Autenticación",
+          description: "Por favor inicia sesión nuevamente.",
+          variant: "destructive"
+        })
+        return false
       }
       
       console.log("✅ Found auth tokens - preparing to save calendar");
@@ -414,48 +434,38 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
         name,
         filters: activeFilters,
         userId: user.id,
-        accessToken,
-        refreshToken
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken
       });
       
       if (!response) {
-        throw new Error("Failed to save calendar: Server returned empty response");
+        throw new Error("Error al guardar calendario: El servidor devolvió una respuesta vacía");
       }
       
       console.log("✅ Server response:", response);
       
-      // Update the list of existing names
-      setExistingNames(prev => [...prev, name]);
-      
       toast({
-        title: "Calendar saved",
-        description: `Your calendar "${name}" has been saved successfully.`,
-      });
-    } catch (error: any) {
-      console.error("Error saving calendar:", error);
+        title: "¡Éxito!",
+        description: `Calendario "${name}" guardado correctamente.`
+      })
+
+      // Refresh calendar names
+      const names = await getUserCalendarNames(
+        user.id,
+        tokens.accessToken,
+        tokens.refreshToken
+      )
+      setExistingNames(names)
       
-      // Get a more descriptive error message if available
-      const errorMessage = typeof error === 'string' ? error : 
-                          error?.message || 
-                          "An error occurred while saving your calendar. Please try again.";
-      
-      // If it's an authentication error, provide specific guidance
-      if (errorMessage.includes("authentication") || 
-          errorMessage.includes("log in") || 
-          errorMessage.includes("session") ||
-          errorMessage.includes("token")) {
-        toast({
-          title: "Authentication error",
-          description: "Please log out and log in again to refresh your session.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Error saving calendar",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
+      return true
+    } catch (error) {
+      console.error('Error saving calendar:', error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Error al guardar el calendario.",
+        variant: "destructive"
+      })
+      return false
     }
   };
 
@@ -496,178 +506,204 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
       whileInView={{ opacity: 1, x: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.5 }}
-      className="space-y-6 rounded-xl border bg-card p-6 shadow-lg"
+      className="space-y-6 rounded-xl border bg-card p-6 shadow-lg relative"
     >
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold tracking-tight">Filters</h2>
-        {Object.keys(activeFilters).length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearAllFilters}
-            className="h-8 text-xs text-muted-foreground hover:text-foreground"
-          >
-            Clear all
-          </Button>
-        )}
-      </div>
-
-      {/* Active Filters section moved to the top */}
-      {Object.keys(activeFilters).length > 0 && (
-        <div className="mt-4">
-          <h3 className="text-sm font-medium mb-2">Active Filters</h3>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(activeFilters).map(([category, values]) =>
-              values.map((value) => (
-                <Badge
-                  key={`${category}-${value}`}
-                  variant="secondary"
-                  className="flex items-center gap-1"
-                >
-                  {value}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-4 w-4 p-0"
-                    onClick={() => removeFilter(category, value)}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </Badge>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="relative">
-        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search all filters..."
-          value={allFiltersSearch}
-          onChange={(e) => setAllFiltersSearch(e.target.value)}
-          className="pl-9"
-        />
-      </div>
-
-      <Accordion 
-        type="multiple" 
-        className="w-full"
-        value={expandedItems}
-        onValueChange={handleAccordionChange}
+      {/* Logo Icon at the top center */}
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.8, y: -10 }}
+        whileInView={{ opacity: 1, scale: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.6, delay: 0.2 }}
+        className="absolute -top-6 left-1/2 transform -translate-x-1/2 -ml-6 z-10"
       >
-        {filterCategories.map((category) => (
-          <AccordionItem key={category.field} value={category.field}>
-            <AccordionTrigger className="text-sm font-medium">
-              <span className="flex-1">{category.name}</span>
-              {/* Remove the buttons from inside the trigger */}
-              {activeFilters[category.field]?.length > 0 && (
-                <Badge variant="outline" className="mr-2 text-xs">
-                  {activeFilters[category.field].length}
-                </Badge>
-              )}
-            </AccordionTrigger>
-            <AccordionContent>
-              {/* Add the buttons at the top of content instead */}
-              <div className="flex items-center gap-2 mb-3">
-                {filteredOptions(category).length > 0 && (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      selectAllFilters(category);
-                    }}
-                    className="text-xs text-muted-foreground hover:text-foreground cursor-pointer underline"
-                  >
-                    Select all
-                  </span>
-                )}
-                {activeFilters[category.field]?.length > 0 && (
-                  <span
-                    onClick={(e) => clearCategoryFilters(category.field, e)}
-                    className="text-xs text-muted-foreground hover:text-foreground cursor-pointer underline"
-                  >
-                    Clear all
-                  </span>
-                )}
-              </div>
+        <div className="relative">
+          <div className="bg-white dark:bg-card rounded-full p-3 shadow-lg border border-border/50">
+            <Image 
+              src="/logo-icon.png" 
+              alt="UPV Logo" 
+              width={32} 
+              height={32}
+              className="h-8 w-8"
+            />
+          </div>
+          {/* Subtle glow effect */}
+          <div className="absolute inset-0 rounded-full bg-primary/20 blur-md -z-10 scale-110"></div>
+        </div>
+      </motion.div>
 
-              {/* Keep the amber card but use a fixed message */}
-              {category.dependsOn && !hasRequiredDependencies(category) && (
-                <Card className="mb-3 border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
-                  <CardContent className="p-3 flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300">
-                    <Info className="h-4 w-4" />
-                    <span>Select one of the options above.</span>
-                  </CardContent>
-                </Card>
+      {/* Add top padding to account for the logo */}
+      <div className="pt-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold tracking-tight">Filtros</h2>
+          {Object.keys(activeFilters).length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearAllFilters}
+              className="h-8 text-xs text-muted-foreground hover:text-foreground"
+            >
+              Limpiar todo
+            </Button>
+          )}
+        </div>
+
+        {/* Active Filters section moved to the top */}
+        {Object.keys(activeFilters).length > 0 && (
+          <div className="mt-4">
+            <h3 className="text-sm font-medium mb-2">Filtros Activos</h3>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(activeFilters).map(([category, values]) =>
+                values.map((value) => (
+                  <Badge
+                    key={`${category}-${value}`}
+                    variant="secondary"
+                    className="flex items-center gap-1"
+                  >
+                    {value}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-4 w-4 p-0"
+                      onClick={() => removeFilter(category, value)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </Badge>
+                ))
               )}
-              
-              {category.searchable && hasRequiredDependencies(category) && (
-                <div className="mb-2">
-                  <Input
-                    placeholder={`Search ${category.name.toLowerCase()}...`}
-                    value={searchQueries[category.field] || ""}
-                    onChange={(e) => setSearchQueries(prev => ({
-                      ...prev,
-                      [category.field]: e.target.value
-                    }))}
-                    className="w-full"
-                  />
-                </div>
-              )}
-              <div className="space-y-2">
-                {filteredOptions(category).length > 0 ? (
-                  filteredOptions(category).map((option) => (
-                    <div key={option} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`${category.field}-${option}`}
-                        checked={activeFilters[category.field]?.includes(option)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            addFilter(category.field, option);
-                          } else {
-                            removeFilter(category.field, option);
-                          }
+            </div>
+          </div>
+        )}
+
+        <div className="relative">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar todos los filtros..."
+            value={allFiltersSearch}
+            onChange={(e) => setAllFiltersSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        <Accordion 
+          type="multiple" 
+          className="w-full"
+          value={expandedItems}
+          onValueChange={handleAccordionChange}
+        >
+          {filterCategories.map((category) => (
+            <AccordionItem key={category.field} value={category.field}>
+              <AccordionTrigger className="text-sm font-medium">
+                <span className="flex-1">{category.name}</span>
+                {/* Remove the buttons from inside the trigger */}
+                {activeFilters[category.field]?.length > 0 && (
+                  <Badge variant="outline" className="mr-2 text-xs">
+                    {activeFilters[category.field].length}
+                  </Badge>
+                )}
+              </AccordionTrigger>
+              <AccordionContent>
+                {/* Add the buttons at the top of content instead */}
+                <div className="flex items-center gap-2 mb-3">
+                  {filteredOptions(category).length > 0 && (
+                                        <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          selectAllFilters(category);
                         }}
-                      />
-                      <Label htmlFor={`${category.field}-${option}`} className="text-sm">
-                        {option}
-                      </Label>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-sm text-muted-foreground py-2">
-                    {!hasRequiredDependencies(category)
-                      ? "" // Remove the dependency message text
-                      : `No ${category.name.toLowerCase()} available for the selected filters`}
+                        className="text-xs text-muted-foreground hover:text-foreground cursor-pointer underline"
+                      >
+                        Seleccionar todo
+                      </span>
+                  )}
+                  {activeFilters[category.field]?.length > 0 && (
+                                        <span
+                        onClick={(e) => clearCategoryFilters(category.field, e)}
+                        className="text-xs text-muted-foreground hover:text-foreground cursor-pointer underline"
+                      >
+                        Limpiar todo
+                      </span>
+                  )}
+                </div>
+
+                {/* Keep the amber card but use a fixed message */}
+                {category.dependsOn && !hasRequiredDependencies(category) && (
+                  <Card className="mb-3 border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
+                    <CardContent className="p-3 flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300">
+                      <Info className="h-4 w-4" />
+                      <span>Selecciona una de las opciones anteriores.</span>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {category.searchable && hasRequiredDependencies(category) && (
+                  <div className="mb-2">
+                    <Input
+                      placeholder={`Buscar ${category.name.toLowerCase()}...`}
+                      value={searchQueries[category.field] || ""}
+                      onChange={(e) => setSearchQueries(prev => ({
+                        ...prev,
+                        [category.field]: e.target.value
+                      }))}
+                      className="w-full"
+                    />
                   </div>
                 )}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        ))}
-      </Accordion>
+                <div className="space-y-2">
+                  {filteredOptions(category).length > 0 ? (
+                    filteredOptions(category).map((option) => (
+                      <div key={option} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`${category.field}-${option}`}
+                          checked={activeFilters[category.field]?.includes(option)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              addFilter(category.field, option);
+                            } else {
+                              removeFilter(category.field, option);
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`${category.field}-${option}`} className="text-sm">
+                          {option}
+                        </Label>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-muted-foreground py-2">
+                      {!hasRequiredDependencies(category)
+                        ? "" // Remove the dependency message text
+                        : `No hay ${category.name.toLowerCase()} disponibles para los filtros seleccionados`}
+                    </div>
+                  )}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
 
-      {/* Save Calendar Button */}
-      {Object.keys(activeFilters).length > 0 && (
-        <div className="mt-6 pt-4 border-t">
-          <Button
-            onClick={openSaveDialog}
-            className="w-full gap-2"
-            variant="default"
-          >
-            <Save className="h-4 w-4" />
-            Save Calendar
-          </Button>
-        </div>
-      )}
+        {/* Save Calendar Button */}
+        {Object.keys(activeFilters).length > 0 && (
+          <div className="mt-6 pt-4 border-t">
+            <Button
+              onClick={openSaveDialog}
+              className="w-full gap-2"
+              variant="default"
+            >
+              <Save className="h-4 w-4" />
+              Guardar Calendario
+            </Button>
+          </div>
+        )}
 
-      <SaveCalendarDialog
-        open={saveDialogOpen}
-        onOpenChange={setSaveDialogOpen}
-        filters={activeFilters}
-        onSave={handleSaveCalendar}
-        existingNames={existingNames}
-      />
+        <SaveCalendarDialog
+          open={saveDialogOpen}
+          onOpenChange={setSaveDialogOpen}
+          filters={activeFilters}
+          onSave={handleSaveCalendar}
+          existingNames={existingNames}
+        />
+      </div>
     </motion.aside>
   )
 }

@@ -14,11 +14,11 @@ export function ViewToggle({ view, onChange }: ViewToggleProps) {
       <TabsList className="grid w-full grid-cols-2 sm:w-[200px]">
         <TabsTrigger value="calendar" className="flex items-center gap-2">
           <Calendar className="h-4 w-4" />
-          <span>Calendar</span>
+          <span>Calendario</span>
         </TabsTrigger>
         <TabsTrigger value="list" className="flex items-center gap-2">
           <List className="h-4 w-4" />
-          <span>List</span>
+          <span>Lista</span>
         </TabsTrigger>
       </TabsList>
     </Tabs>

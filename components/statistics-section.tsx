@@ -8,26 +8,26 @@ const stats = [
   {
     icon: Users,
     value: "5,000+",
-    label: "Active Users",
-    description: "Students using the platform",
+    label: "Usuarios Activos",
+    description: "Estudiantes usando la plataforma",
   },
   {
     icon: Calendar,
     value: "15,000+",
-    label: "Exams Tracked",
-    description: "Across all departments",
+    label: "Exámenes Registrados",
+    description: "En todos los departamentos",
   },
   {
     icon: School,
     value: "25+",
-    label: "Schools",
-    description: "Connected to our platform",
+    label: "Escuelas",
+    description: "Conectadas a nuestra plataforma",
   },
   {
     icon: BookOpen,
     value: "500+",
-    label: "Subjects",
-    description: "Available in our database",
+    label: "Asignaturas",
+    description: "Disponibles en nuestra base de datos",
   },
 ]
 
@@ -67,7 +67,7 @@ export function StatisticsSection() {
             transition={{ duration: 0.5 }}
             className="mb-4 text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl"
           >
-            Trusted by <span className="text-primary">Students</span>
+            Confianza de <span className="text-primary">Estudiantes</span>
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -76,7 +76,7 @@ export function StatisticsSection() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="mx-auto max-w-2xl text-lg text-muted-foreground"
           >
-            Join thousands of students who use UPV Exam Calendar to stay organized and never miss an important exam.
+            Únete a miles de estudiantes que usan el Calendario de Exámenes UPV para mantenerse organizados y nunca perderse un examen importante.
           </motion.p>
         </div>
 

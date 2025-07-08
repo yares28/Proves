@@ -27,12 +27,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
+import { getFreshAuthTokens } from "@/utils/auth-helpers"
 
 const formSchema = z.object({
   name: z
     .string()
-    .min(1, { message: "Calendar name is required" })
-    .max(50, { message: "Calendar name cannot exceed 50 characters" })
+    .min(1, { message: "El nombre del calendario es requerido" })
+    .max(50, { message: "El nombre del calendario no puede exceder 50 caracteres" })
 })
 
 type SaveCalendarFormValues = z.infer<typeof formSchema>
@@ -74,7 +75,7 @@ export function SaveCalendarDialog({
       console.log('⚠️ Duplicate calendar name detected:', values.name);
       form.setError("name", { 
         type: "manual", 
-        message: "You already have a calendar with this name" 
+        message: "Ya tienes un calendario con este nombre" 
       })
       return
     }
@@ -83,8 +84,8 @@ export function SaveCalendarDialog({
     if (!user) {
       console.log('❌ Save calendar failed: User not logged in');
       toast({
-        title: "Authentication required",
-        description: "Please log in to save calendars",
+        title: "Autenticación requerida",
+        description: "Por favor inicia sesión para guardar calendarios",
         variant: "destructive",
       })
       onOpenChange(false)
@@ -102,7 +103,7 @@ export function SaveCalendarDialog({
       
       if (!tokenSynced) {
         console.error('❌ Failed to synchronize authentication tokens');
-        throw new Error("Failed to synchronize authentication state. Please log out and log in again.");
+        throw new Error("Error al sincronizar el estado de autenticación. Por favor cierra sesión e inicia sesión de nuevo.");
       }
       
       console.log('✅ Token synchronization successful');
@@ -112,7 +113,7 @@ export function SaveCalendarDialog({
       const authValid = await isAuthenticated();
       if (!authValid) {
         console.error('❌ Authentication validation failed after token sync');
-        throw new Error("Authentication validation failed. Please log out and log in again.");
+        throw new Error("Error en la validación de autenticación. Por favor cierra sesión e inicia sesión de nuevo.");
       }
       
       // Get auth token from localStorage to pass directly to server
@@ -138,8 +139,8 @@ export function SaveCalendarDialog({
       
       // Show success toast
       toast({
-        title: "Calendar saved",
-        description: `Your calendar "${values.name}" has been saved successfully.`,
+        title: "Calendario guardado",
+        description: `Tu calendario "${values.name}" ha sido guardado exitosamente.`,
       })
       
       console.log('✅ Calendar save completed successfully');
@@ -149,7 +150,7 @@ export function SaveCalendarDialog({
       
       // Get specific error message if available
       const errorMessage = error instanceof Error ? error.message : 
-        "An error occurred while saving your calendar. Please try again.";
+        "Ocurrió un error al guardar tu calendario. Por favor intenta de nuevo.";
       
       // Provide precise error guidance
       if (errorMessage.includes("authentication") || 
@@ -157,14 +158,14 @@ export function SaveCalendarDialog({
           errorMessage.includes("session")) {
         console.log('⚠️ Authentication-related error detected:', errorMessage);
         toast({
-          title: "Session expired",
-          description: "Your session has expired. Please log out and log in again to refresh your authentication.",
+          title: "Sesión expirada",
+          description: "Tu sesión ha expirado. Por favor cierra sesión e inicia sesión de nuevo para actualizar tu autenticación.",
           variant: "destructive",
         })
       } else {
         console.log('⚠️ General error saving calendar:', errorMessage);
         toast({
-          title: "Error saving calendar",
+          title: "Error al guardar calendario",
           description: errorMessage,
           variant: "destructive",
         })
@@ -178,9 +179,9 @@ export function SaveCalendarDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Save Calendar View</DialogTitle>
+          <DialogTitle>Guardar Vista de Calendario</DialogTitle>
           <DialogDescription>
-            Give your calendar view a name to save it for future use.
+            Dale un nombre a tu vista de calendario para guardarla para uso futuro.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -190,10 +191,10 @@ export function SaveCalendarDialog({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Calendar Name</FormLabel>
+                  <FormLabel>Nombre del Calendario</FormLabel>
                   <FormControl>
                     <Input 
-                      placeholder="My Exam Calendar" 
+                      placeholder="Mi Calendario de Exámenes" 
                       {...field} 
                       disabled={isSubmitting}
                     />
@@ -210,7 +211,7 @@ export function SaveCalendarDialog({
                 onClick={() => onOpenChange(false)}
                 disabled={isSubmitting}
               >
-                Cancel
+                Cancelar
               </Button>
               <Button 
                 type="submit" 
@@ -219,10 +220,10 @@ export function SaveCalendarDialog({
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    Guardando...
                   </>
                 ) : (
-                  "Save"
+                  "Guardar"
                 )}
               </Button>
             </DialogFooter>

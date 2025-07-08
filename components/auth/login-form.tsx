@@ -11,18 +11,17 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle } from "lucide-react"
+import { AlertCircle, Eye, EyeOff } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/utils/supabase/client"
+import { FastGoogleAuth } from "./fast-google-auth"
+import { AuthPerformanceMonitor } from "../auth-performance-monitor"
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabase = createClient()
 
 const formSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address" }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  email: z.string().email({ message: "Por favor ingresa un email válido" }),
+  password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres" }),
   rememberMe: z.boolean().default(true)
 })
 
@@ -36,6 +35,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   const { signIn, signInWithProvider } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -53,39 +53,42 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
     try {
       const { error } = await signIn(data.email, data.password)
       if (error) {
-        setError(error.message)
+        // Translate common error messages to Spanish
+        let translatedError = error.message
+        if (error.message.includes("Invalid login credentials")) {
+          translatedError = "Credenciales de inicio de sesión incorrectas"
+        } else if (error.message.includes("Email not confirmed")) {
+          translatedError = "Email no confirmado"
+        }
+        setError(translatedError)
         return
       }
       
-      // If rememberMe is selected, set a longer session in localStorage
-      if (data.rememberMe) {
-        // Get the actual session
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData && sessionData.session) {
-          // Store the actual session object
-          localStorage.setItem('supabase.auth.token', JSON.stringify({
-            currentSession: sessionData.session
-          }));
-          console.log("Session stored in localStorage");
-        }
+      // Automatic session persistence - always remember the user
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData && sessionData.session) {
+        localStorage.setItem('supabase.auth.token', JSON.stringify({
+          currentSession: sessionData.session
+        }));
+        console.log("Sesión almacenada automáticamente");
       }
       
       onSuccess()
     } catch (err) {
-      setError("An unexpected error occurred. Please try again.")
+      setError("Ocurrió un error inesperado. Por favor intenta de nuevo.")
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleProviderSignIn = async (provider: "google" | "github" | "facebook") => {
+  const handleProviderSignIn = async (provider: "google") => {
     setIsLoading(true)
     setError(null)
     
     try {
       await signInWithProvider(provider)
     } catch (err) {
-      setError("Failed to sign in with provider. Please try again.")
+      setError("Error al iniciar sesión con el proveedor. Por favor intenta de nuevo.")
     } finally {
       setIsLoading(false)
     }
@@ -109,7 +112,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
               <FormItem>
                 <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter your email" {...field} disabled={isLoading} />
+                  <Input placeholder="Ingresa tu email" {...field} disabled={isLoading} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -121,9 +124,30 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
             name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Password</FormLabel>
+                <FormLabel>Contraseña</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="Enter your password" {...field} disabled={isLoading} />
+                  <div className="relative">
+                    <Input 
+                      type={showPassword ? "text" : "password"} 
+                      placeholder="Ingresa tu contraseña" 
+                      {...field} 
+                      disabled={isLoading} 
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={isLoading}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -143,7 +167,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                 </FormControl>
                 <div className="space-y-1 leading-none">
                   <FormLabel>
-                    Remember me for 30 days
+                    Recordarme por 30 días
                   </FormLabel>
                 </div>
               </FormItem>
@@ -153,10 +177,10 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? (
               <>
-                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> Please wait
+                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> Espera por favor
               </>
             ) : (
-              "Sign In"
+              "Iniciar Sesión"
             )}
           </Button>
         </form>
@@ -164,30 +188,19 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       
       <div className="relative flex items-center">
         <div className="flex-grow border-t"></div>
-        <span className="mx-4 flex-shrink text-xs text-muted-foreground">OR CONTINUE WITH</span>
+        <span className="mx-4 flex-shrink text-xs text-muted-foreground">O CONTINÚA CON</span>
         <div className="flex-grow border-t"></div>
       </div>
       
-      <div className="grid grid-cols-2 gap-3">
-        <Button
-          variant="outline"
-          type="button"
-          disabled={isLoading}
-          onClick={() => handleProviderSignIn("google")}
-        >
-          <Icons.google className="mr-2 h-4 w-4" />
-          Google
-        </Button>
-        <Button
-          variant="outline"
-          type="button"
-          disabled={isLoading}
-          onClick={() => handleProviderSignIn("github")}
-        >
-          <Icons.github className="mr-2 h-4 w-4" />
-          GitHub
-        </Button>
-      </div>
+      <FastGoogleAuth 
+        mode="fast"
+        onSuccess={onSuccess}
+        onError={(error: string) => setError(error)}
+        className="w-full"
+        variant="outline"
+      />
+      
+      <AuthPerformanceMonitor />
     </div>
   )
 } 

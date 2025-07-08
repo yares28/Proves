@@ -13,6 +13,7 @@ export function mapExamData(exam: any) {
     semester: exam.semester || '',
     school: exam.school || '',
     degree: exam.degree || '',
+    acronym: exam.acronym || '',
     // Add any other fields needed by frontend
   };
 } 
