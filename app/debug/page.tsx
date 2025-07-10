@@ -1,73 +1,52 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { checkTableStructure, runDirectQuery } from "@/actions/table-check";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { ShieldAlert, AlertTriangle } from "lucide-react"
+import { AuthStatusChecker } from "@/components/auth-status-checker"
 
 export default function DebugPage() {
-  const [result, setResult] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-
-  const checkTable = async () => {
-    setLoading(true);
-    try {
-      const data = await checkTableStructure();
-      setResult(data);
-    } catch (error) {
-      setResult({ error: String(error) });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const runQuery = async () => {
-    setLoading(true);
-    try {
-      const data = await runDirectQuery();
-      setResult(data);
-    } catch (error) {
-      setResult({ error: String(error) });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="container py-8 space-y-6">
-      <h1 className="text-2xl font-bold">Database Debug Page</h1>
-      
-      <div className="flex gap-4">
-        <Button 
-          onClick={checkTable} 
-          disabled={loading}
-        >
-          Check Table Structure
-        </Button>
-        
-        <Button 
-          onClick={runQuery} 
-          disabled={loading}
-          variant="outline"
-        >
-          Run Direct Query
-        </Button>
-      </div>
-      
-      {loading && <p>Loading...</p>}
-      
-      {result && (
-        <Card>
+  // Security check: Only allow access in development environment
+  if (process.env.NODE_ENV === 'production') {
+    return (
+      <div className="container py-8 space-y-8">
+        <Card className="border-red-200 bg-red-50">
           <CardHeader>
-            <CardTitle>Result</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-red-700">
+              <ShieldAlert className="h-5 w-5" />
+              Access Restricted
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="bg-muted p-4 rounded overflow-auto max-h-[600px]">
-              {JSON.stringify(result, null, 2)}
-            </pre>
+            <p className="text-red-600">
+              This debug page is not available in production for security reasons.
+              Debugging tools are disabled to protect sensitive application information.
+            </p>
           </CardContent>
         </Card>
-      )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="container py-8 space-y-8">
+      <div className="mb-6">
+        <Alert className="border-yellow-200 bg-yellow-50">
+          <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          <AlertTitle className="text-yellow-800">Development Environment</AlertTitle>
+          <AlertDescription className="text-yellow-700">
+            This is a debug page only available in development. It contains diagnostic 
+            information and is automatically disabled in production for security.
+          </AlertDescription>
+        </Alert>
+      </div>
+
+      <h1 className="text-3xl font-bold">Debug Dashboard</h1>
+      <p className="text-muted-foreground">
+        Development debugging and diagnostic tools for troubleshooting application issues.
+      </p>
+      
+      <AuthStatusChecker />
     </div>
-  );
+  )
 } 

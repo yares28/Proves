@@ -4,6 +4,7 @@ export interface Exam {
   code: string
   date: string
   time: string
+  duration_minutes: number
   location: string
   school: string
   degree: string

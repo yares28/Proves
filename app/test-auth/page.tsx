@@ -1,85 +1,52 @@
 "use client"
 
-import { useAuth } from "@/context/auth-context"
 import { useState } from "react"
-import { testServerAuth } from "@/actions/auth-test"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { AuthDebugger } from "@/components/auth-debug"
+import { AuthDebugger } from "@/components/auth-debugger"
+import { useAuth } from "@/context/auth-context"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { ShieldAlert, AlertTriangle } from "lucide-react"
 
 export default function TestAuthPage() {
-  const { user } = useAuth()
-  const [result, setResult] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
-  
-  const runAuthTest = async () => {
-    setLoading(true)
-    try {
-      // Try getting auth token from localStorage for direct testing
-      let authToken = null;
-      try {
-        const storedAuth = localStorage.getItem('supabase.auth.token');
-        if (storedAuth) {
-          const authData = JSON.parse(storedAuth);
-          if (authData.currentSession?.access_token) {
-            authToken = authData.currentSession.access_token;
-            console.log("Found auth token:", authData.currentSession.access_token.substring(0, 10) + "...");
-          }
-        }
-      } catch (e) {
-        console.error("Error getting token:", e);
-      }
-      
-      // Run the auth test server action with direct token passing
-      const testResult = await testServerAuth(authToken);
-      setResult(testResult);
-    } catch (error) {
-      console.error("Error running auth test:", error);
-      setResult({ error: String(error) });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
+  // Security check: Only allow access in development environment
+  if (process.env.NODE_ENV === 'production') {
+    return (
+      <div className="container py-8 space-y-8">
+        <Card className="border-red-200 bg-red-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-700">
+              <ShieldAlert className="h-5 w-5" />
+              Access Restricted
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-red-600">
+              This debug page is not available in production for security reasons.
+              Authentication debugging features are disabled to protect sensitive information.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
-    <div className="container mx-auto py-10 space-y-8">
-      <h1 className="text-3xl font-bold">Authentication Test Page</h1>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Authentication Status</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm font-medium">User Status:</p>
-              <p className="text-lg">{user ? "Logged In" : "Not Logged In"}</p>
-              {user && (
-                <div className="mt-2">
-                  <p className="text-sm">User ID: {user.id}</p>
-                  <p className="text-sm">Email: {user.email}</p>
-                </div>
-              )}
-            </div>
-            
-            <Button 
-              onClick={runAuthTest} 
-              disabled={loading}
-            >
-              {loading ? "Testing..." : "Test Server Authentication"}
-            </Button>
-            
-            {result && (
-              <div className="mt-4 border rounded-md p-4 bg-muted/20">
-                <h3 className="text-sm font-medium mb-2">Test Result:</h3>
-                <pre className="text-xs overflow-auto p-2 bg-card rounded border">
-                  {JSON.stringify(result, null, 2)}
-                </pre>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+    <div className="container py-8 space-y-8">
+      <div className="mb-6">
+        <Alert className="border-yellow-200 bg-yellow-50">
+          <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          <AlertTitle className="text-yellow-800">Development Environment</AlertTitle>
+          <AlertDescription className="text-yellow-700">
+            This is a debug page only available in development. It contains sensitive authentication 
+            information and is automatically disabled in production for security.
+          </AlertDescription>
+        </Alert>
+      </div>
+
+      <h1 className="text-3xl font-bold">Test Authentication Page</h1>
+      <p className="text-muted-foreground">
+        This page provides authentication debugging and testing capabilities for development.
+      </p>
       
       <AuthDebugger />
     </div>

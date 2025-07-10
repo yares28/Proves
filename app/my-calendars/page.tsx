@@ -6,10 +6,13 @@ import { getUserCalendars, deleteUserCalendar } from "@/actions/user-calendars"
 import { getExams } from "@/actions/exam-actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Calendar, Trash2, Eye, X, Clock, MapPin, List, CalendarDays, Loader2 } from "lucide-react"
+import { Trash2, Eye, X, Clock, MapPin, List, CalendarDays, Loader2 } from "lucide-react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { getFreshAuthTokens } from "@/utils/auth-helpers"
+import { GoogleCalendarExportDialog } from "@/components/export-google-calendar-dialog"
+import { generateICalContent, downloadICalFile } from "@/lib/utils"
 
 interface SavedCalendar {
   id: string
@@ -27,6 +30,9 @@ export default function MyCalendarsPage() {
   const [examsLoading, setExamsLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar')
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [exportingCalendar, setExportingCalendar] = useState<SavedCalendar | null>(null)
+  const [exportingExams, setExportingExams] = useState<any[]>([])
   const router = useRouter()
   const { toast } = useToast()
 
@@ -211,6 +217,65 @@ export default function MyCalendarsPage() {
     }
   }
 
+  const handleGoogleCalendarExport = async (calendar: SavedCalendar) => {
+    try {
+      console.log('🔄 Preparing Google Calendar export for:', calendar.name)
+      const exams = await getExams(calendar.filters)
+      console.log(`✅ Fetched ${exams.length} exams for export`)
+      
+      setExportingCalendar(calendar)
+      setExportingExams(exams)
+      setExportDialogOpen(true)
+    } catch (error) {
+      console.error('❌ Error preparing Google Calendar export:', error)
+      toast({
+        title: "Error",
+        description: "Error al preparar la exportación a Google Calendar.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleIcalExport = async (calendar: SavedCalendar) => {
+    try {
+      console.log('🍎 Starting iCal export for calendar:', calendar.name)
+      
+      // Fetch exams for this calendar
+      const exams = await getExams(calendar.filters)
+      
+      if (exams.length === 0) {
+        toast({
+          title: "Sin exámenes",
+          description: "No hay exámenes para exportar con los filtros actuales.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // Generate iCal content using the new function
+      const icalContent = generateICalContent(exams, {
+        calendarName: calendar.name,
+        timeZone: 'Europe/Madrid',
+        reminderMinutes: [24 * 60, 60] // 1 day and 1 hour before
+      })
+
+      // Download the file using the new function
+      downloadICalFile(icalContent, `${calendar.name}.ics`)
+      
+      toast({
+        title: "¡Éxito!",
+        description: `Descargado "${calendar.name}.ics" con ${exams.length} exámenes.`
+      })
+    } catch (error) {
+      console.error('❌ Error exporting to iCal:', error)
+      toast({
+        title: "Error",
+        description: "Error al exportar a iCal.",
+        variant: "destructive"
+      })
+    }
+  }
+
   const getFilterSummary = (filters: Record<string, string[]>) => {
     const filterEntries = Object.entries(filters).filter(([_, values]) => values.length > 0)
     const totalFilters = filterEntries.reduce((sum, [_, values]) => sum + values.length, 0)
@@ -273,6 +338,8 @@ export default function MyCalendarsPage() {
                       <div className="flex-1 flex items-center justify-center p-6">
                         <h3 className="text-lg font-medium text-center">{calendar.name}</h3>
                       </div>
+                      
+                      {/* Action buttons row */}
                       <div className="bg-muted/30 p-3 flex justify-between items-center">
                         <Button
                           variant="ghost"
@@ -287,14 +354,51 @@ export default function MyCalendarsPage() {
                             <Trash2 className="h-4 w-4" />
                           )}
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleViewCalendar(calendar)}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          Ver
-                        </Button>
+                        
+                        <div className="flex items-center gap-1">
+                          {/* Export buttons */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleGoogleCalendarExport(calendar)}
+                            title="Export to Google Calendar"
+                          >
+                            <Image 
+                              src="/google-cal.png" 
+                              alt="Google Calendar" 
+                              width={25} 
+                              height={25}
+                              className="w-5 h-5"
+                            />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleIcalExport(calendar)}
+                            title="Export to Apple Calendar (iCal)"
+                          >
+                            <Image 
+                              src="/apple-cal.png" 
+                              alt="Apple Calendar" 
+                              width={16} 
+                              height={16}
+                              className="w-4 h-4"
+                            />
+                          </Button>
+                          
+                          {/* View button */}
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleViewCalendar(calendar)}
+                            title="Ver calendario"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -303,7 +407,7 @@ export default function MyCalendarsPage() {
             </div>
           ) : (
             <div className="text-center p-8 border rounded-lg bg-muted/10">
-              <Calendar className="mx-auto h-12 w-12 text-muted-foreground opacity-20 mb-2" />
+              <CalendarDays className="mx-auto h-12 w-12 text-muted-foreground opacity-20 mb-2" />
               <h3 className="text-lg font-medium mb-1">No hay calendarios guardados</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 Aún no has guardado ningún calendario de exámenes.
@@ -484,7 +588,7 @@ export default function MyCalendarsPage() {
               )
             ) : (
               <div className="text-center p-8 border rounded-lg bg-muted/10">
-                <Calendar className="mx-auto h-12 w-12 text-muted-foreground opacity-20 mb-2" />
+                <CalendarDays className="mx-auto h-12 w-12 text-muted-foreground opacity-20 mb-2" />
                 <h3 className="text-lg font-medium mb-1">No hay exámenes</h3>
                 <p className="text-sm text-muted-foreground">
                   No se encontraron exámenes para los filtros de este calendario.
@@ -494,6 +598,22 @@ export default function MyCalendarsPage() {
           </div>
         )}
       </div>
+
+      {/* Google Calendar Export Dialog */}
+      {exportingCalendar && (
+        <GoogleCalendarExportDialog
+          open={exportDialogOpen}
+          onOpenChange={(open) => {
+            setExportDialogOpen(open)
+            if (!open) {
+              setExportingCalendar(null)
+              setExportingExams([])
+            }
+          }}
+          exams={exportingExams}
+          defaultCalendarName={exportingCalendar.name}
+        />
+      )}
     </div>
   )
 } 

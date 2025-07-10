@@ -1,18 +1,21 @@
 
-import { createBrowserClient } from "@supabase/ssr";
+import { createBrowserClient } from '@supabase/ssr'
+import { Database } from '@/types/database.types'
 
-export const createClient = () =>
-  createBrowserClient(
+export function createClient() {
+  return createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       auth: {
-        // Keep your refresh token around (localStorage by default in the browser)
-        persistSession: true,
-        // When access tokens expire, automatically refresh them
-        autoRefreshToken: true,
-        // (optional) detect auth state in URL hash after a redirect sign-in
+        // Use secure server-side session management
+        persistSession: false, // Don't persist on client
+        autoRefreshToken: false, // Handle refresh server-side
         detectSessionInUrl: true,
+        // Remove localStorage usage completely
+        storage: undefined
       }
     }
-  );
+  )
+}
+
