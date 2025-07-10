@@ -51,7 +51,7 @@ export async function saveUserCalendar({ name, filters, userId, accessToken, ref
     
     // If auth tokens were explicitly passed, use them to set the session
     if (accessToken && refreshToken) {
-      console.log('🔄 [SERVER] Setting session with provided auth tokens:', accessToken.substring(0, 10) + '...');
+      console.log('🔄 [SERVER] Setting session with provided auth tokens (token details redacted for security)');
       
       try {
         // Set the session using the provided tokens
@@ -61,11 +61,11 @@ export async function saveUserCalendar({ name, filters, userId, accessToken, ref
         });
         
         if (error) {
-          console.error('❌ [SERVER] Error setting session with tokens:', error);
+          console.error('❌ [SERVER] Error setting session with tokens (error details may contain sensitive data):', error.message);
           throw new Error(`Auth token error: ${error.message}`);
         }
         
-        console.log('✅ [SERVER] Session set using provided tokens:', {
+        console.log('✅ [SERVER] Session set successfully:', {
           user: data?.user?.id,
           hasSession: !!data?.session
         });
@@ -169,7 +169,7 @@ export async function getUserCalendars(userId: string, accessToken?: string, ref
     
     // If auth tokens were provided, use them to set the session
     if (accessToken && refreshToken) {
-      console.log('🔄 [SERVER] Setting session with provided auth tokens');
+      console.log('🔄 [SERVER] Setting session with provided auth tokens (details redacted)');
       
       try {
         const { data, error } = await supabase.auth.setSession({
@@ -178,13 +178,13 @@ export async function getUserCalendars(userId: string, accessToken?: string, ref
         });
         
         if (error) {
-          console.error('❌ [SERVER] Error setting session:', error);
+          console.error('❌ [SERVER] Error setting session (sensitive details redacted):', error.message);
           throw new Error(`Auth token error: ${error.message}`);
         }
         
         console.log('✅ [SERVER] Session set successfully');
       } catch (e) {
-        console.error('❌ [SERVER] Error setting session:', e);
+        console.error('❌ [SERVER] Error setting session (sensitive details redacted)');
         throw e;
       }
     } else {
@@ -259,7 +259,7 @@ export async function getUserCalendarNames(userId: string, accessToken?: string,
     
     // If auth tokens were provided, use them to set the session
     if (accessToken && refreshToken) {
-      console.log('🔄 [SERVER] Setting session with provided auth tokens');
+      console.log('🔄 [SERVER] Setting session with provided auth tokens (details redacted)');
       
       try {
         const { data, error } = await supabase.auth.setSession({
@@ -268,13 +268,13 @@ export async function getUserCalendarNames(userId: string, accessToken?: string,
         });
         
         if (error) {
-          console.error('❌ [SERVER] Error setting session:', error);
+          console.error('❌ [SERVER] Error setting session (sensitive details redacted):', error.message);
           throw new Error(`Auth token error: ${error.message}`);
         }
         
         console.log('✅ [SERVER] Session set successfully');
       } catch (e) {
-        console.error('❌ [SERVER] Error setting session:', e);
+        console.error('❌ [SERVER] Error setting session (sensitive details redacted)');
         throw e;
       }
     } else {
@@ -350,7 +350,7 @@ export async function deleteUserCalendar(calendarId: string, userId: string, acc
     
     // If auth tokens were provided, use them to set the session
     if (accessToken && refreshToken) {
-      console.log('🔄 [SERVER] Setting session with provided auth tokens');
+      console.log('🔄 [SERVER] Setting session with provided auth tokens (details redacted)');
       
       try {
         const { data, error } = await supabase.auth.setSession({
@@ -359,13 +359,13 @@ export async function deleteUserCalendar(calendarId: string, userId: string, acc
         });
         
         if (error) {
-          console.error('❌ [SERVER] Error setting session:', error);
+          console.error('❌ [SERVER] Error setting session (sensitive details redacted):', error.message);
           throw new Error(`Auth token error: ${error.message}`);
         }
         
         console.log('✅ [SERVER] Session set successfully');
       } catch (e) {
-        console.error('❌ [SERVER] Error setting session:', e);
+        console.error('❌ [SERVER] Error setting session (sensitive details redacted)');
         throw e;
       }
     } else {

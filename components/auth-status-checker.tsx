@@ -126,44 +126,41 @@ export function AuthStatusChecker() {
     setLoading(true)
     
     try {
-      console.log("🔧 Starting authentication repair...")
-
-      // 1. Refresh the session
+      console.log("🔄 Attempting to repair authentication...")
+      
+      // 1. Refresh the session using Supabase's built-in refresh
       const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
       
-      if (refreshError) {
+      if (refreshError || !refreshData.session) {
         console.error("Failed to refresh session:", refreshError)
-        throw new Error(`Session refresh failed: ${refreshError.message}`)
-      }
-
-      if (!refreshData.session) {
         throw new Error("No session available after refresh")
       }
 
-      // 2. Store session properly in localStorage
-      localStorage.setItem('supabase.auth.token', JSON.stringify({
-        currentSession: refreshData.session
-      }))
+      // 2. Let server handle secure session storage via httpOnly cookies
+      // Send session to server for secure storage
+      const response = await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          access_token: refreshData.session.access_token,
+          refresh_token: refreshData.session.refresh_token,
+          expires_at: refreshData.session.expires_at
+        }),
+        credentials: 'include' // Important for httpOnly cookies
+      });
 
-      // 3. Set cookies for server-side access
-      const domain = window.location.hostname
-      const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/^https?:\/\//, '').replace(/\..*$/, '')
-      const maxAge = 60 * 60 * 24 * 7 // 7 days
+      if (!response.ok) {
+        throw new Error('Failed to store session securely');
+      }
 
-      // Set multiple cookie formats for compatibility
-      const cookieOptions = `path=/; domain=${domain}; max-age=${maxAge}; SameSite=Lax; Secure`
-      
-      document.cookie = `sb-access-token=${refreshData.session.access_token}; ${cookieOptions}`
-      document.cookie = `sb-refresh-token=${refreshData.session.refresh_token}; ${cookieOptions}`
-      document.cookie = `sb:token=${refreshData.session.access_token}; ${cookieOptions}`
-      document.cookie = `sb-${baseUrl}-auth-token=${JSON.stringify(refreshData.session)}; ${cookieOptions}`
-
-      // 4. Sync with auth context
+      // 3. Sync with auth context
       if (syncToken) {
         await syncToken()
       }
 
-      console.log("✅ Authentication repair completed")
+      console.log("✅ Authentication repair completed securely")
       
       // Re-check status
       await performAuthCheck()
@@ -182,7 +179,7 @@ export function AuthStatusChecker() {
     }
   }
 
-  // Clear all authentication data
+  // Clear all authentication data securely
   const clearAuthData = async () => {
     setLoading(true)
     
@@ -190,21 +187,11 @@ export function AuthStatusChecker() {
       // Sign out from Supabase
       await supabase.auth.signOut()
       
-      // Clear localStorage
-      localStorage.removeItem('supabase.auth.token')
-      
-      // Clear cookies
-      const domain = window.location.hostname
-      const cookiesToClear = [
-        'sb-access-token',
-        'sb-refresh-token', 
-        'sb:token',
-        `sb-${process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/^https?:\/\//, '').replace(/\..*$/, '')}-auth-token`
-      ]
-      
-      cookiesToClear.forEach(name => {
-        document.cookie = `${name}=; path=/; domain=${domain}; max-age=0`
-      })
+      // Clear server-side session via API
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
       
       // Refresh the page to clear all state
       window.location.reload()

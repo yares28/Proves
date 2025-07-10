@@ -9,7 +9,7 @@ import { cookies } from 'next/headers'
  */
 export async function testServerAuth(authToken?: string) {
   console.log('🔍 [SERVER] Running server authentication test');
-  console.log('Token provided directly:', authToken ? 'yes' : 'no');
+  console.log('Token provided directly:', authToken ? 'yes (details redacted)' : 'no');
   
   try {
     // Create server client

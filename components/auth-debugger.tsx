@@ -1,149 +1,90 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { useAuth } from "@/context/auth-context"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { ShieldAlert, AlertTriangle } from "lucide-react"
 
 export function AuthDebugger() {
+  // Security: Only show debug information in development
+  if (process.env.NODE_ENV === 'production') {
+    return (
+      <Card className="border-red-200 bg-red-50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-red-700">
+            <ShieldAlert className="h-5 w-5" />
+            Debug Information Restricted
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-red-600">
+            Authentication debug information is not available in production environments 
+            for security reasons. This prevents sensitive data exposure.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
   const { user } = useAuth()
-  const [localStorageData, setLocalStorageData] = useState<any>(null)
-  const [cookieData, setCookieData] = useState<string>("")
-  const [refreshing, setRefreshing] = useState(false)
-
-  // Load localStorage data
-  useEffect(() => {
-    try {
-      const auth = localStorage.getItem('supabase.auth.token')
-      if (auth) {
-        const parsed = JSON.parse(auth)
-        setLocalStorageData(parsed)
-      }
-    } catch (e) {
-      console.error("Error parsing auth data:", e)
-    }
-    
-    // Show cookies
-    setCookieData(document.cookie)
-  }, [refreshing])
-
-  // Function to refresh data
-  const refreshData = () => {
-    setRefreshing(true)
-    setTimeout(() => setRefreshing(false), 100)
-  }
-
-  // Format token display
-  const formatToken = (token: string | null | undefined) => {
-    if (!token) return "Not available"
-    return `${token.substring(0, 12)}...${token.substring(token.length - 8)}`
-  }
 
   return (
-    <Card className="w-full">
+    <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          Authentication Debug
-          <Button size="sm" onClick={refreshData}>Refresh</Button>
+        <CardTitle className="flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5 text-yellow-500" />
+          Authentication Debugger
         </CardTitle>
         <CardDescription>
-          Diagnostic information for troubleshooting authentication issues
+          Development-only debug information. Automatically disabled in production.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="overview">
-          <TabsList className="mb-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="tokens">Tokens</TabsTrigger>
-            <TabsTrigger value="cookies">Cookies</TabsTrigger>
-            <TabsTrigger value="localStorage">LocalStorage</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="overview">
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-medium mb-2">User Status</h3>
-                <div className="flex items-center space-x-2">
-                  <Badge variant={user ? "default" : "destructive"}>
-                    {user ? "Logged In" : "Not Logged In"}
-                  </Badge>
-                  {user && <Badge variant="outline">{user.email}</Badge>}
+      <CardContent className="space-y-4">
+        <Alert className="border-yellow-200 bg-yellow-50">
+          <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          <AlertTitle className="text-yellow-800">Security Notice</AlertTitle>
+          <AlertDescription className="text-yellow-700">
+            This component exposes sensitive authentication data and is only available 
+            in development environments.
+          </AlertDescription>
+        </Alert>
+
+        <div className="space-y-4">
+          <div>
+            <h4 className="text-sm font-medium mb-2">User Information</h4>
+            {user ? (
+              <div className="space-y-2 text-sm">
+                <div><strong>ID:</strong> {user.id}</div>
+                <div><strong>Email:</strong> {user.email}</div>
+                <div><strong>Email Verified:</strong> {user.email_confirmed_at ? "Yes" : "No"}</div>
+                <div><strong>Provider:</strong> {user.app_metadata?.provider || "Unknown"}</div>
+                <div><strong>Created:</strong> {user.created_at}</div>
+                <div><strong>Auth Status:</strong> 
+                  <Badge variant="default" className="ml-2">Authenticated</Badge>
                 </div>
               </div>
+            ) : (
+              <div className="space-y-2">
+                <Badge variant="destructive">No user data</Badge>
+                <p className="text-sm text-muted-foreground">
+                  User is not authenticated or session data is not available
+                </p>
+              </div>
+            )}
+          </div>
 
-              <div>
-                <h3 className="text-sm font-medium mb-2">Authentication Summary</h3>
-                <ul className="list-disc pl-5 space-y-1 text-sm">
-                  <li>User ID: {user?.id || "Not available"}</li>
-                  <li>Email: {user?.email || "Not available"}</li>
-                  <li>Auth Method: {localStorageData?.currentSession?.provider_token ? "OAuth" : "Email/Password"}</li>
-                  <li>Access Token: {localStorageData?.currentSession?.access_token ? "Available" : "Missing"}</li>
-                  <li>Refresh Token: {localStorageData?.currentSession?.refresh_token ? "Available" : "Missing"}</li>
-                  <li>Token Expiry: {
-                    localStorageData?.currentSession?.expires_at 
-                      ? new Date(localStorageData.currentSession.expires_at * 1000).toLocaleString() 
-                      : "Unknown"
-                  }</li>
-                </ul>
-              </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="tokens">
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-medium mb-2">Access Token</h3>
-                <pre className="bg-muted p-2 rounded-md text-xs whitespace-pre-wrap break-all">
-                  {formatToken(localStorageData?.currentSession?.access_token)}
-                </pre>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium mb-2">Refresh Token</h3>
-                <pre className="bg-muted p-2 rounded-md text-xs whitespace-pre-wrap break-all">
-                  {formatToken(localStorageData?.currentSession?.refresh_token)}
-                </pre>
-              </div>
+          <Separator />
 
-              <div>
-                <h3 className="text-sm font-medium mb-2">Token Information</h3>
-                <ul className="list-disc pl-5 space-y-1 text-sm">
-                  <li>Provider: {localStorageData?.currentSession?.provider || "Not available"}</li>
-                  <li>Expires At: {
-                    localStorageData?.currentSession?.expires_at 
-                      ? new Date(localStorageData.currentSession.expires_at * 1000).toLocaleString() 
-                      : "Unknown"
-                  }</li>
-                  <li>Issued At: {
-                    localStorageData?.currentSession?.created_at 
-                      ? new Date(localStorageData.currentSession.created_at * 1000).toLocaleString() 
-                      : "Unknown"
-                  }</li>
-                </ul>
-              </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="cookies">
-            <div>
-              <h3 className="text-sm font-medium mb-2">Browser Cookies</h3>
-              <pre className="bg-muted p-2 rounded-md text-xs whitespace-pre-wrap">
-                {cookieData || "No cookies found"}
-              </pre>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="localStorage">
-            <div>
-              <h3 className="text-sm font-medium mb-2">localStorage Auth Data</h3>
-              <pre className="bg-muted p-2 rounded-md text-xs overflow-auto max-h-96">
-                {JSON.stringify(localStorageData, null, 2) || "No data found"}
-              </pre>
-            </div>
-          </TabsContent>
-        </Tabs>
+          <div>
+            <h4 className="text-sm font-medium mb-2">Security Notice</h4>
+            <p className="text-sm text-muted-foreground">
+              Detailed session information (tokens, etc.) is not displayed for security reasons, 
+              even in development. Only basic user authentication status is shown.
+            </p>
+          </div>
+        </div>
       </CardContent>
     </Card>
   )
