@@ -325,6 +325,29 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               <Download className="h-4 w-4" />
               <span>Add to Apple</span>
             </Button>
+            {/* Development: Manual iCal download */}
+            {process.env.NODE_ENV === 'development' && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-10 gap-1.5 rounded-md border-orange-300 text-orange-600"
+                disabled={exams.length === 0}
+                onClick={() => {
+                  import("@/lib/utils").then(({ generateICalContent, downloadICalFile }) => {
+                    const icalContent = generateICalContent(exams, {
+                      calendarName: 'UPV Exams (Dev)',
+                      timeZone: 'Europe/Madrid',
+                      reminderMinutes: [24 * 60, 60]
+                    })
+                    downloadICalFile(icalContent, 'upv-exams-dev.ics')
+                  })
+                }}
+                title="Development: Download .ics file for inspection"
+              >
+                <Download className="h-4 w-4" />
+                <span>Dev Download</span>
+              </Button>
+            )}
           </div>
 
           <DropdownMenu>
@@ -365,6 +388,26 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                 <Download className="mr-2 h-4 w-4" />
                 <span>Add to Apple</span>
               </DropdownMenuItem>
+              {/* Development: Manual iCal download */}
+              {process.env.NODE_ENV === 'development' && (
+                <DropdownMenuItem 
+                  disabled={exams.length === 0}
+                  onClick={() => {
+                    import("@/lib/utils").then(({ generateICalContent, downloadICalFile }) => {
+                      const icalContent = generateICalContent(exams, {
+                        calendarName: 'UPV Exams (Dev)',
+                        timeZone: 'Europe/Madrid',
+                        reminderMinutes: [24 * 60, 60]
+                      })
+                      downloadICalFile(icalContent, 'upv-exams-dev.ics')
+                    })
+                  }}
+                  className="text-orange-600"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  <span>Dev Download .ics</span>
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
