@@ -83,7 +83,7 @@ export function generateICalContent(exams: Exam[], options: ICalExportOptions = 
 
     icalLines.push(
       'BEGIN:VEVENT',
-      `UID:exam-${exam.id}-${Date.now()}@upv-exam-calendar.com`,
+      `UID:exam-${exam.id}-${exam.date}-${exam.time}@upv-exam-calendar.com`,
       `DTSTART;TZID=${timeZone}:${formatICalDate(startTime)}`,
       `DTEND;TZID=${timeZone}:${formatICalDate(endTime)}`,
       `SUMMARY:🎓 ${exam.subject} - Exam`,

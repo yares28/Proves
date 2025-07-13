@@ -6,7 +6,7 @@ import { getUserCalendars, deleteUserCalendar } from "@/actions/user-calendars"
 import { getExams } from "@/actions/exam-actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Trash2, Eye, X, Clock, MapPin, List, CalendarDays, Loader2 } from "lucide-react"
+import { Trash2, Eye, X, Clock, MapPin, List, CalendarDays, Loader2, Download } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
@@ -264,6 +264,49 @@ export default function MyCalendarsPage() {
     }
   }
 
+  const handleDevIcalDownload = async (calendar: SavedCalendar) => {
+    try {
+      console.log('🔧 [DEV] Starting iCal download for calendar:', calendar.name)
+      
+      // Fetch exams for this calendar
+      const exams = await getExams(calendar.filters)
+      
+      if (exams.length === 0) {
+        toast({
+          title: "[DEV] Sin exámenes",
+          description: "No hay exámenes para exportar con los filtros actuales.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // Dynamically import the utils to avoid SSR issues
+      const { generateICalContent, downloadICalFile } = await import("@/lib/utils")
+
+      // Generate iCal content with dev marker
+      const icalContent = generateICalContent(exams, {
+        calendarName: `${calendar.name} (DEV)`,
+        timeZone: 'Europe/Madrid',
+        reminderMinutes: [24 * 60, 60]
+      })
+
+      // Download the file
+      downloadICalFile(icalContent, `${calendar.name}-dev.ics`)
+      
+      toast({
+        title: "🔧 [DEV] ¡Descarga completa!",
+        description: `Descargado "${calendar.name}-dev.ics" con ${exams.length} exámenes para inspección.`
+      })
+    } catch (error) {
+      console.error('❌ [DEV] Error downloading iCal:', error)
+      toast({
+        title: "[DEV] Error",
+        description: "Error al descargar el archivo iCal para desarrollo.",
+        variant: "destructive"
+      })
+    }
+  }
+
   const getFilterSummary = (filters: Record<string, string[]>) => {
     const filterEntries = Object.entries(filters).filter(([_, values]) => values.length > 0)
     const totalFilters = filterEntries.reduce((sum, [_, values]) => sum + values.length, 0)
@@ -396,6 +439,19 @@ export default function MyCalendarsPage() {
                               className="w-4 h-4"
                             />
                           </Button>
+                          
+                          {/* Development: Manual iCal download */}
+                          {process.env.NODE_ENV === 'development' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-orange-600"
+                              onClick={() => handleDevIcalDownload(calendar)}
+                              title="Development: Download .ics file"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          )}
                           
                           {/* View button */}
                           <Button 

@@ -6,6 +6,7 @@ export function mapExamData(exam: any) {
     id: exam.exam_instance_id,
     date: exam.exam_date,
     time: exam.exam_time,
+    duration_minutes: exam.duration_minutes || 120, // Default to 2 hours if not specified
     subject: exam.subject,
     code: exam.code?.toString() || '',
     location: exam.place || '',
