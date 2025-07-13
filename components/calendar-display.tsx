@@ -14,7 +14,7 @@ import { ExamListView } from "@/components/exam-list-view"
 import { getExams } from "@/actions/exam-actions"
 import { formatDateString, getCurrentYear, getAcademicYearForMonth, detectAcademicYearFromExams, generateAcademicYearMonths } from "@/utils/date-utils"
 import { SaveCalendarDialog } from "@/components/save-calendar-dialog"
-import { GoogleCalendarExportDialog } from "@/components/export-google-calendar-dialog"
+
 import { useAuth } from "@/context/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { 
@@ -36,7 +36,6 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
   const [months, setMonths] = useState<any[]>([])
   const [academicYear, setAcademicYear] = useState<{ startYear: number; endYear: number } | null>(null)
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
-  const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [existingNames, setExistingNames] = useState<string[]>([])
   const { user, syncToken } = useAuth()
   const { toast } = useToast()
@@ -297,15 +296,34 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               variant="outline" 
               size="sm" 
               className="h-10 gap-1.5 rounded-md"
-              onClick={() => setExportDialogOpen(true)}
               disabled={exams.length === 0}
+              onClick={() => {
+                const baseUrl = window.location.origin
+                const filtersParam = encodeURIComponent(JSON.stringify(activeFilters))
+                const icalUrl = `${baseUrl}/api/ical?filters=${filtersParam}&name=UPV%20Exams`
+                const encodedUrl = encodeURIComponent(icalUrl)
+                const googleCalendarUrl = `https://calendar.google.com/calendar/r/addbyurl?url=${encodedUrl}`
+                window.open(googleCalendarUrl, '_blank')
+              }}
             >
               <Calendar className="h-4 w-4" />
-              <span>Google Calendar</span>
+              <span>Add to Google</span>
             </Button>
-            <Button variant="outline" size="sm" className="h-10 gap-1.5 rounded-md">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-10 gap-1.5 rounded-md"
+              disabled={exams.length === 0}
+              onClick={() => {
+                const baseUrl = window.location.origin
+                const filtersParam = encodeURIComponent(JSON.stringify(activeFilters))
+                const icalUrl = `${baseUrl}/api/ical?filters=${filtersParam}&name=UPV%20Exams`
+                const webcalUrl = icalUrl.replace(/^https?:/, 'webcal:')
+                window.location.href = webcalUrl
+              }}
+            >
               <Download className="h-4 w-4" />
-              <span>iCal Export</span>
+              <span>Add to Apple</span>
             </Button>
           </div>
 
@@ -321,15 +339,31 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                 <span>Save View</span>
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onClick={() => setExportDialogOpen(true)}
                 disabled={exams.length === 0}
+                onClick={() => {
+                  const baseUrl = window.location.origin
+                  const filtersParam = encodeURIComponent(JSON.stringify(activeFilters))
+                  const icalUrl = `${baseUrl}/api/ical?filters=${filtersParam}&name=UPV%20Exams`
+                  const encodedUrl = encodeURIComponent(icalUrl)
+                  const googleCalendarUrl = `https://calendar.google.com/calendar/r/addbyurl?url=${encodedUrl}`
+                  window.open(googleCalendarUrl, '_blank')
+                }}
               >
                 <Calendar className="mr-2 h-4 w-4" />
-                <span>Google Calendar</span>
+                <span>Add to Google</span>
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem 
+                disabled={exams.length === 0}
+                onClick={() => {
+                  const baseUrl = window.location.origin
+                  const filtersParam = encodeURIComponent(JSON.stringify(activeFilters))
+                  const icalUrl = `${baseUrl}/api/ical?filters=${filtersParam}&name=UPV%20Exams`
+                  const webcalUrl = icalUrl.replace(/^https?:/, 'webcal:')
+                  window.location.href = webcalUrl
+                }}
+              >
                 <Download className="mr-2 h-4 w-4" />
-                <span>iCal Export</span>
+                <span>Add to Apple</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -345,12 +379,7 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
         existingNames={existingNames}
       />
 
-              {/* Add GoogleCalendarExportDialog component */}
-        <GoogleCalendarExportDialog
-          open={exportDialogOpen}
-          onOpenChange={setExportDialogOpen}
-        exams={exams}
-      />
+
 
       <AnimatePresence mode="wait">
         {view === "calendar" ? (

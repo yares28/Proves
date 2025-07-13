@@ -11,8 +11,8 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { getFreshAuthTokens } from "@/utils/auth-helpers"
-import { GoogleCalendarExportDialog } from "@/components/export-google-calendar-dialog"
-import { generateICalContent, downloadICalFile } from "@/lib/utils"
+
+
 
 interface SavedCalendar {
   id: string
@@ -30,9 +30,6 @@ export default function MyCalendarsPage() {
   const [examsLoading, setExamsLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar')
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [exportDialogOpen, setExportDialogOpen] = useState(false)
-  const [exportingCalendar, setExportingCalendar] = useState<SavedCalendar | null>(null)
-  const [exportingExams, setExportingExams] = useState<any[]>([])
   const router = useRouter()
   const { toast } = useToast()
 
@@ -217,60 +214,51 @@ export default function MyCalendarsPage() {
     }
   }
 
+
+
   const handleGoogleCalendarExport = async (calendar: SavedCalendar) => {
     try {
-      console.log('🔄 Preparing Google Calendar export for:', calendar.name)
-      const exams = await getExams(calendar.filters)
-      console.log(`✅ Fetched ${exams.length} exams for export`)
+      const baseUrl = window.location.origin
+      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`
+      const encodedUrl = encodeURIComponent(icalUrl)
+      const googleCalendarUrl = `https://calendar.google.com/calendar/r/addbyurl?url=${encodedUrl}`
       
-      setExportingCalendar(calendar)
-      setExportingExams(exams)
-      setExportDialogOpen(true)
+      // Open Google Calendar in a new tab
+      window.open(googleCalendarUrl, '_blank')
+      
+      toast({
+        title: "Redirigiendo a Google Calendar",
+        description: "Se abrirá Google Calendar con el enlace de suscripción.",
+      })
     } catch (error) {
-      console.error('❌ Error preparing Google Calendar export:', error)
+      console.error('❌ Error opening Google Calendar:', error)
       toast({
         title: "Error",
-        description: "Error al preparar la exportación a Google Calendar.",
+        description: "No se pudo abrir Google Calendar.",
         variant: "destructive"
       })
     }
   }
 
-  const handleIcalExport = async (calendar: SavedCalendar) => {
+  const handleAppleCalendarExport = async (calendar: SavedCalendar) => {
     try {
-      console.log('🍎 Starting iCal export for calendar:', calendar.name)
+      const baseUrl = window.location.origin
+      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`
+      // Convert http/https to webcal protocol for Apple Calendar
+      const webcalUrl = icalUrl.replace(/^https?:/, 'webcal:')
       
-      // Fetch exams for this calendar
-      const exams = await getExams(calendar.filters)
-      
-      if (exams.length === 0) {
-        toast({
-          title: "Sin exámenes",
-          description: "No hay exámenes para exportar con los filtros actuales.",
-          variant: "destructive"
-        })
-        return
-      }
-
-      // Generate iCal content using the new function
-      const icalContent = generateICalContent(exams, {
-        calendarName: calendar.name,
-        timeZone: 'Europe/Madrid',
-        reminderMinutes: [24 * 60, 60] // 1 day and 1 hour before
-      })
-
-      // Download the file using the new function
-      downloadICalFile(icalContent, `${calendar.name}.ics`)
+      // Try to open with webcal protocol
+      window.location.href = webcalUrl
       
       toast({
-        title: "¡Éxito!",
-        description: `Descargado "${calendar.name}.ics" con ${exams.length} exámenes.`
+        title: "Abriendo Apple Calendar",
+        description: "Se intentará abrir Apple Calendar con el enlace de suscripción.",
       })
     } catch (error) {
-      console.error('❌ Error exporting to iCal:', error)
+      console.error('❌ Error opening Apple Calendar:', error)
       toast({
         title: "Error",
-        description: "Error al exportar a iCal.",
+        description: "No se pudo abrir Apple Calendar.",
         variant: "destructive"
       })
     }
@@ -317,6 +305,27 @@ export default function MyCalendarsPage() {
       <div className="opacity-100">
         <h1 className="text-center text-3xl font-bold tracking-tight mb-8">MIS CALENDARIOS</h1>
 
+        {/* Calendar Export Help Section */}
+        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 mt-0.5">
+              <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                Añadir a tu calendario
+              </h3>
+              <p className="text-sm text-blue-700 dark:text-blue-200">
+                Haz clic en <strong>Google Calendar</strong> o <strong>Apple Calendar</strong> para abrir tu aplicación de calendario y añadir automáticamente la suscripción. Los exámenes se actualizarán automáticamente.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-6">
           {loading ? (
             <div className="flex justify-center p-8">
@@ -362,22 +371,22 @@ export default function MyCalendarsPage() {
                             size="sm"
                             className="h-8 w-8 p-0"
                             onClick={() => handleGoogleCalendarExport(calendar)}
-                            title="Export to Google Calendar"
+                            title="Add to Google Calendar"
                           >
                             <Image 
                               src="/google-cal.png" 
                               alt="Google Calendar" 
-                              width={25} 
-                              height={25}
-                              className="w-5 h-5"
+                              width={16} 
+                              height={16}
+                              className="w-4 h-4"
                             />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             className="h-8 w-8 p-0"
-                            onClick={() => handleIcalExport(calendar)}
-                            title="Export to Apple Calendar (iCal)"
+                            onClick={() => handleAppleCalendarExport(calendar)}
+                            title="Add to Apple Calendar"
                           >
                             <Image 
                               src="/apple-cal.png" 
@@ -599,21 +608,7 @@ export default function MyCalendarsPage() {
         )}
       </div>
 
-      {/* Google Calendar Export Dialog */}
-      {exportingCalendar && (
-        <GoogleCalendarExportDialog
-          open={exportDialogOpen}
-          onOpenChange={(open) => {
-            setExportDialogOpen(open)
-            if (!open) {
-              setExportingCalendar(null)
-              setExportingExams([])
-            }
-          }}
-          exams={exportingExams}
-          defaultCalendarName={exportingCalendar.name}
-        />
-      )}
+
     </div>
   )
 } 
