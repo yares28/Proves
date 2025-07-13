@@ -4,6 +4,8 @@ import { generateICalContent } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   try {
+    // This endpoint is designed for public access by calendar applications
+    // It doesn't require authentication since it uses filters from URL parameters
     const { searchParams } = new URL(request.url)
     const filtersParam = searchParams.get('filters')
     const calendarName = searchParams.get('name') || 'UPV Exams'
