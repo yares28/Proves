@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+// Use service role so this endpoint can be fetched by external
+// calendar clients (e.g. Google Calendar) without user cookies
+import { createAdminClient } from '@/lib/supabase/server'
 import { getExams } from '@/actions/exam-actions'
 import { generateICalContent } from '@/lib/utils'
+
 
 export async function GET(
   request: NextRequest,
@@ -11,8 +13,8 @@ export async function GET(
   try {
     const calendarId = params.id
     
-    // Create Supabase client
-    const supabase = createRouteHandlerClient({ cookies })
+    // Create Supabase client using service role to bypass RLS
+    const supabase = await createAdminClient()
     
     // Fetch the saved calendar from Supabase
     const { data: calendar, error: calendarError } = await supabase
@@ -26,8 +28,9 @@ export async function GET(
       return new NextResponse('Calendar not found', { status: 404 })
     }
     
-    // Fetch exams using the calendar's filters
-    const exams = await getExams(calendar.filters || {})
+    // Fetch exams using the calendar's saved filters
+    const filters = (calendar.filters || {}) as Record<string, string[]>
+    const exams = await getExams(filters)
     
     // Generate iCal content
     const icalContent = generateICalContent(exams, {
