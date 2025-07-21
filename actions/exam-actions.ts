@@ -1,6 +1,8 @@
 "use server"
 
 import { supabase } from "@/lib/supabase"
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database.types'
 import type { ExamFilters } from "@/types/exam"
 import { mapExamData } from "@/utils/exam-mapper"
 
@@ -88,7 +90,10 @@ const cache = {
   }
 };
 
-export async function getExams(filters: ExamFilters = {}) {
+export async function getExams(
+  filters: ExamFilters = {},
+  client: SupabaseClient<Database> = supabase
+) {
   // Check cache expiry first
   cache.checkExpiry();
   
@@ -106,7 +111,7 @@ export async function getExams(filters: ExamFilters = {}) {
     const startTime = performance.now();
     
     // Only select needed columns for better network performance
-    let query = supabase
+    let query = client
       .from('ETSINF')
       .select('exam_instance_id, exam_date, exam_time, duration_minutes, code, subject, acronym, degree, year, semester, place, comment, school')
       .order('exam_date', { ascending: true });

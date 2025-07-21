@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getExams } from '@/actions/exam-actions'
 import { generateICalContent } from '@/lib/utils'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,8 +22,11 @@ export async function GET(request: NextRequest) {
       }
     }
     
+    // Use service role client so anonymous calendar apps can read data
+    const supabase = await createAdminClient()
+
     // Fetch exams using the provided filters
-    const exams = await getExams(filters)
+    const exams = await getExams(filters, supabase)
     
     // Generate iCal content
     const icalContent = generateICalContent(exams, {
