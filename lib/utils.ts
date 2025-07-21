@@ -12,7 +12,30 @@ export interface ICalExportOptions {
   timeZone?: string;
 }
 
-export function generateICalContent(exams: Exam[], options: ICalExportOptions = {}): string {
+function pad(n: number): string {
+  return n.toString().padStart(2, '0');
+}
+
+export function formatICalDateLocal(date: Date): string {
+  return (
+    date.getFullYear().toString() +
+    pad(date.getMonth() + 1) +
+    pad(date.getDate()) +
+    'T' +
+    pad(date.getHours()) +
+    pad(date.getMinutes()) +
+    pad(date.getSeconds())
+  );
+}
+
+export function escapeICalText(text: string): string {
+  return text.replace(/\\/g, '\\\\').replace(/,/g, '\\,').replace(/;/g, '\\;');
+}
+
+export function generateICalContent(
+  exams: Exam[],
+  options: ICalExportOptions = {}
+): string {
   const { 
     calendarName = 'UPV Exams',
     reminderMinutes = [24 * 60, 60], // 1 day and 1 hour before
@@ -61,10 +84,8 @@ export function generateICalContent(exams: Exam[], options: ICalExportOptions = 
     const endTime = new Date(startTime);
     endTime.setMinutes(startTime.getMinutes() + exam.duration_minutes);
 
-    // Format dates for iCal (YYYYMMDDTHHMMSSZ)
-    const formatICalDate = (date: Date) => {
-      return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-    };
+    // Helper to format dates in local time for the specified timezone
+    const formatDate = (date: Date) => formatICalDateLocal(date);
 
     // Create enhanced description with emoji
     const description = [
@@ -76,21 +97,23 @@ export function generateICalContent(exams: Exam[], options: ICalExportOptions = 
       `📖 Semester: ${exam.semester}`,
       exam.acronym ? `🏷️ Acronym: ${exam.acronym}` : '',
       '',
-      '⏰ Duration: ' + exam.duration_minutes + ' minutes (' + Math.round(exam.duration_minutes / 60 * 10) / 10 + ' hours)',
+      '⏰ Duration: ' + exam.duration_minutes + ' minutes (' + Math.round((exam.duration_minutes / 60) * 10) / 10 + ' hours)',
       '📅 Exported from UPV Exam Calendar',
       '🕒 Export time: ' + new Date().toLocaleString()
-    ].filter(Boolean).join('\\n');
+    ]
+      .filter(Boolean)
+      .join('\\n');
 
     icalLines.push(
       'BEGIN:VEVENT',
       `UID:exam-${exam.id}-${exam.date}-${exam.time}@upv-exam-calendar.com`,
-      `DTSTART;TZID=${timeZone}:${formatICalDate(startTime)}`,
-      `DTEND;TZID=${timeZone}:${formatICalDate(endTime)}`,
-      `SUMMARY:🎓 ${exam.subject} - Exam`,
-      `DESCRIPTION:${description}`,
-      `LOCATION:${exam.location || 'Location TBD'}`,
-      `CREATED:${formatICalDate(new Date())}`,
-      `LAST-MODIFIED:${formatICalDate(new Date())}`,
+      `DTSTART;TZID=${timeZone}:${formatDate(startTime)}`,
+      `DTEND;TZID=${timeZone}:${formatDate(endTime)}`,
+      `SUMMARY:${escapeICalText('🎓 ' + exam.subject + ' - Exam')}`,
+      `DESCRIPTION:${escapeICalText(description)}`,
+      `LOCATION:${escapeICalText(exam.location || 'Location TBD')}`,
+      `CREATED:${formatDate(new Date())}`,
+      `LAST-MODIFIED:${formatDate(new Date())}`,
       'STATUS:CONFIRMED',
       'TRANSP:OPAQUE',
       'CATEGORIES:EXAM,UNIVERSITY'
