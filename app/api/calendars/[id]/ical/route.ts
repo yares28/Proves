@@ -30,7 +30,7 @@ export async function GET(
     
     // Fetch exams using the calendar's saved filters
     const filters = (calendar.filters || {}) as Record<string, string[]>
-    const exams = await getExams(filters)
+    const exams = await getExams(filters, supabase)
     
     // Generate iCal content
     const icalContent = generateICalContent(exams, {
