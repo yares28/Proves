@@ -48,8 +48,8 @@ export default function TestICalPage() {
 
   const googleCalendarUrls = [
     {
-      name: "Method 1: settings/addbyurl (current - like UPV)",
-      url: `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(
+      name: "Method 1: render?cid (recommended)",
+      url: `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(
         "https://upv-cal.vercel.app/api/ical?name=UPV%20Exams"
       )}`,
     },
