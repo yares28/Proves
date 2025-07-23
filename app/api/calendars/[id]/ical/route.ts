@@ -10,13 +10,14 @@ function getOptimalHeaders(filename: string) {
   return {
     'Content-Type': 'text/calendar; charset=utf-8',
     'Content-Disposition': `attachment; filename="${filename}.ics"`,
-    'Cache-Control': 'public, max-age=900', // Reduced to 15 minutes for better freshness
+    'Cache-Control': 'no-cache, no-store, must-revalidate', // Prevent caching issues
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, User-Agent, Referer',
+    'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
     'X-Content-Type-Options': 'nosniff',
-    'Content-Transfer-Encoding': 'binary',
-    'Pragma': 'no-cache', // Help prevent caching issues
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
   };
 }
 
