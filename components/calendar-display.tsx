@@ -298,7 +298,15 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               className="h-10 gap-1.5 rounded-md"
               disabled={exams.length === 0}
               onClick={() => {
-                const baseUrl = window.location.origin
+                // Use production domain instead of localhost to prevent Google Calendar refresh loops
+                let baseUrl = window.location.origin;
+                
+                // If we're in development or localhost, use a production URL
+                if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
+                  // Try to get production URL from environment or use a default
+                  baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal-v2.vercel.app';
+                }
+                
                 const filtersParam = encodeURIComponent(JSON.stringify(activeFilters))
                 const icalUrl = `${baseUrl}/api/ical?filters=${filtersParam}&name=UPV%20Exams`
                 const encodedUrl = encodeURIComponent(icalUrl)
@@ -364,7 +372,15 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               <DropdownMenuItem 
                 disabled={exams.length === 0}
                 onClick={() => {
-                  const baseUrl = window.location.origin
+                  // Use production domain instead of localhost to prevent Google Calendar refresh loops
+                  let baseUrl = window.location.origin;
+                  
+                  // If we're in development or localhost, use a production URL
+                  if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
+                    // Try to get production URL from environment or use a default
+                    baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal-v2.vercel.app';
+                  }
+                  
                   const filtersParam = encodeURIComponent(JSON.stringify(activeFilters))
                   const icalUrl = `${baseUrl}/api/ical?filters=${filtersParam}&name=UPV%20Exams`
                   const encodedUrl = encodeURIComponent(icalUrl)
