@@ -1,9 +1,8 @@
 // Test the API endpoint directly to see what's happening
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://pzmmphrbkrmyyzjoitau.supabase.co';
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB6bW1waHJia3JteXl6am9pdGF1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NjgwMzgyNSwiZXhwIjoyMDYyMzc5ODI1fQ.xUThDr8CHEe8iwoUr0YZBq6IA7EjMnSkycn8izNqiho';
-
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 async function testApiLogic() {
   console.log('🔍 Testing API logic directly...');
   
