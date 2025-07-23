@@ -209,5 +209,41 @@ describe('iCalendar Generation', () => {
       // Should be 09:30 (08:00 + 90 minutes)
       expect(endTime).toBe('20240601T093000');
     });
+
+    it('should generate placeholder event for empty exam list to prevent Google Calendar infinite loading', () => {
+      const icalContent = generateICalContent([]);
+      
+      // Should still have valid calendar structure
+      expect(icalContent).toMatch(/BEGIN:VCALENDAR/);
+      expect(icalContent).toMatch(/END:VCALENDAR/);
+      
+      // Should contain a placeholder event
+      expect(icalContent).toMatch(/BEGIN:VEVENT/);
+      expect(icalContent).toMatch(/END:VEVENT/);
+      expect(icalContent).toMatch(/SUMMARY:No Exams Found/);
+      expect(icalContent).toMatch(/DESCRIPTION:No exams match your current filters/);
+      expect(icalContent).toMatch(/STATUS:TENTATIVE/);
+      expect(icalContent).toMatch(/TRANSP:TRANSPARENT/);
+      expect(icalContent).toMatch(/CATEGORIES:INFO/);
+      
+      // Should have proper UID format
+      expect(icalContent).toMatch(/UID:no-exams-\d+@upv-exam-calendar\.com/);
+      
+      // Should have proper timezone format (no Z suffix with TZID)
+      const lines = icalContent.split('\r\n');
+      const dtstartLine = lines.find(line => line.startsWith('DTSTART;TZID='));
+      const dtendLine = lines.find(line => line.startsWith('DTEND;TZID='));
+      
+      expect(dtstartLine).toBeDefined();
+      expect(dtendLine).toBeDefined();
+      
+      const startTime = dtstartLine!.split(':')[1];
+      const endTime = dtendLine!.split(':')[1];
+      
+      expect(startTime).not.toMatch(/Z$/);
+      expect(endTime).not.toMatch(/Z$/);
+      expect(startTime).toMatch(/^\d{8}T\d{6}$/);
+      expect(endTime).toMatch(/^\d{8}T\d{6}$/);
+    });
   });
 });
