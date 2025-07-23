@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getExams } from '@/actions/exam-actions'
 import { generateICalContent } from '@/lib/utils'
-import { validateICalContent } from '@/lib/ical-diagnostics'
 import { createAdminClient } from '@/lib/supabase/server'
 
 // Enhanced headers for better calendar app compatibility
@@ -106,27 +105,9 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
       ].join('\r\n')
     }
     
-    // Validate generated content
-    const validation = validateICalContent(icalContent, {
-      validateRFC5545: true,
-      checkEncoding: true,
-      validateTimezones: true,
-      checkLineEndings: true
-    })
-    
-    if (!validation.isValid) {
-      console.error('Generated iCal content is invalid:', validation.errors)
-      
-      // Log validation issues but still serve content if it's not critically broken
-      if (validation.errors.some(e => e.includes('Missing required property'))) {
-        return new NextResponse('Calendar generation failed', { status: 500 })
-      }
-    }
-    
-    // Log warnings in development
-    if (validation.warnings.length > 0 && process.env.NODE_ENV === 'development') {
-      console.warn('iCal validation warnings:', validation.warnings)
-    }
+    // Log content info for debugging
+    console.log('📄 [API] Generated iCal content length:', icalContent.length);
+    console.log('📄 [API] Content preview:', icalContent.substring(0, 200));
     
     // Return iCal content with optimal headers
     return new NextResponse(icalContent, {
