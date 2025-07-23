@@ -12,6 +12,7 @@ export interface ICalExportOptions {
   timeZone?: string;
 }
 
+<<<<<<< HEAD
 // Helper function to escape iCalendar text fields
 function escapeICalText(text: string): string {
   return text
@@ -124,6 +125,32 @@ function parseExamDateTime(dateStr: string, timeStr: string, timeZone: string): 
 }
 
 export function generateICalContent(exams: Exam[], options: ICalExportOptions = {}): string {
+=======
+function pad(n: number): string {
+  return n.toString().padStart(2, '0');
+}
+
+export function formatICalDateLocal(date: Date): string {
+  return (
+    date.getFullYear().toString() +
+    pad(date.getMonth() + 1) +
+    pad(date.getDate()) +
+    'T' +
+    pad(date.getHours()) +
+    pad(date.getMinutes()) +
+    pad(date.getSeconds())
+  );
+}
+
+export function escapeICalText(text: string): string {
+  return text.replace(/\\/g, '\\\\').replace(/,/g, '\\,').replace(/;/g, '\\;');
+}
+
+export function generateICalContent(
+  exams: Exam[],
+  options: ICalExportOptions = {}
+): string {
+>>>>>>> 91fea84840f896ddf558daad57e8075340984a0b
   const { 
     calendarName = 'UPV Exams',
     reminderMinutes = [24 * 60, 60], // 1 day and 1 hour before
@@ -179,6 +206,7 @@ export function generateICalContent(exams: Exam[], options: ICalExportOptions = 
     const endTime = new Date(startTime);
     endTime.setMinutes(startTime.getMinutes() + exam.duration_minutes);
 
+<<<<<<< HEAD
     // Format dates for iCal - LOCAL TIME FORMAT (no Z suffix when using TZID)
     const formatICalLocalDate = (date: Date) => {
       const year = date.getFullYear();
@@ -194,6 +222,27 @@ export function generateICalContent(exams: Exam[], options: ICalExportOptions = 
     const formatICalUtcDate = (date: Date) => {
       return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
     };
+=======
+    // Helper to format dates in local time for the specified timezone
+    const formatDate = (date: Date) => formatICalDateLocal(date);
+
+    // Create enhanced description with emoji
+    const description = [
+      `📚 Subject: ${exam.subject}`,
+      `🔢 Code: ${exam.code}`,
+      `🏫 School: ${exam.school}`,
+      `🎓 Degree: ${exam.degree}`,
+      `📅 Year: ${exam.year}`,
+      `📖 Semester: ${exam.semester}`,
+      exam.acronym ? `🏷️ Acronym: ${exam.acronym}` : '',
+      '',
+      '⏰ Duration: ' + exam.duration_minutes + ' minutes (' + Math.round((exam.duration_minutes / 60) * 10) / 10 + ' hours)',
+      '📅 Exported from UPV Exam Calendar',
+      '🕒 Export time: ' + new Date().toLocaleString()
+    ]
+      .filter(Boolean)
+      .join('\\n');
+>>>>>>> 91fea84840f896ddf558daad57e8075340984a0b
 
     // Create enhanced description with proper escaping
     const description = escapeICalText([
@@ -232,6 +281,7 @@ export function generateICalContent(exams: Exam[], options: ICalExportOptions = 
     icalLines.push(
       'BEGIN:VEVENT',
       `UID:exam-${exam.id}-${exam.date}-${exam.time}@upv-exam-calendar.com`,
+<<<<<<< HEAD
       `DTSTART;TZID=${timeZone}:${formatICalLocalDate(startTime)}`,
       `DTEND;TZID=${timeZone}:${formatICalLocalDate(endTime)}`,
       foldLine(`SUMMARY:${escapeICalText(exam.subject + ' - Exam')}`),
@@ -239,6 +289,15 @@ export function generateICalContent(exams: Exam[], options: ICalExportOptions = 
       foldLine(`LOCATION:${escapeICalText(exam.location || 'Location TBD')}`),
       `CREATED:${formatICalUtcDate(now)}`,
       `LAST-MODIFIED:${formatICalUtcDate(now)}`,
+=======
+      `DTSTART;TZID=${timeZone}:${formatDate(startTime)}`,
+      `DTEND;TZID=${timeZone}:${formatDate(endTime)}`,
+      `SUMMARY:${escapeICalText('🎓 ' + exam.subject + ' - Exam')}`,
+      `DESCRIPTION:${escapeICalText(description)}`,
+      `LOCATION:${escapeICalText(exam.location || 'Location TBD')}`,
+      `CREATED:${formatDate(new Date())}`,
+      `LAST-MODIFIED:${formatDate(new Date())}`,
+>>>>>>> 91fea84840f896ddf558daad57e8075340984a0b
       'STATUS:CONFIRMED',
       'TRANSP:OPAQUE',
       'CATEGORIES:EXAM,UNIVERSITY'
