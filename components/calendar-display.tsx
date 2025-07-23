@@ -297,57 +297,42 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               size="sm" 
               className="h-10 gap-1.5 rounded-md"
               disabled={exams.length === 0}
-              onClick={() => {
-                // Check if there are exams to export
-                if (exams.length === 0) {
-                  // The button should be disabled, but add extra protection
-                  console.warn('Attempted to export empty calendar to Google Calendar');
+              onClick={async () => {
+                // Always use production URL for Google Calendar iCal subscription
+                let baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
+                if (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')) {
+                  toast({
+                    title: "Cannot Export from Localhost",
+                    description: "Google Calendar cannot access localhost. Please use the production site.",
+                    variant: "destructive",
+                  });
                   return;
                 }
-                
-                // Use production domain instead of localhost to prevent Google Calendar refresh loops
-                let baseUrl = window.location.origin;
-                
-                // If we're in development or localhost, use a production URL
-                if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
-                  // Try to get production URL from environment or use a default
-                  baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
-                }
-                
-                // For Google Calendar, use a direct iCal URL like UPV's working example
-                // This will open Google Calendar's "Add calendar from URL" dialog with our URL pre-filled
-                const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent('UPV Exams')}`
-                
-                // Use Google Calendar's direct subscription URL - this opens the add calendar dialog
-                // with the URL pre-filled, user just needs to click "Add calendar"
-                const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`
-                
-                console.log(`📅 Exporting ${exams.length} exams to Google Calendar`);
-                console.log(`🔗 iCal URL: ${icalUrl}`);
-                console.log(`🔗 Google Calendar URL: ${googleCalendarUrl}`);
-                console.log(`🔍 Testing iCal URL directly...`);
-                
-                // Test the iCal URL directly to see if it works
-                fetch(icalUrl)
-                  .then(response => {
-                    console.log(`✅ iCal URL Status: ${response.status}`);
-                    console.log(`✅ iCal URL Content-Type: ${response.headers.get('content-type')}`);
-                    return response.text();
-                  })
-                  .then(content => {
-                    console.log(`✅ iCal Content Length: ${content.length}`);
-                    console.log(`✅ iCal Content Preview:`, content.substring(0, 200));
-                    if (content.includes('BEGIN:VEVENT')) {
-                      console.log(`✅ iCal contains events - should work with Google Calendar`);
-                    } else {
-                      console.log(`❌ iCal has no events - this will cause issues`);
-                    }
-                  })
-                  .catch(error => {
-                    console.error(`❌ iCal URL failed:`, error);
+                // Only use ?name=... for Google Calendar (no filters)
+                const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent('UPV Exams')}`;
+                // Validate iCal URL before opening Google Calendar
+                try {
+                  const response = await fetch(icalUrl);
+                  const content = await response.text();
+                  if (!content.includes('BEGIN:VEVENT')) {
+                    toast({
+                      title: "iCal Feed Error",
+                      description: "No events found in the iCal feed. Please check your calendar data.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                } catch (error) {
+                  toast({
+                    title: "iCal Feed Error",
+                    description: "Could not fetch the iCal feed. Please try again later.",
+                    variant: "destructive",
                   });
-                
-                window.open(googleCalendarUrl, '_blank')
+                  return;
+                }
+                // Google Calendar subscription link
+                const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`;
+                window.open(googleCalendarUrl, '_blank');
               }}
             >
               <Calendar className="h-4 w-4" />
@@ -359,11 +344,20 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               className="h-10 gap-1.5 rounded-md"
               disabled={exams.length === 0}
               onClick={() => {
-                const baseUrl = window.location.origin
-                const filtersParam = encodeURIComponent(JSON.stringify(activeFilters))
-                const icalUrl = `${baseUrl}/api/ical?filters=${filtersParam}&name=UPV%20Exams`
-                const webcalUrl = icalUrl.replace(/^https?:/, 'webcal:')
-                window.location.href = webcalUrl
+                // For Apple Calendar, allow filters in the URL
+                let baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
+                if (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')) {
+                  toast({
+                    title: "Cannot Export from Localhost",
+                    description: "Apple Calendar cannot access localhost. Please use the production site.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                const filtersParam = encodeURIComponent(JSON.stringify(activeFilters));
+                const icalUrl = `${baseUrl}/api/ical?filters=${filtersParam}&name=UPV%20Exams`;
+                const webcalUrl = icalUrl.replace(/^https?:/, 'webcal:');
+                window.location.href = webcalUrl;
               }}
             >
               <Download className="h-4 w-4" />
@@ -407,22 +401,38 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               </DropdownMenuItem>
               <DropdownMenuItem 
                 disabled={exams.length === 0}
-                onClick={() => {
-                  // Use production domain instead of localhost to prevent Google Calendar refresh loops
-                  let baseUrl = window.location.origin;
-                  
-                  // If we're in development or localhost, use a production URL
-                  if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
-                    // Try to get production URL from environment or use a default
-                    baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
+                onClick={async () => {
+                  let baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
+                  if (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')) {
+                    toast({
+                      title: "Cannot Export from Localhost",
+                      description: "Google Calendar cannot access localhost. Please use the production site.",
+                      variant: "destructive",
+                    });
+                    return;
                   }
-                  
-                  // For Google Calendar, use a direct iCal URL like UPV's working example
-                  const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent('UPV Exams')}`
-                  
-                  // Use Google Calendar's direct subscription URL - opens add calendar dialog
-                  const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`
-                  window.open(googleCalendarUrl, '_blank')
+                  const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent('UPV Exams')}`;
+                  try {
+                    const response = await fetch(icalUrl);
+                    const content = await response.text();
+                    if (!content.includes('BEGIN:VEVENT')) {
+                      toast({
+                        title: "iCal Feed Error",
+                        description: "No events found in the iCal feed. Please check your calendar data.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                  } catch (error) {
+                    toast({
+                      title: "iCal Feed Error",
+                      description: "Could not fetch the iCal feed. Please try again later.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`;
+                  window.open(googleCalendarUrl, '_blank');
                 }}
               >
                 <Calendar className="mr-2 h-4 w-4" />
@@ -431,11 +441,19 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               <DropdownMenuItem 
                 disabled={exams.length === 0}
                 onClick={() => {
-                  const baseUrl = window.location.origin
-                  const filtersParam = encodeURIComponent(JSON.stringify(activeFilters))
-                  const icalUrl = `${baseUrl}/api/ical?filters=${filtersParam}&name=UPV%20Exams`
-                  const webcalUrl = icalUrl.replace(/^https?:/, 'webcal:')
-                  window.location.href = webcalUrl
+                  let baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
+                  if (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')) {
+                    toast({
+                      title: "Cannot Export from Localhost",
+                      description: "Apple Calendar cannot access localhost. Please use the production site.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  const filtersParam = encodeURIComponent(JSON.stringify(activeFilters));
+                  const icalUrl = `${baseUrl}/api/ical?filters=${filtersParam}&name=UPV%20Exams`;
+                  const webcalUrl = icalUrl.replace(/^https?:/, 'webcal:');
+                  window.location.href = webcalUrl;
                 }}
               >
                 <Download className="mr-2 h-4 w-4" />
