@@ -298,6 +298,13 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               className="h-10 gap-1.5 rounded-md"
               disabled={exams.length === 0}
               onClick={() => {
+                // Check if there are exams to export
+                if (exams.length === 0) {
+                  // The button should be disabled, but add extra protection
+                  console.warn('Attempted to export empty calendar to Google Calendar');
+                  return;
+                }
+                
                 // Use production domain instead of localhost to prevent Google Calendar refresh loops
                 let baseUrl = window.location.origin;
                 
@@ -311,6 +318,8 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                 const icalUrl = `${baseUrl}/api/ical?filters=${filtersParam}&name=UPV%20Exams`
                 const encodedUrl = encodeURIComponent(icalUrl)
                 const googleCalendarUrl = `https://calendar.google.com/calendar/r/addbyurl?url=${encodedUrl}`
+                
+                console.log(`📅 Exporting ${exams.length} exams to Google Calendar`);
                 window.open(googleCalendarUrl, '_blank')
               }}
             >

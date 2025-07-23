@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getExams } from '@/actions/exam-actions'
 import { generateICalContent } from '@/lib/utils'
-<<<<<<< HEAD
 import { validateICalContent } from '@/lib/ical-diagnostics'
-=======
 import { createAdminClient } from '@/lib/supabase/server'
->>>>>>> 91fea84840f896ddf558daad57e8075340984a0b
 
 // Enhanced headers for better calendar app compatibility
 function getOptimalHeaders(filename: string) {
@@ -63,12 +60,20 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
     const supabase = await createAdminClient()
 
     // Fetch exams using the provided filters
+    console.log('🔍 [API] Calling getExams with filters:', filters);
     const exams = await getExams(filters, supabase)
+    console.log('📊 [API] getExams returned:', exams?.length || 0, 'exams');
     
     // Validate exam data before processing
     if (!Array.isArray(exams)) {
       console.error('getExams returned non-array:', typeof exams)
       return new NextResponse('Invalid exam data', { status: 500 })
+    }
+    
+    if (exams.length === 0) {
+      console.warn('⚠️ [API] No exams returned from getExams');
+    } else {
+      console.log('✅ [API] Sample exam:', exams[0]);
     }
     
     // Generate iCal content with error handling
