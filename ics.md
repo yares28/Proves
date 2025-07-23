@@ -109,7 +109,7 @@ The returned file is validated and delivered with proper headers.
 
 const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
 const encodedUrl = encodeURIComponent(icalUrl);
-const googleCalendarUrl = `https://calendar.google.com/calendar/r/addbyurl?url=${encodedUrl}`;
+const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodedUrl}`;
 window.open(googleCalendarUrl, '\_blank');
 
 4. Issues found
