@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getExams } from '@/actions/exam-actions'
 import { generateICalContent } from '@/lib/utils'
+<<<<<<< HEAD
 import { validateICalContent } from '@/lib/ical-diagnostics'
+=======
+import { createAdminClient } from '@/lib/supabase/server'
+>>>>>>> 91fea84840f896ddf558daad57e8075340984a0b
 
 // Enhanced headers for better calendar app compatibility
 function getOptimalHeaders(filename: string) {
@@ -55,8 +59,11 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
       }
     }
     
+    // Use service role client so anonymous calendar apps can read data
+    const supabase = await createAdminClient()
+
     // Fetch exams using the provided filters
-    const exams = await getExams(filters)
+    const exams = await getExams(filters, supabase)
     
     // Validate exam data before processing
     if (!Array.isArray(exams)) {

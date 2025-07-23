@@ -75,6 +75,7 @@ async function handleRequest(
     }
     
     // Fetch exams using the calendar's saved filters
+    const filters = (calendar.filters || {}) as Record<string, string[]>
     const exams = await getExams(filters)
     
     // Validate exam data before processing
