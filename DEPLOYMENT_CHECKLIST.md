@@ -1,6 +1,7 @@
 # Production Deployment Checklist - Google Calendar Fix
 
 ## 🚨 **Current Issue**
+
 - ✅ Fix implemented locally (placeholder events prevent infinite loading)
 - ❌ Production API returns 500 errors
 - ❌ Google Calendar cannot fetch .ics files → infinite loading continues
@@ -8,6 +9,7 @@
 ## 🚀 **Deployment Steps**
 
 ### **1. Verify Local Fix is Working**
+
 ```bash
 # Test local API (should work)
 curl http://localhost:3000/api/ical
@@ -15,6 +17,7 @@ curl http://localhost:3000/api/ical
 ```
 
 ### **2. Deploy to Production**
+
 ```bash
 # Commit and push changes
 git add .
@@ -29,6 +32,7 @@ git push origin main
 ```
 
 ### **3. Verify Production Deployment**
+
 ```bash
 # Test production API (should work after deployment)
 curl https://upv-cal.vercel.app/api/ical
@@ -40,8 +44,9 @@ curl "https://upv-cal.vercel.app/api/ical?filters=%7B%7D&name=UPV%20Exams"
 ```
 
 ### **4. Test Google Calendar Integration**
+
 1. Visit https://upv-cal.vercel.app
-2. Click "Add to Google Calendar" 
+2. Click "Add to Google Calendar"
 3. Verify Google Calendar loads without infinite spinner
 4. Should show "No Exams Found" event
 
@@ -50,20 +55,26 @@ curl "https://upv-cal.vercel.app/api/ical?filters=%7B%7D&name=UPV%20Exams"
 If deployment still shows 500 errors, check:
 
 ### **Environment Variables**
+
 Ensure these are set in Vercel:
+
 - `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` 
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `NEXT_PUBLIC_SITE_URL=https://upv-cal.vercel.app`
 
 ### **Build Logs**
+
 Check Vercel build logs for:
+
 - TypeScript compilation errors
 - Missing dependencies
 - Runtime errors
 
 ### **Function Logs**
+
 Check Vercel function logs for:
+
 - Database connection errors
 - Import/export errors
 - Runtime exceptions
@@ -71,12 +82,13 @@ Check Vercel function logs for:
 ## 📊 **Expected Results After Deployment**
 
 ### **API Endpoints**
+
 ```bash
 # General calendar
 GET https://upv-cal.vercel.app/api/ical
 → 200 OK with placeholder event
 
-# Filtered calendar  
+# Filtered calendar
 GET https://upv-cal.vercel.app/api/ical?filters=%7B%7D&name=UPV%20Exams
 → 200 OK with placeholder event
 
@@ -86,6 +98,7 @@ GET https://upv-cal.vercel.app/api/calendars/[id]/ical
 ```
 
 ### **Google Calendar Integration**
+
 - ✅ No more infinite loading
 - ✅ Shows "No Exams Found" event when no data
 - ✅ Shows actual exams when data available
@@ -113,6 +126,7 @@ echo $? # Expected: 0 (found)
 ## ✅ **Success Criteria**
 
 The deployment is successful when:
+
 1. **API returns 200** - No more 500 errors
 2. **Contains events** - Always has at least placeholder event
 3. **Google Calendar works** - No infinite loading

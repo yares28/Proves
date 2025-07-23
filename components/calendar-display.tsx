@@ -314,8 +314,9 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                   baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
                 }
                 
-                const filtersParam = encodeURIComponent(JSON.stringify(activeFilters))
-                const icalUrl = `${baseUrl}/api/ical?filters=${filtersParam}&name=UPV%20Exams`
+                // For Google Calendar, use a simpler URL without complex filters
+                // The API will return all exams or placeholder event, which is fine for Google Calendar
+                const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent('UPV Exams')}`
                 const encodedUrl = encodeURIComponent(icalUrl)
                 const googleCalendarUrl = `https://calendar.google.com/calendar/r/addbyurl?url=${encodedUrl}`
                 
@@ -414,8 +415,8 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                     baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
                   }
                   
-                  const filtersParam = encodeURIComponent(JSON.stringify(activeFilters))
-                  const icalUrl = `${baseUrl}/api/ical?filters=${filtersParam}&name=UPV%20Exams`
+                  // For Google Calendar, use a simpler URL without complex filters
+                  const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent('UPV Exams')}`
                   const encodedUrl = encodeURIComponent(icalUrl)
                   const googleCalendarUrl = `https://calendar.google.com/calendar/r/addbyurl?url=${encodedUrl}`
                   window.open(googleCalendarUrl, '_blank')
