@@ -227,7 +227,9 @@ export default function MyCalendarsPage() {
         baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
       }
       
-      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`
+      // For Google Calendar, use a simpler URL without complex parameters
+      // Instead of using the calendar ID, use a simple URL that will return all exams
+      const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent(calendar.name)}`
       const encodedUrl = encodeURIComponent(icalUrl)
       const googleCalendarUrl = `https://calendar.google.com/calendar/r/addbyurl?url=${encodedUrl}`
       
