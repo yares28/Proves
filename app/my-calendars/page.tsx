@@ -224,7 +224,7 @@ export default function MyCalendarsPage() {
       // If we're in development or localhost, use a production URL
       if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
         // Try to get production URL from environment or use a default
-        baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal-v2.vercel.app';
+        baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
       }
       
       const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`

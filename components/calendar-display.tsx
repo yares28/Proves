@@ -311,7 +311,7 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                 // If we're in development or localhost, use a production URL
                 if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
                   // Try to get production URL from environment or use a default
-                  baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal-v2.vercel.app';
+                  baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
                 }
                 
                 const filtersParam = encodeURIComponent(JSON.stringify(activeFilters))
@@ -320,6 +320,30 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                 const googleCalendarUrl = `https://calendar.google.com/calendar/r/addbyurl?url=${encodedUrl}`
                 
                 console.log(`📅 Exporting ${exams.length} exams to Google Calendar`);
+                console.log(`🔗 iCal URL: ${icalUrl}`);
+                console.log(`🔗 Google Calendar URL: ${googleCalendarUrl}`);
+                console.log(`🔍 Testing iCal URL directly...`);
+                
+                // Test the iCal URL directly to see if it works
+                fetch(icalUrl)
+                  .then(response => {
+                    console.log(`✅ iCal URL Status: ${response.status}`);
+                    console.log(`✅ iCal URL Content-Type: ${response.headers.get('content-type')}`);
+                    return response.text();
+                  })
+                  .then(content => {
+                    console.log(`✅ iCal Content Length: ${content.length}`);
+                    console.log(`✅ iCal Content Preview:`, content.substring(0, 200));
+                    if (content.includes('BEGIN:VEVENT')) {
+                      console.log(`✅ iCal contains events - should work with Google Calendar`);
+                    } else {
+                      console.log(`❌ iCal has no events - this will cause issues`);
+                    }
+                  })
+                  .catch(error => {
+                    console.error(`❌ iCal URL failed:`, error);
+                  });
+                
                 window.open(googleCalendarUrl, '_blank')
               }}
             >
@@ -387,7 +411,7 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                   // If we're in development or localhost, use a production URL
                   if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
                     // Try to get production URL from environment or use a default
-                    baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal-v2.vercel.app';
+                    baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
                   }
                   
                   const filtersParam = encodeURIComponent(JSON.stringify(activeFilters))
