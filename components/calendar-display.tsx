@@ -317,8 +317,10 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                 // For Google Calendar, use a simpler URL without complex filters
                 // The API will return all exams or placeholder event, which is fine for Google Calendar
                 const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent('UPV Exams')}`
-                const encodedUrl = encodeURIComponent(icalUrl)
-                const googleCalendarUrl = `https://calendar.google.com/calendar/r/addbyurl?url=${encodedUrl}`
+                
+                // Try Google Calendar's subscription URL format instead of addbyurl
+                // This format is more reliable for calendar subscriptions
+                const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`
                 
                 console.log(`📅 Exporting ${exams.length} exams to Google Calendar`);
                 console.log(`🔗 iCal URL: ${icalUrl}`);
@@ -417,8 +419,9 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                   
                   // For Google Calendar, use a simpler URL without complex filters
                   const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent('UPV Exams')}`
-                  const encodedUrl = encodeURIComponent(icalUrl)
-                  const googleCalendarUrl = `https://calendar.google.com/calendar/r/addbyurl?url=${encodedUrl}`
+                  
+                  // Try Google Calendar's subscription URL format instead of addbyurl
+                  const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`
                   window.open(googleCalendarUrl, '_blank')
                 }}
               >

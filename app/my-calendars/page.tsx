@@ -230,8 +230,10 @@ export default function MyCalendarsPage() {
       // For Google Calendar, use a simpler URL without complex parameters
       // Instead of using the calendar ID, use a simple URL that will return all exams
       const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent(calendar.name)}`
-      const encodedUrl = encodeURIComponent(icalUrl)
-      const googleCalendarUrl = `https://calendar.google.com/calendar/r/addbyurl?url=${encodedUrl}`
+      
+      // Try Google Calendar's subscription URL format instead of addbyurl
+      // This format is more reliable for calendar subscriptions
+      const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`
       
       // Open Google Calendar in a new tab
       window.open(googleCalendarUrl, '_blank')

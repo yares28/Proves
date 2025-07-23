@@ -7,15 +7,17 @@ import { createAdminClient } from '@/lib/supabase/server'
 function getOptimalHeaders(filename: string) {
   return {
     'Content-Type': 'text/calendar; charset=utf-8',
-    'Content-Disposition': `attachment; filename="${filename}.ics"`,
-    'Cache-Control': 'no-cache, no-store, must-revalidate', // Prevent caching issues
+    // Remove Content-Disposition for Google Calendar compatibility
+    // 'Content-Disposition': `attachment; filename="${filename}.ics"`,
+    'Cache-Control': 'public, max-age=300', // Allow some caching for Google Calendar
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, User-Agent, Referer',
     'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
-    'X-Content-Type-Options': 'nosniff',
-    'X-Frame-Options': 'DENY',
-    'Referrer-Policy': 'no-referrer',
+    // Remove security headers that might interfere with Google Calendar
+    // 'X-Content-Type-Options': 'nosniff',
+    // 'X-Frame-Options': 'DENY',
+    // 'Referrer-Policy': 'no-referrer',
   };
 }
 
