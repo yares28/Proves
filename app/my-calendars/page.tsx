@@ -229,7 +229,7 @@ export default function MyCalendarsPage() {
       
       // For Google Calendar, construct a direct iCal URL
       // This will open Google Calendar's "Add calendar?" dialog with our URL pre-filled
-      const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent(calendar.name)}`
+      const icalUrl = `${baseUrl}/api/ical?name=${calendar.name}`
       
       // Use Google Calendar's direct subscription URL - this opens the dialog
       // with the URL pre-filled so the user can simply click "Add"

@@ -108,9 +108,8 @@ The returned file is validated and delivered with proper headers.
    On the client side, pages like my-calendars/page.tsx craft Google Calendar URLs using the API route and open them in a new tab. Apple Calendar is triggered via the webcal: protocol.
 
 const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
-const encodedUrl = encodeURIComponent(icalUrl);
-const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodedUrl}`;
-window.open(googleCalendarUrl, '\_blank');
+const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(icalUrl)}`;
+window.open(googleCalendarUrl, '_blank');
 
 4. Issues found
    Unresolved merge conflicts.

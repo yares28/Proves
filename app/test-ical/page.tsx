@@ -13,7 +13,7 @@ export default function TestICalPage() {
     setLoading(true);
     try {
       const baseUrl = window.location.origin;
-      const icalUrl = `${baseUrl}/api/ical?name=UPV%20Exams`;
+      const icalUrl = `${baseUrl}/api/ical?name=UPV Exams`;
 
       console.log("🧪 Testing iCal endpoint:", icalUrl);
 
@@ -50,13 +50,13 @@ export default function TestICalPage() {
     {
       name: "Method 1: render?cid (recommended)",
       url: `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(
-        "https://upv-cal.vercel.app/api/ical?name=UPV%20Exams"
+        "https://upv-cal.vercel.app/api/ical?name=UPV Exams"
       )}`,
     },
     {
       name: "Method 2: addbyurl (legacy)",
       url: `https://calendar.google.com/calendar/r/addbyurl?url=${encodeURIComponent(
-        "https://upv-cal.vercel.app/api/ical?name=UPV%20Exams"
+        "https://upv-cal.vercel.app/api/ical?name=UPV Exams"
       )}`,
     },
     {
@@ -207,7 +207,7 @@ export default function TestICalPage() {
                 <li>
                   Paste this URL:{" "}
                   <code className="bg-gray-100 px-1 rounded">
-                    https://upv-cal.vercel.app/api/ical?name=UPV%20Exams
+                    https://upv-cal.vercel.app/api/ical?name=UPV Exams
                   </code>
                 </li>
                 <li>Click "Add calendar"</li>
@@ -216,14 +216,14 @@ export default function TestICalPage() {
 
             <div className="flex items-center gap-2">
               <code className="flex-1 p-2 bg-gray-100 rounded text-sm">
-                https://upv-cal.vercel.app/api/ical?name=UPV%20Exams
+                https://upv-cal.vercel.app/api/ical?name=UPV Exams
               </code>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() =>
                   copyToClipboard(
-                    "https://upv-cal.vercel.app/api/ical?name=UPV%20Exams"
+                    "https://upv-cal.vercel.app/api/ical?name=UPV Exams"
                   )
                 }
               >
@@ -243,7 +243,7 @@ export default function TestICalPage() {
               onClick={() => {
                 const link = document.createElement("a");
                 link.href =
-                  "https://upv-cal.vercel.app/api/ical?name=UPV%20Exams";
+                  "https://upv-cal.vercel.app/api/ical?name=UPV Exams";
                 link.download = "upv-exams.ics";
                 link.click();
               }}
