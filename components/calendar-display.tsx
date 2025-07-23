@@ -314,12 +314,12 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                   baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
                 }
                 
-                // For Google Calendar, use a simpler URL without complex filters
-                // The API will return all exams or placeholder event, which is fine for Google Calendar
+                // For Google Calendar, use a direct iCal URL like UPV's working example
+                // This will open Google Calendar's "Add calendar from URL" dialog with our URL pre-filled
                 const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent('UPV Exams')}`
                 
-                // Try Google Calendar's subscription URL format instead of addbyurl
-                // This format is more reliable for calendar subscriptions
+                // Use Google Calendar's direct subscription URL - this opens the add calendar dialog
+                // with the URL pre-filled, user just needs to click "Add calendar"
                 const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`
                 
                 console.log(`📅 Exporting ${exams.length} exams to Google Calendar`);
@@ -417,10 +417,10 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                     baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
                   }
                   
-                  // For Google Calendar, use a simpler URL without complex filters
+                  // For Google Calendar, use a direct iCal URL like UPV's working example
                   const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent('UPV Exams')}`
                   
-                  // Try Google Calendar's subscription URL format instead of addbyurl
+                  // Use Google Calendar's direct subscription URL - opens add calendar dialog
                   const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`
                   window.open(googleCalendarUrl, '_blank')
                 }}
