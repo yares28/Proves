@@ -227,13 +227,13 @@ export default function MyCalendarsPage() {
         baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
       }
       
-      // For Google Calendar, use a direct iCal URL like UPV's working example
-      // This will open Google Calendar's "Add calendar from URL" dialog with our URL pre-filled
+      // For Google Calendar, construct a direct iCal URL
+      // This will open Google Calendar's "Add calendar?" dialog with our URL pre-filled
       const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent(calendar.name)}`
       
-      // Use Google Calendar's direct subscription URL - this opens the add calendar dialog
-      // with the URL pre-filled, user just needs to click "Add calendar"
-      const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`
+      // Use Google Calendar's direct subscription URL - this opens the dialog
+      // with the URL pre-filled so the user can simply click "Add"
+      const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(icalUrl)}`
       
       // Open Google Calendar in a new tab
       window.open(googleCalendarUrl, '_blank')
