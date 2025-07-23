@@ -218,7 +218,15 @@ export default function MyCalendarsPage() {
 
   const handleGoogleCalendarExport = async (calendar: SavedCalendar) => {
     try {
-      const baseUrl = window.location.origin
+      // Use production domain instead of localhost to prevent Google Calendar refresh loops
+      let baseUrl = window.location.origin;
+      
+      // If we're in development or localhost, use a production URL
+      if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
+        // Try to get production URL from environment or use a default
+        baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal-v2.vercel.app';
+      }
+      
       const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`
       const encodedUrl = encodeURIComponent(icalUrl)
       const googleCalendarUrl = `https://calendar.google.com/calendar/r/addbyurl?url=${encodedUrl}`
