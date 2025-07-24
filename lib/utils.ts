@@ -161,8 +161,8 @@ export function generateICalContent(exams: Exam[], options: ICalExportOptions = 
     validExams.push(exam);
   });
 
-  // Log invalid exams for debugging (in development)
-  if (invalidExams.length > 0 && process.env.NODE_ENV === 'development') {
+  // Log invalid exams for debugging (always, including production)
+  if (invalidExams.length > 0) {
     console.warn(`Skipped ${invalidExams.length} invalid exams:`, invalidExams);
   }
 
