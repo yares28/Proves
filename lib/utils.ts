@@ -10,6 +10,7 @@ export interface ICalExportOptions {
   calendarName?: string;
   reminderMinutes?: number[];
   timeZone?: string;
+  useUPVFormat?: boolean;
 }
 
 // Helper function to escape iCalendar text fields
@@ -123,8 +124,13 @@ export function generateICalContent(exams: Exam[], options: ICalExportOptions = 
   const { 
     calendarName = 'UPV Exams',
     reminderMinutes = [24 * 60, 60], // 1 day and 1 hour before
-    timeZone = 'Europe/Madrid'
+    timeZone = 'Europe/Madrid',
+    useUPVFormat = true // New option to use UPV-compatible format
   } = options;
+
+  if (useUPVFormat) {
+    return generateUPVCompatibleICalContent(exams, calendarName);
+  }
 
   const icalLines = [
     'BEGIN:VCALENDAR',
@@ -360,4 +366,204 @@ export function generateGoogleCalendarUrl(exam: Exam): string {
   const dates = `${formatGoogleDate(startTime)}/${formatGoogleDate(endTime)}`;
 
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}&location=${location}`;
+}
+
+// UPV-compatible iCal generator following official UPV format
+function generateUPVCompatibleICalContent(exams: Exam[], calendarName: string): string {
+  // Step 1: Use UTC timezone strategy (no VTIMEZONE block)
+  const icalLines = [
+    'BEGIN:VCALENDAR',
+    'PRODID:-//UPV-Cal//Exam API 1.0//ES',
+    'VERSION:2.0',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    `X-WR-CALNAME:${calendarName}`,
+    'X-APPLE-CALENDAR-COLOR:#0252D4'
+  ];
+
+  // Step 2: Generate events in UPV format
+  const now = new Date();
+  const nowUtc = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+
+  // Subject color mapping (from UPV examples)
+  const subjectColors: Record<string, { bg: string; fg: string }> = {
+    'Estructura de computadores': { bg: '#336600', fg: '#ffffff' },
+    'Sistemas inteligentes': { bg: '#88AB2F', fg: '#ffffff' },
+    'Bases de datos y sistemas de información': { bg: '#CCBC0F', fg: '#FFFFFF' },
+    'Tecnología de sistemas de información en la red': { bg: '#CCBC0F', fg: '#FFFFFF' },
+    'Concurrencia y sistemas distribuidos': { bg: '#D55E8E', fg: '0' },
+    'Teoría de autómatas y lenguajes formales': { bg: '#FFCBFF', fg: '0' },
+    'Lenguajes, tecnologías y paradigmas de la programación': { bg: '#F0F0F0', fg: '#0' },
+    'Desarrollo web': { bg: '#1B5A96', fg: '#ffffff' },
+    'Diseño y configuración de redes de área local': { bg: '#578A07', fg: '#ffffff' },
+    'Diseño, configuración y evaluación de los sistemas informáticos': { bg: '#DB8E00', fg: '#ffffff' },
+    'Administración de sistemas': { bg: '#009900', fg: '#ffffff' }
+  };
+
+  // Default colors for unknown subjects
+  const defaultColors = { bg: '#0252D4', fg: '#ffffff' };
+
+  // Filter and process valid exams
+  const validExams: Exam[] = [];
+  exams.forEach(exam => {
+    if (!exam.date || !exam.time || !exam.duration_minutes || !exam.subject) {
+      return;
+    }
+
+    const parseResult = parseExamDateTime(exam.date, exam.time, 'Europe/Madrid');
+    if (!parseResult.isValid) {
+      return;
+    }
+
+    validExams.push(exam);
+  });
+
+  // Generate events
+  validExams.forEach(exam => {
+    const parseResult = parseExamDateTime(exam.date, exam.time, 'Europe/Madrid');
+    const startTime = parseResult.start;
+    const endTime = new Date(startTime);
+    endTime.setMinutes(startTime.getMinutes() + exam.duration_minutes);
+
+    // Convert to UTC for UPV format
+    const formatUTCDate = (date: Date) => {
+      return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+    };
+
+    // Get colors for this subject
+    const colors = subjectColors[exam.subject] || defaultColors;
+
+    // Generate stable UID
+    const uid = `${generateStableId(exam)}@upv-cal`;
+
+    // Fold long lines (RFC 5545 compliance)
+    const foldLine = (line: string) => {
+      if (line.length <= 75) return line;
+      const folded = [];
+      let start = 0;
+      while (start < line.length) {
+        if (start === 0) {
+          folded.push(line.substring(0, 75));
+          start = 75;
+        } else {
+          folded.push(' ' + line.substring(start, start + 74));
+          start += 74;
+        }
+      }
+      return folded.join('\r\n');
+    };
+
+    // Step 3: Canonical template for each exam (exact order from UPV)
+    icalLines.push(
+      'BEGIN:VEVENT',
+      `DTSTART:${formatUTCDate(startTime)}`,
+      `DTEND:${formatUTCDate(endTime)}`,
+      `DTSTAMP:${nowUtc}`,
+      `UID:${uid}`,
+      `CREATED:${nowUtc}`,
+      foldLine(`DESCRIPTION:${exam.subject}`),
+      `LAST-MODIFIED:${nowUtc}`,
+      foldLine(`LOCATION:${exam.location || ''}`),
+      'SEQUENCE:0',
+      'STATUS:CONFIRMED',
+      foldLine(`SUMMARY:Examen ${exam.subject}`),
+      'TRANSP:OPAQUE',
+      `UPV_BGCOLOR:${colors.bg}`,
+      `UPV_FGCOLOR:${colors.fg}`,
+      'END:VEVENT'
+    );
+  });
+
+  // Handle empty exam list
+  if (validExams.length === 0) {
+    const uid = `no-exams-${Date.now()}@upv-cal`;
+    icalLines.push(
+      'BEGIN:VEVENT',
+      `DTSTART:${nowUtc}`,
+      `DTEND:${new Date(now.getTime() + 60 * 60 * 1000).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}`,
+      `DTSTAMP:${nowUtc}`,
+      `UID:${uid}`,
+      `CREATED:${nowUtc}`,
+      'DESCRIPTION:No exams match your current filters or there are no exams available. Please adjust your filters and try again, or check back later for new exam schedules.',
+      `LAST-MODIFIED:${nowUtc}`,
+      'LOCATION:',
+      'SEQUENCE:0',
+      'STATUS:TENTATIVE',
+      'SUMMARY:No Exams Found',
+      'TRANSP:TRANSPARENT',
+      'UPV_BGCOLOR:#0252D4',
+      'UPV_FGCOLOR:#ffffff',
+      'END:VEVENT'
+    );
+  }
+
+  icalLines.push('END:VCALENDAR');
+  
+  // Step 4: Emit lines with hard CRLF
+  return icalLines.join('\r\n');
+}
+
+// Generate stable ID for exam (for UID consistency)
+function generateStableId(exam: Exam): string {
+  // Create a stable identifier based on exam properties
+  const baseString = `${exam.id || exam.subject}-${exam.date}-${exam.time}-${exam.code || ''}`;
+  
+  // Simple hash function (since we don't have crypto)
+  let hash = 0;
+  for (let i = 0; i < baseString.length; i++) {
+    const char = baseString.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  
+  // Convert to positive hex string
+  return Math.abs(hash).toString(16).toUpperCase().padStart(8, '0');
+}
+
+// Generate UPV-style token URL
+export async function generateUPVTokenUrl(filters: Record<string, string[]>, calendarName: string = 'UPV Exams'): Promise<string> {
+  // Build query string
+  const params = new URLSearchParams();
+  params.set('name', calendarName);
+  
+  // Add individual filter parameters
+  if (filters.school && filters.school.length > 0) {
+    filters.school.forEach(school => params.append('school', school));
+  }
+  if (filters.degree && filters.degree.length > 0) {
+    filters.degree.forEach(degree => params.append('degree', degree));
+  }
+  if (filters.year && filters.year.length > 0) {
+    filters.year.forEach(year => params.append('year', year));
+  }
+  if (filters.semester && filters.semester.length > 0) {
+    filters.semester.forEach(semester => params.append('semester', semester));
+  }
+  if (filters.subject && filters.subject.length > 0) {
+    filters.subject.forEach(subject => params.append('subject', subject));
+  }
+  
+  const queryString = params.toString();
+  
+  // Generate token (client-side hash since we can't use crypto in browser)
+  let hash = 0;
+  for (let i = 0; i < queryString.length; i++) {
+    const char = queryString.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  const token = Math.abs(hash).toString(16).toUpperCase().padStart(16, '0');
+  
+  // Store the mapping by calling our API
+  try {
+    await fetch('/api/ical/store-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, queryString })
+    });
+  } catch (error) {
+    console.error('Failed to store token mapping:', error);
+  }
+  
+  return `/ical/${token}.ics`;
 }

@@ -16,6 +16,7 @@ import {
   Share2,
   Settings,
   Loader2,
+  MoreHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -381,35 +382,44 @@ export function CalendarDisplay({
               className="h-10 gap-1.5 rounded-md"
               disabled={exams.length === 0}
               onClick={async () => {
-                // Always use production URL for Google Calendar iCal subscription with filters
-                const filtersParam = encodeURIComponent(
-                  JSON.stringify(activeFilters)
-                );
-                const icalUrl = `${GOOGLE_ICAL_BASE_URL}/api/ical?filters=${filtersParam}&name=UPV%20Exams`;
-
-                // Use HEAD request for validation
-                let ok = false;
                 try {
-                  ok = await fetch(icalUrl, { method: "HEAD" }).then(
-                    (r) => r.ok
-                  );
+                  // Generate UPV-style token URL
+                  const { generateUPVTokenUrl } = await import("@/lib/utils");
+                  const tokenPath = await generateUPVTokenUrl(activeFilters, "UPV Exams");
+                  const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
+
+                  // Use HEAD request for validation
+                  let ok = false;
+                  try {
+                    ok = await fetch(icalUrl, { method: "HEAD" }).then(
+                      (r) => r.ok
+                    );
+                  } catch (error) {
+                    ok = false;
+                  }
+                  if (!ok) {
+                    toast({
+                      title: "Calendar feed is empty or unreachable.",
+                      description:
+                        "Google Calendar could not access the feed. Please try again later.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+
+                  // Google Calendar subscription link
+                  const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(
+                    icalUrl
+                  )}`;
+                  window.open(googleCalendarUrl, "_blank", "noopener,noreferrer");
                 } catch (error) {
-                  ok = false;
-                }
-                if (!ok) {
+                  console.error("Error generating token URL:", error);
                   toast({
-                    title: "Calendar feed is empty or unreachable.",
-                    description:
-                      "Google Calendar could not access the feed. Please try again later.",
+                    title: "Error generating calendar link",
+                    description: "Please try again later.",
                     variant: "destructive",
                   });
-                  return;
                 }
-                // Google Calendar subscription link (encode once)
-                const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(
-                  icalUrl
-                )}`;
-                window.open(googleCalendarUrl, "_blank", "noopener,noreferrer");
               }}
             >
               <Calendar className="h-4 w-4" />
@@ -420,27 +430,35 @@ export function CalendarDisplay({
               size="sm"
               className="h-10 gap-1.5 rounded-md"
               disabled={exams.length === 0}
-              onClick={() => {
-                // For Apple Calendar, allow filters in the URL
-                let baseUrl = "https://upv-cal.vercel.app";
-                if (
-                  window.location.origin.includes("localhost") ||
-                  window.location.origin.includes("127.0.0.1")
-                ) {
+              onClick={async () => {
+                try {
+                  if (
+                    window.location.origin.includes("localhost") ||
+                    window.location.origin.includes("127.0.0.1")
+                  ) {
+                    toast({
+                      title: "Cannot Export from Localhost",
+                      description:
+                        "Apple Calendar cannot access localhost. Please use the production site.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+
+                  // Generate UPV-style token URL
+                  const { generateUPVTokenUrl } = await import("@/lib/utils");
+                  const tokenPath = await generateUPVTokenUrl(activeFilters, "UPV Exams");
+                  const icalUrl = `https://upv-cal.vercel.app${tokenPath}`;
+                  const webcalUrl = icalUrl.replace(/^https?:/, "webcal:");
+                  window.location.href = webcalUrl;
+                } catch (error) {
+                  console.error("Error generating token URL:", error);
                   toast({
-                    title: "Cannot Export from Localhost",
-                    description:
-                      "Apple Calendar cannot access localhost. Please use the production site.",
+                    title: "Error generating calendar link",
+                    description: "Please try again later.",
                     variant: "destructive",
                   });
-                  return;
                 }
-                const filtersParam = encodeURIComponent(
-                  JSON.stringify(activeFilters)
-                );
-                const icalUrl = `${baseUrl}/api/ical?filters=${filtersParam}&name=UPV%20Exams`;
-                const webcalUrl = icalUrl.replace(/^https?:/, "webcal:");
-                window.location.href = webcalUrl;
               }}
             >
               <Download className="h-4 w-4" />
@@ -487,38 +505,47 @@ export function CalendarDisplay({
               <DropdownMenuItem
                 disabled={exams.length === 0}
                 onClick={async () => {
-                  // Always use production URL for Google Calendar iCal subscription with filters
-                  const filtersParam = encodeURIComponent(
-                    JSON.stringify(activeFilters)
-                  );
-                  const icalUrl = `${GOOGLE_ICAL_BASE_URL}/api/ical?filters=${filtersParam}&name=UPV%20Exams`;
-
-                  // Use HEAD request for validation
-                  let ok = false;
                   try {
-                    ok = await fetch(icalUrl, { method: "HEAD" }).then(
-                      (r) => r.ok
+                    // Generate UPV-style token URL
+                    const { generateUPVTokenUrl } = await import("@/lib/utils");
+                    const tokenPath = await generateUPVTokenUrl(activeFilters, "UPV Exams");
+                    const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
+
+                    // Use HEAD request for validation
+                    let ok = false;
+                    try {
+                      ok = await fetch(icalUrl, { method: "HEAD" }).then(
+                        (r) => r.ok
+                      );
+                    } catch (error) {
+                      ok = false;
+                    }
+                    if (!ok) {
+                      toast({
+                        title: "Calendar feed is empty or unreachable.",
+                        description:
+                          "Google Calendar could not access the feed. Please try again later.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(
+                      icalUrl
+                    )}`;
+                    window.open(
+                      googleCalendarUrl,
+                      "_blank",
+                      "noopener,noreferrer"
                     );
                   } catch (error) {
-                    ok = false;
-                  }
-                  if (!ok) {
+                    console.error("Error generating token URL:", error);
                     toast({
-                      title: "Calendar feed is empty or unreachable.",
-                      description:
-                        "Google Calendar could not access the feed. Please try again later.",
+                      title: "Error generating calendar link",
+                      description: "Please try again later.",
                       variant: "destructive",
                     });
-                    return;
                   }
-                  const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(
-                    icalUrl
-                  )}`;
-                  window.open(
-                    googleCalendarUrl,
-                    "_blank",
-                    "noopener,noreferrer"
-                  );
                 }}
               >
                 <Calendar className="mr-2 h-4 w-4" />
@@ -526,27 +553,35 @@ export function CalendarDisplay({
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={exams.length === 0}
-                onClick={() => {
-                  // For Apple Calendar, allow filters in the URL
-                  let baseUrl = "https://upv-cal.vercel.app";
-                  if (
-                    window.location.origin.includes("localhost") ||
-                    window.location.origin.includes("127.0.0.1")
-                  ) {
+                onClick={async () => {
+                  try {
+                    if (
+                      window.location.origin.includes("localhost") ||
+                      window.location.origin.includes("127.0.0.1")
+                    ) {
+                      toast({
+                        title: "Cannot Export from Localhost",
+                        description:
+                          "Apple Calendar cannot access localhost. Please use the production site.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    // Generate UPV-style token URL
+                    const { generateUPVTokenUrl } = await import("@/lib/utils");
+                    const tokenPath = await generateUPVTokenUrl(activeFilters, "UPV Exams");
+                    const icalUrl = `https://upv-cal.vercel.app${tokenPath}`;
+                    const webcalUrl = icalUrl.replace(/^https?:/, "webcal:");
+                    window.location.href = webcalUrl;
+                  } catch (error) {
+                    console.error("Error generating token URL:", error);
                     toast({
-                      title: "Cannot Export from Localhost",
-                      description:
-                        "Apple Calendar cannot access localhost. Please use the production site.",
+                      title: "Error generating calendar link",
+                      description: "Please try again later.",
                       variant: "destructive",
                     });
-                    return;
                   }
-                  const filtersParam = encodeURIComponent(
-                    JSON.stringify(activeFilters)
-                  );
-                  const icalUrl = `${baseUrl}/api/ical?filters=${filtersParam}&name=UPV%20Exams`;
-                  const webcalUrl = icalUrl.replace(/^https?:/, "webcal:");
-                  window.location.href = webcalUrl;
                 }}
               >
                 <Download className="mr-2 h-4 w-4" />

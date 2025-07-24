@@ -49,8 +49,10 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
       })
     }
     
-    // Parse filters from URL parameter with better error handling
+    // Parse filters from URL parameters with better error handling
     let filters = {}
+    
+    // First try to parse JSON filters parameter (for backward compatibility)
     if (filtersParam) {
       try {
         const decodedFilters = decodeURIComponent(filtersParam)
@@ -65,6 +67,19 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
         console.error('Error parsing filters:', e)
         filters = {}
       }
+    } else {
+      // Parse individual filter parameters (better for Google Calendar compatibility)
+      const schools = searchParams.getAll('school')
+      const degrees = searchParams.getAll('degree')
+      const years = searchParams.getAll('year')
+      const semesters = searchParams.getAll('semester')
+      const subjects = searchParams.getAll('subject')
+      
+      if (schools.length > 0) filters.school = schools
+      if (degrees.length > 0) filters.degree = degrees
+      if (years.length > 0) filters.year = years
+      if (semesters.length > 0) filters.semester = semesters
+      if (subjects.length > 0) filters.subject = subjects
     }
     
     // Use service role client so anonymous calendar apps can read data
@@ -129,7 +144,8 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
       icalContent = generateICalContent(exams, {
         calendarName: sanitizedCalendarName,
         timeZone: 'Europe/Madrid',
-        reminderMinutes: [24 * 60, 60] // 1 day and 1 hour before
+        reminderMinutes: [24 * 60, 60], // 1 day and 1 hour before
+        useUPVFormat: true // Use UPV-compatible format by default
       })
     } catch (contentError) {
       console.error('Error generating iCal content:', contentError)
