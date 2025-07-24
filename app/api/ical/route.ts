@@ -35,9 +35,28 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
     
     // For HEAD requests, we can return early with just headers
     if (method === 'HEAD') {
+      // Generate a minimal valid VCALENDAR for length calculation
+      const minimalContent = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//UPV Exam Calendar//EN',
+        `X-WR-CALNAME:${sanitizedCalendarName}`,
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        'BEGIN:VEVENT',
+        `UID:head-request@upv-exam-calendar.com`,
+        'DTSTART:20250101T000000Z',
+        'DTEND:20250101T010000Z',
+        'SUMMARY:Calendar HEAD Request',
+        'END:VEVENT',
+        'END:VCALENDAR',
+      ].join('\r\n');
       return new NextResponse(null, {
         status: 200,
-        headers: getOptimalHeaders(sanitizedCalendarName),
+        headers: getOptimalHeaders(
+          sanitizedCalendarName,
+          Buffer.byteLength(minimalContent, 'utf8')
+        ),
       })
     }
     
