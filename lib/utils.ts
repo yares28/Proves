@@ -378,7 +378,8 @@ function generateUPVCompatibleICalContent(exams: Exam[], calendarName: string): 
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${calendarName}`,
-    'X-APPLE-CALENDAR-COLOR:#0252D4'
+    'X-APPLE-CALENDAR-COLOR:#0252D4',
+    'X-WR-TIMEZONE:Europe/Madrid'
   ];
 
   // Step 2: Generate events in UPV format
