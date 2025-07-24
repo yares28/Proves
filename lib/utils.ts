@@ -163,7 +163,7 @@ export function generateICalContent(exams: Exam[], options: ICalExportOptions = 
 
   // Log invalid exams for debugging (always, including production)
   if (invalidExams.length > 0) {
-    console.warn(`Skipped ${invalidExams.length} invalid exams:`, invalidExams);
+    console.error(`Skipped ${invalidExams.length} invalid exams:`, invalidExams);
   }
 
   validExams.forEach(exam => {
