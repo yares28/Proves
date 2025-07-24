@@ -339,7 +339,7 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               disabled={exams.length === 0}
               onClick={() => {
                 // For Apple Calendar, allow filters in the URL
-                let baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
+                let baseUrl = 'https://upv-cal.vercel.app';
                 if (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')) {
                   toast({
                     title: "Cannot Export from Localhost",
