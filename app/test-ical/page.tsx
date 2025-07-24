@@ -13,23 +13,51 @@ export default function TestICalPage() {
     setLoading(true);
     try {
       const baseUrl = window.location.origin;
-      const icalUrl = `${baseUrl}/api/ical?name=UPV Exams`;
+      
+      // Test both old and new formats
+      const oldFormatUrl = `${baseUrl}/api/ical?name=UPV Exams`;
+      
+      // Generate token URL for new format
+      const { generateUPVTokenUrl } = await import("@/lib/utils");
+      const tokenPath = await generateUPVTokenUrl({}, "UPV Exams");
+      const newFormatUrl = `${baseUrl}${tokenPath}`;
 
-      console.log("🧪 Testing iCal endpoint:", icalUrl);
+      console.log("🧪 Testing old format:", oldFormatUrl);
+      console.log("🧪 Testing new format:", newFormatUrl);
 
-      const response = await fetch(icalUrl);
-      const content = await response.text();
+      // Test old format
+      const oldResponse = await fetch(oldFormatUrl);
+      const oldContent = await oldResponse.text();
+
+      // Test new format
+      const newResponse = await fetch(newFormatUrl);
+      const newContent = await newResponse.text();
 
       const results = {
-        url: icalUrl,
-        status: response.status,
-        statusText: response.statusText,
-        contentType: response.headers.get("content-type"),
-        contentLength: content.length,
-        hasEvents: content.includes("BEGIN:VEVENT"),
-        eventCount: (content.match(/BEGIN:VEVENT/g) || []).length,
-        preview: content.substring(0, 500),
-        headers: Object.fromEntries(response.headers.entries()),
+        oldFormat: {
+          url: oldFormatUrl,
+          status: oldResponse.status,
+          statusText: oldResponse.statusText,
+          contentType: oldResponse.headers.get("content-type"),
+          contentLength: oldContent.length,
+          hasEvents: oldContent.includes("BEGIN:VEVENT"),
+          eventCount: (oldContent.match(/BEGIN:VEVENT/g) || []).length,
+          preview: oldContent.substring(0, 500),
+          isUPVFormat: oldContent.includes("PRODID:-//UPV-Cal//Exam API 1.0//ES"),
+          hasUPVColors: oldContent.includes("UPV_BGCOLOR"),
+        },
+        newFormat: {
+          url: newFormatUrl,
+          status: newResponse.status,
+          statusText: newResponse.statusText,
+          contentType: newResponse.headers.get("content-type"),
+          contentLength: newContent.length,
+          hasEvents: newContent.includes("BEGIN:VEVENT"),
+          eventCount: (newContent.match(/BEGIN:VEVENT/g) || []).length,
+          preview: newContent.substring(0, 500),
+          isUPVFormat: newContent.includes("PRODID:-//UPV-Cal//Exam API 1.0//ES"),
+          hasUPVColors: newContent.includes("UPV_BGCOLOR"),
+        }
       };
 
       setTestResults(results);
@@ -81,63 +109,124 @@ export default function TestICalPage() {
             </Button>
 
             {testResults && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {testResults.error ? (
                   <div className="p-4 bg-red-50 border border-red-200 rounded">
                     <h4 className="font-medium text-red-800">Error</h4>
                     <p className="text-red-600">{testResults.error}</p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <strong>Status:</strong> {testResults.status}{" "}
-                        {testResults.statusText}
+                  <div className="space-y-6">
+                    {/* Old Format Results */}
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-3 text-blue-600">Legacy Format (/api/ical)</h4>
+                      <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                        <div>
+                          <strong>Status:</strong> {testResults.oldFormat.status}{" "}
+                          {testResults.oldFormat.statusText}
+                        </div>
+                        <div>
+                          <strong>Content-Type:</strong> {testResults.oldFormat.contentType}
+                        </div>
+                        <div>
+                          <strong>Content Length:</strong>{" "}
+                          {testResults.oldFormat.contentLength} bytes
+                        </div>
+                        <div>
+                          <strong>Has Events:</strong>{" "}
+                          {testResults.oldFormat.hasEvents ? "✅ Yes" : "❌ No"}
+                        </div>
+                        <div>
+                          <strong>Event Count:</strong> {testResults.oldFormat.eventCount}
+                        </div>
+                        <div>
+                          <strong>UPV Format:</strong>{" "}
+                          {testResults.oldFormat.isUPVFormat ? "✅ Yes" : "❌ No"}
+                        </div>
+                        <div>
+                          <strong>UPV Colors:</strong>{" "}
+                          {testResults.oldFormat.hasUPVColors ? "✅ Yes" : "❌ No"}
+                        </div>
                       </div>
-                      <div>
-                        <strong>Content-Type:</strong> {testResults.contentType}
+
+                      <div className="mb-4">
+                        <h5 className="font-medium mb-2">URL</h5>
+                        <div className="flex items-center gap-2">
+                          <code className="flex-1 p-2 bg-gray-100 rounded text-sm">
+                            {testResults.oldFormat.url}
+                          </code>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => copyToClipboard(testResults.oldFormat.url)}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
+
                       <div>
-                        <strong>Content Length:</strong>{" "}
-                        {testResults.contentLength} bytes
-                      </div>
-                      <div>
-                        <strong>Has Events:</strong>{" "}
-                        {testResults.hasEvents ? "✅ Yes" : "❌ No"}
-                      </div>
-                      <div>
-                        <strong>Event Count:</strong> {testResults.eventCount}
+                        <h5 className="font-medium mb-2">Content Preview</h5>
+                        <pre className="p-4 bg-gray-100 rounded text-xs overflow-x-auto">
+                          {testResults.oldFormat.preview}...
+                        </pre>
                       </div>
                     </div>
 
-                    <div>
-                      <h4 className="font-medium mb-2">iCal URL</h4>
-                      <div className="flex items-center gap-2">
-                        <code className="flex-1 p-2 bg-gray-100 rounded text-sm">
-                          {testResults.url}
-                        </code>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => copyToClipboard(testResults.url)}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
+                    {/* New Format Results */}
+                    <div className="border rounded-lg p-4 border-green-200 bg-green-50">
+                      <h4 className="font-medium mb-3 text-green-600">UPV Token Format (/ical/[token].ics)</h4>
+                      <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                        <div>
+                          <strong>Status:</strong> {testResults.newFormat.status}{" "}
+                          {testResults.newFormat.statusText}
+                        </div>
+                        <div>
+                          <strong>Content-Type:</strong> {testResults.newFormat.contentType}
+                        </div>
+                        <div>
+                          <strong>Content Length:</strong>{" "}
+                          {testResults.newFormat.contentLength} bytes
+                        </div>
+                        <div>
+                          <strong>Has Events:</strong>{" "}
+                          {testResults.newFormat.hasEvents ? "✅ Yes" : "❌ No"}
+                        </div>
+                        <div>
+                          <strong>Event Count:</strong> {testResults.newFormat.eventCount}
+                        </div>
+                        <div>
+                          <strong>UPV Format:</strong>{" "}
+                          {testResults.newFormat.isUPVFormat ? "✅ Yes" : "❌ No"}
+                        </div>
+                        <div>
+                          <strong>UPV Colors:</strong>{" "}
+                          {testResults.newFormat.hasUPVColors ? "✅ Yes" : "❌ No"}
+                        </div>
                       </div>
-                    </div>
 
-                    <div>
-                      <h4 className="font-medium mb-2">Content Preview</h4>
-                      <pre className="p-4 bg-gray-100 rounded text-xs overflow-x-auto">
-                        {testResults.preview}...
-                      </pre>
-                    </div>
+                      <div className="mb-4">
+                        <h5 className="font-medium mb-2">Token URL</h5>
+                        <div className="flex items-center gap-2">
+                          <code className="flex-1 p-2 bg-white rounded text-sm">
+                            {testResults.newFormat.url}
+                          </code>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => copyToClipboard(testResults.newFormat.url)}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
 
-                    <div>
-                      <h4 className="font-medium mb-2">Response Headers</h4>
-                      <pre className="p-4 bg-gray-100 rounded text-xs overflow-x-auto">
-                        {JSON.stringify(testResults.headers, null, 2)}
-                      </pre>
+                      <div>
+                        <h5 className="font-medium mb-2">Content Preview</h5>
+                        <pre className="p-4 bg-white rounded text-xs overflow-x-auto">
+                          {testResults.newFormat.preview}...
+                        </pre>
+                      </div>
                     </div>
                   </div>
                 )}
