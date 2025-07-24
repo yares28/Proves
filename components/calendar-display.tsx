@@ -309,7 +309,7 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                   return;
                 }
                 // Only use ?name=... for Google Calendar (no filters)
-                const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent('UPV Exams')}`;
+                const icalUrl = `${baseUrl}/api/ical?name=UPV Exams`;
                 // Validate iCal URL before opening Google Calendar
                 try {
                   const response = await fetch(icalUrl);
@@ -331,7 +331,12 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                   return;
                 }
                 // Google Calendar subscription link
+<<<<<<< HEAD
                 const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${icalUrl}`;
+=======
+                // Opens Google Calendar's "Add calendar?" dialog
+                const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(icalUrl)}`;
+>>>>>>> refs/remotes/origin/main
                 window.open(googleCalendarUrl, '_blank');
               }}
             >
@@ -411,7 +416,7 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                     });
                     return;
                   }
-                  const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent('UPV Exams')}`;
+                  const icalUrl = `${baseUrl}/api/ical?name=UPV Exams`;
                   try {
                     const response = await fetch(icalUrl);
                     const content = await response.text();
@@ -431,7 +436,12 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                     });
                     return;
                   }
+<<<<<<< HEAD
                   const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${icalUrl}`;
+=======
+                  // Opens Google Calendar's "Add calendar?" dialog
+                  const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(icalUrl)}`;
+>>>>>>> refs/remotes/origin/main
                   window.open(googleCalendarUrl, '_blank');
                 }}
               >
