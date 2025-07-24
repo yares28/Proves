@@ -276,6 +276,57 @@ export default function MyCalendarsPage() {
     }
   }
 
+  const handleDirectDownload = async (calendar: SavedCalendar) => {
+    try {
+      console.log('📥 Starting direct iCal download for calendar:', calendar.name)
+      
+      // Fetch exams for this calendar
+      const exams = await getExams(calendar.filters)
+      
+      if (exams.length === 0) {
+        toast({
+          title: "Sin exámenes",
+          description: "No hay exámenes para exportar con los filtros actuales.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // Dynamically import the utils to avoid SSR issues
+      const { generateICalContent } = await import("@/lib/utils")
+
+      // Generate UPV-compatible iCal content
+      const icalContent = generateICalContent(exams, {
+        calendarName: calendar.name,
+        useUPVFormat: true // Use UPV-compatible format
+      })
+
+      // Create blob and download
+      const blob = new Blob([icalContent], { type: 'text/calendar' })
+      const url = URL.createObjectURL(blob)
+      
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${calendar.name.replace(/[^\w\s-]/g, '').trim()}-${new Date().toISOString().slice(0, 10)}.ics`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      
+      toast({
+        title: "¡Descarga completa!",
+        description: `Descargado "${calendar.name}.ics" con ${exams.length} exámenes en formato UPV.`
+      })
+    } catch (error) {
+      console.error('❌ Error downloading iCal:', error)
+      toast({
+        title: "Error",
+        description: "Error al descargar el archivo iCal.",
+        variant: "destructive"
+      })
+    }
+  }
+
   const handleDevIcalDownload = async (calendar: SavedCalendar) => {
     try {
       console.log('🔧 [DEV] Starting iCal download for calendar:', calendar.name)
@@ -452,6 +503,17 @@ export default function MyCalendarsPage() {
                             />
                           </Button>
                           
+                          {/* Direct Download Button */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
+                            onClick={() => handleDirectDownload(calendar)}
+                            title="Download .ics file"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+
                           {/* Development: Manual iCal download */}
                           {process.env.NODE_ENV === 'development' && (
                             <Button
