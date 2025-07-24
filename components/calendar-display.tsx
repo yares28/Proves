@@ -27,6 +27,8 @@ import styles from "@/styles/tooltip.module.css"
 import { saveUserCalendar, getUserCalendarNames } from "@/actions/user-calendars"
 import { getCurrentSession, getFreshAuthTokens } from "@/utils/auth-helpers"
 
+const GOOGLE_ICAL_BASE_URL = 'https://upv-cal.vercel.app';
+
 export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record<string, string[]> }) {
   const [selectedDay, setSelectedDay] = useState<{ month: string; day: number } | null>(null)
   const [selectedExams, setSelectedExams] = useState<any[]>([])
@@ -299,34 +301,25 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               disabled={exams.length === 0}
               onClick={async () => {
                 // Always use production URL for Google Calendar iCal subscription
-                const baseUrl = window.location.origin.startsWith('http://localhost')
-                  ? 'https://upv-cal.vercel.app'
-                  : window.location.origin;
-                // Only use ?name=... for Google Calendar (no filters)
-                const icalUrl = `${baseUrl}/api/ical?name=UPV Exams`;
-                // Validate iCal URL before opening Google Calendar
+                const icalUrl = `${GOOGLE_ICAL_BASE_URL}/api/ical?name=UPV Exams`;
+                // Use HEAD request for validation
+                let ok = false;
                 try {
-                  const response = await fetch(icalUrl);
-                  const content = await response.text();
-                  if (!content.includes('BEGIN:VEVENT')) {
-                    toast({
-                      title: "iCal Feed Error",
-                      description: "No events found in the iCal feed. Please check your calendar data.",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
+                  ok = await fetch(icalUrl, { method: 'HEAD' }).then(r => r.ok);
                 } catch (error) {
+                  ok = false;
+                }
+                if (!ok) {
                   toast({
-                    title: "iCal Feed Error",
-                    description: "Could not fetch the iCal feed. Please try again later.",
+                    title: "Calendar feed is empty or unreachable.",
+                    description: "Google Calendar could not access the feed. Please try again later.",
                     variant: "destructive",
                   });
                   return;
                 }
                 // Google Calendar subscription link (encode once)
                 const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`;
-                window.open(googleCalendarUrl, '_blank');
+                window.open(googleCalendarUrl, '_blank', 'noopener,noreferrer');
               }}
             >
               <Calendar className="h-4 w-4" />
@@ -397,33 +390,24 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                 disabled={exams.length === 0}
                 onClick={async () => {
                   // Always use production URL for Google Calendar iCal subscription
-                  const baseUrl = window.location.origin.startsWith('http://localhost')
-                    ? 'https://upv-cal.vercel.app'
-                    : window.location.origin;
-                  // Only use ?name=... for Google Calendar (no filters)
-                  const icalUrl = `${baseUrl}/api/ical?name=UPV Exams`;
-                  // Validate iCal URL before opening Google Calendar
+                  const icalUrl = `${GOOGLE_ICAL_BASE_URL}/api/ical?name=UPV Exams`;
+                  // Use HEAD request for validation
+                  let ok = false;
                   try {
-                    const response = await fetch(icalUrl);
-                    const content = await response.text();
-                    if (!content.includes('BEGIN:VEVENT')) {
-                      toast({
-                        title: "iCal Feed Error",
-                        description: "No events found in the iCal feed. Please check your calendar data.",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
+                    ok = await fetch(icalUrl, { method: 'HEAD' }).then(r => r.ok);
                   } catch (error) {
+                    ok = false;
+                  }
+                  if (!ok) {
                     toast({
-                      title: "iCal Feed Error",
-                      description: "Could not fetch the iCal feed. Please try again later.",
+                      title: "Calendar feed is empty or unreachable.",
+                      description: "Google Calendar could not access the feed. Please try again later.",
                       variant: "destructive",
                     });
                     return;
                   }
                   const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`;
-                  window.open(googleCalendarUrl, '_blank');
+                  window.open(googleCalendarUrl, '_blank', 'noopener,noreferrer');
                 }}
               >
                 <Calendar className="mr-2 h-4 w-4" />

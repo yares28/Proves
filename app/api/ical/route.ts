@@ -8,17 +8,6 @@ function getOptimalHeaders(filename: string, contentLength?: number) {
   return {
     'Content-Type': 'text/calendar; charset=utf-8',
     ...(contentLength ? { 'Content-Length': String(contentLength) } : {}),
-    // Remove Content-Disposition for Google Calendar compatibility
-    // 'Content-Disposition': `attachment; filename="${filename}.ics"`,
-    'Cache-Control': 'public, max-age=300', // Allow some caching for Google Calendar
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, User-Agent, Referer',
-    'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
-    // Remove security headers that might interfere with Google Calendar
-    // 'X-Content-Type-Options': 'nosniff',
-    // 'X-Frame-Options': 'DENY',
-    // 'Referrer-Policy': 'no-referrer',
   };
 }
 
@@ -47,7 +36,7 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
         `UID:head-request@upv-exam-calendar.com`,
         'DTSTART:20250101T000000Z',
         'DTEND:20250101T010000Z',
-        'SUMMARY:Calendar HEAD Request',
+        'SUMMARY:No Exams Found',
         'END:VEVENT',
         'END:VCALENDAR',
       ].join('\r\n');
@@ -100,11 +89,25 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
           `UID:no-exams-${Date.now()}@upv-exam-calendar.com`,
           'DTSTART:20250101T000000Z',
           'DTEND:20250101T010000Z',
-          'SUMMARY:(No exams found for your filters)',
+          'SUMMARY:No Exams Found',
           'END:VEVENT',
           'END:VCALENDAR',
         ].join('\r\n'),
-        { status: 200, headers: getOptimalHeaders(sanitizedCalendarName) }
+        { status: 200, headers: getOptimalHeaders(sanitizedCalendarName, Buffer.byteLength([
+          'BEGIN:VCALENDAR',
+          'VERSION:2.0',
+          'PRODID:-//UPV Exam Calendar//EN',
+          `X-WR-CALNAME:${sanitizedCalendarName}`,
+          'CALSCALE:GREGORIAN',
+          'METHOD:PUBLISH',
+          'BEGIN:VEVENT',
+          `UID:no-exams-${Date.now()}@upv-exam-calendar.com`,
+          'DTSTART:20250101T000000Z',
+          'DTEND:20250101T010000Z',
+          'SUMMARY:No Exams Found',
+          'END:VEVENT',
+          'END:VCALENDAR',
+        ].join('\r\n'), 'utf8')) }
       );
     }
     
