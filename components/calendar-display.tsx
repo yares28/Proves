@@ -472,21 +472,56 @@ export function CalendarDisplay({
               disabled={exams.length === 0}
               onClick={async () => {
                 try {
-                  // Generate UPV-style token URL for download
-                  const { generateUPVTokenUrl } = await import("@/lib/utils");
-                  const tokenPath = await generateUPVTokenUrl(activeFilters, "UPV Exams");
-                  const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
+                  // Build direct API URL with current filters
+                  const params = new URLSearchParams();
+                  params.set("name", "UPV Exams");
+
+                  // Add individual filter parameters
+                  if (activeFilters.school && activeFilters.school.length > 0) {
+                    activeFilters.school.forEach((school) =>
+                      params.append("school", school)
+                    );
+                  }
+                  if (activeFilters.degree && activeFilters.degree.length > 0) {
+                    activeFilters.degree.forEach((degree) =>
+                      params.append("degree", degree)
+                    );
+                  }
+                  if (activeFilters.year && activeFilters.year.length > 0) {
+                    activeFilters.year.forEach((year) =>
+                      params.append("year", year)
+                    );
+                  }
+                  if (activeFilters.semester && activeFilters.semester.length > 0) {
+                    activeFilters.semester.forEach((semester) =>
+                      params.append("semester", semester)
+                    );
+                  }
+                  if (activeFilters.subject && activeFilters.subject.length > 0) {
+                    activeFilters.subject.forEach((subject) =>
+                      params.append("subject", subject)
+                    );
+                  }
+
+                  const icalUrl = `${GOOGLE_ICAL_BASE_URL}/api/ical?${params.toString()}`;
+                  console.log("📥 Downloading from:", icalUrl);
 
                   // Fetch the iCal content
                   const response = await fetch(icalUrl);
                   if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                   }
                   
                   const icalContent = await response.text();
+                  console.log("📄 Downloaded content length:", icalContent.length);
+                  
+                  // Validate content
+                  if (!icalContent.includes("BEGIN:VCALENDAR")) {
+                    throw new Error("Invalid iCal content received");
+                  }
                   
                   // Create blob and download
-                  const blob = new Blob([icalContent], { type: 'text/calendar' });
+                  const blob = new Blob([icalContent], { type: 'text/calendar;charset=utf-8' });
                   const url = URL.createObjectURL(blob);
                   
                   const a = document.createElement('a');
@@ -499,13 +534,13 @@ export function CalendarDisplay({
 
                   toast({
                     title: "Download Started",
-                    description: "Your iCal file is being downloaded.",
+                    description: `Downloaded ${(icalContent.match(/BEGIN:VEVENT/g) || []).length} exams to your device.`,
                   });
                 } catch (error) {
                   console.error("Error downloading iCal:", error);
                   toast({
                     title: "Download Failed",
-                    description: "Please try again later.",
+                    description: error instanceof Error ? error.message : "Please try again later.",
                     variant: "destructive",
                   });
                 }
@@ -642,21 +677,56 @@ export function CalendarDisplay({
                 disabled={exams.length === 0}
                 onClick={async () => {
                   try {
-                    // Generate UPV-style token URL for download
-                    const { generateUPVTokenUrl } = await import("@/lib/utils");
-                    const tokenPath = await generateUPVTokenUrl(activeFilters, "UPV Exams");
-                    const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
+                    // Build direct API URL with current filters
+                    const params = new URLSearchParams();
+                    params.set("name", "UPV Exams");
+
+                    // Add individual filter parameters
+                    if (activeFilters.school && activeFilters.school.length > 0) {
+                      activeFilters.school.forEach((school) =>
+                        params.append("school", school)
+                      );
+                    }
+                    if (activeFilters.degree && activeFilters.degree.length > 0) {
+                      activeFilters.degree.forEach((degree) =>
+                        params.append("degree", degree)
+                      );
+                    }
+                    if (activeFilters.year && activeFilters.year.length > 0) {
+                      activeFilters.year.forEach((year) =>
+                        params.append("year", year)
+                      );
+                    }
+                    if (activeFilters.semester && activeFilters.semester.length > 0) {
+                      activeFilters.semester.forEach((semester) =>
+                        params.append("semester", semester)
+                      );
+                    }
+                    if (activeFilters.subject && activeFilters.subject.length > 0) {
+                      activeFilters.subject.forEach((subject) =>
+                        params.append("subject", subject)
+                      );
+                    }
+
+                    const icalUrl = `${GOOGLE_ICAL_BASE_URL}/api/ical?${params.toString()}`;
+                    console.log("📥 Mobile downloading from:", icalUrl);
 
                     // Fetch the iCal content
                     const response = await fetch(icalUrl);
                     if (!response.ok) {
-                      throw new Error(`HTTP ${response.status}`);
+                      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
                     
                     const icalContent = await response.text();
+                    console.log("📄 Mobile downloaded content length:", icalContent.length);
+                    
+                    // Validate content
+                    if (!icalContent.includes("BEGIN:VCALENDAR")) {
+                      throw new Error("Invalid iCal content received");
+                    }
                     
                     // Create blob and download
-                    const blob = new Blob([icalContent], { type: 'text/calendar' });
+                    const blob = new Blob([icalContent], { type: 'text/calendar;charset=utf-8' });
                     const url = URL.createObjectURL(blob);
                     
                     const a = document.createElement('a');
@@ -669,13 +739,13 @@ export function CalendarDisplay({
 
                     toast({
                       title: "Download Started",
-                      description: "Your iCal file is being downloaded.",
+                      description: `Downloaded ${(icalContent.match(/BEGIN:VEVENT/g) || []).length} exams to your device.`,
                     });
                   } catch (error) {
                     console.error("Error downloading iCal:", error);
                     toast({
                       title: "Download Failed",
-                      description: "Please try again later.",
+                      description: error instanceof Error ? error.message : "Please try again later.",
                       variant: "destructive",
                     });
                   }
