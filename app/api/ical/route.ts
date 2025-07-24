@@ -90,40 +90,43 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
     const exams = await getExams(filters, supabase)
     console.log('📊 [API] getExams returned:', exams?.length || 0, 'exams');
     
-    // Guarantee at least one valid VEVENT if no exams found
+    // Guarantee at least one valid VEVENT if no exams found - use UPV format
     if (exams.length === 0) {
-      return new NextResponse(
-        [
-          'BEGIN:VCALENDAR',
-          'VERSION:2.0',
-          'PRODID:-//UPV Exam Calendar//EN',
-          `X-WR-CALNAME:${sanitizedCalendarName}`,
-          'CALSCALE:GREGORIAN',
-          'METHOD:PUBLISH',
-          'BEGIN:VEVENT',
-          `UID:no-exams-${Date.now()}@upv-exam-calendar.com`,
-          'DTSTART:20250101T000000Z',
-          'DTEND:20250101T010000Z',
-          'SUMMARY:No Exams Found',
-          'END:VEVENT',
-          'END:VCALENDAR',
-        ].join('\r\n'),
-        { status: 200, headers: getOptimalHeaders(sanitizedCalendarName, Buffer.byteLength([
-          'BEGIN:VCALENDAR',
-          'VERSION:2.0',
-          'PRODID:-//UPV Exam Calendar//EN',
-          `X-WR-CALNAME:${sanitizedCalendarName}`,
-          'CALSCALE:GREGORIAN',
-          'METHOD:PUBLISH',
-          'BEGIN:VEVENT',
-          `UID:no-exams-${Date.now()}@upv-exam-calendar.com`,
-          'DTSTART:20250101T000000Z',
-          'DTEND:20250101T010000Z',
-          'SUMMARY:No Exams Found',
-          'END:VEVENT',
-          'END:VCALENDAR',
-        ].join('\r\n'), 'utf8')) }
-      );
+      const now = new Date();
+      const nowUtc = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+      const endUtc = new Date(now.getTime() + 60 * 60 * 1000).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+      
+      const emptyContent = [
+        'BEGIN:VCALENDAR',
+        'PRODID:-//UPV-Cal//Exam API 1.0//ES',
+        'VERSION:2.0',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        `X-WR-CALNAME:${sanitizedCalendarName}`,
+        'X-APPLE-CALENDAR-COLOR:#0252D4',
+        'BEGIN:VEVENT',
+        `DTSTART:${nowUtc}`,
+        `DTEND:${endUtc}`,
+        `DTSTAMP:${nowUtc}`,
+        `UID:no-exams-${Date.now()}@upv-cal`,
+        `CREATED:${nowUtc}`,
+        'DESCRIPTION:No exams match your current filters or there are no exams available. Please adjust your filters and try again, or check back later for new exam schedules.',
+        `LAST-MODIFIED:${nowUtc}`,
+        'LOCATION:',
+        'SEQUENCE:0',
+        'STATUS:TENTATIVE',
+        'SUMMARY:No Exams Found',
+        'TRANSP:TRANSPARENT',
+        'UPV_BGCOLOR:#0252D4',
+        'UPV_FGCOLOR:#ffffff',
+        'END:VEVENT',
+        'END:VCALENDAR',
+      ].join('\r\n');
+      
+      return new NextResponse(emptyContent, { 
+        status: 200, 
+        headers: getOptimalHeaders(sanitizedCalendarName, Buffer.byteLength(emptyContent, 'utf8')) 
+      });
     }
     
     // Validate exam data before processing
