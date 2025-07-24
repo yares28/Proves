@@ -299,15 +299,9 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               disabled={exams.length === 0}
               onClick={async () => {
                 // Always use production URL for Google Calendar iCal subscription
-                let baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
-                if (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')) {
-                  toast({
-                    title: "Cannot Export from Localhost",
-                    description: "Google Calendar cannot access localhost. Please use the production site.",
-                    variant: "destructive",
-                  });
-                  return;
-                }
+                const baseUrl = window.location.origin.startsWith('http://localhost')
+                  ? 'https://upv-cal.vercel.app'
+                  : window.location.origin;
                 // Only use ?name=... for Google Calendar (no filters)
                 const icalUrl = `${baseUrl}/api/ical?name=UPV Exams`;
                 // Validate iCal URL before opening Google Calendar
@@ -402,16 +396,13 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               <DropdownMenuItem 
                 disabled={exams.length === 0}
                 onClick={async () => {
-                  let baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
-                  if (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')) {
-                    toast({
-                      title: "Cannot Export from Localhost",
-                      description: "Google Calendar cannot access localhost. Please use the production site.",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
+                  // Always use production URL for Google Calendar iCal subscription
+                  const baseUrl = window.location.origin.startsWith('http://localhost')
+                    ? 'https://upv-cal.vercel.app'
+                    : window.location.origin;
+                  // Only use ?name=... for Google Calendar (no filters)
                   const icalUrl = `${baseUrl}/api/ical?name=UPV Exams`;
+                  // Validate iCal URL before opening Google Calendar
                   try {
                     const response = await fetch(icalUrl);
                     const content = await response.text();
@@ -431,6 +422,7 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                     });
                     return;
                   }
+                  // Google Calendar subscription link
                   const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${icalUrl}`;
                   window.open(googleCalendarUrl, '_blank');
                 }}
@@ -441,6 +433,7 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
               <DropdownMenuItem 
                 disabled={exams.length === 0}
                 onClick={() => {
+                  // For Apple Calendar, allow filters in the URL
                   let baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
                   if (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')) {
                     toast({

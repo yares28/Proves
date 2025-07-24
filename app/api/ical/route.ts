@@ -4,9 +4,10 @@ import { generateICalContent } from '@/lib/utils'
 import { createAdminClient } from '@/lib/supabase/server'
 
 // Enhanced headers for better calendar app compatibility
-function getOptimalHeaders(filename: string) {
+function getOptimalHeaders(filename: string, contentLength?: number) {
   return {
     'Content-Type': 'text/calendar; charset=utf-8',
+    ...(contentLength ? { 'Content-Length': String(contentLength) } : {}),
     // Remove Content-Disposition for Google Calendar compatibility
     // 'Content-Disposition': `attachment; filename="${filename}.ics"`,
     'Cache-Control': 'public, max-age=300', // Allow some caching for Google Calendar
@@ -66,6 +67,28 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
     const exams = await getExams(filters, supabase)
     console.log('📊 [API] getExams returned:', exams?.length || 0, 'exams');
     
+    // Guarantee at least one valid VEVENT if no exams found
+    if (exams.length === 0) {
+      return new NextResponse(
+        [
+          'BEGIN:VCALENDAR',
+          'VERSION:2.0',
+          'PRODID:-//UPV Exam Calendar//EN',
+          `X-WR-CALNAME:${sanitizedCalendarName}`,
+          'CALSCALE:GREGORIAN',
+          'METHOD:PUBLISH',
+          'BEGIN:VEVENT',
+          `UID:no-exams-${Date.now()}@upv-exam-calendar.com`,
+          'DTSTART:20250101T000000Z',
+          'DTEND:20250101T010000Z',
+          'SUMMARY:(No exams found for your filters)',
+          'END:VEVENT',
+          'END:VCALENDAR',
+        ].join('\r\n'),
+        { status: 200, headers: getOptimalHeaders(sanitizedCalendarName) }
+      );
+    }
+    
     // Validate exam data before processing
     if (!Array.isArray(exams)) {
       console.error('getExams returned non-array:', typeof exams)
@@ -112,10 +135,13 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
     console.log('📄 [API] Generated iCal content length:', icalContent.length);
     console.log('📄 [API] Content preview:', icalContent.substring(0, 200));
     
-    // Return iCal content with optimal headers
+    // Return iCal content with optimal headers, including Content-Length
     return new NextResponse(icalContent, {
       status: 200,
-      headers: getOptimalHeaders(sanitizedCalendarName),
+      headers: getOptimalHeaders(
+        sanitizedCalendarName,
+        Buffer.byteLength(icalContent, 'utf8')
+      ),
     })
   } catch (error) {
     console.error('Error in iCal route:', error)
