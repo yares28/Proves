@@ -464,6 +464,56 @@ export function CalendarDisplay({
               <Download className="h-4 w-4" />
               <span>Add to Apple</span>
             </Button>
+            {/* Direct Download Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-10 gap-1.5 rounded-md"
+              disabled={exams.length === 0}
+              onClick={async () => {
+                try {
+                  // Generate UPV-style token URL for download
+                  const { generateUPVTokenUrl } = await import("@/lib/utils");
+                  const tokenPath = await generateUPVTokenUrl(activeFilters, "UPV Exams");
+                  const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
+
+                  // Fetch the iCal content
+                  const response = await fetch(icalUrl);
+                  if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                  }
+                  
+                  const icalContent = await response.text();
+                  
+                  // Create blob and download
+                  const blob = new Blob([icalContent], { type: 'text/calendar' });
+                  const url = URL.createObjectURL(blob);
+                  
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `upv-exams-${new Date().toISOString().slice(0, 10)}.ics`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+
+                  toast({
+                    title: "Download Started",
+                    description: "Your iCal file is being downloaded.",
+                  });
+                } catch (error) {
+                  console.error("Error downloading iCal:", error);
+                  toast({
+                    title: "Download Failed",
+                    description: "Please try again later.",
+                    variant: "destructive",
+                  });
+                }
+              }}
+            >
+              <Download className="h-4 w-4" />
+              <span>Download .ics</span>
+            </Button>
             {/* Development: Manual iCal download */}
             {process.env.NODE_ENV === "development" && (
               <Button
@@ -586,6 +636,53 @@ export function CalendarDisplay({
               >
                 <Download className="mr-2 h-4 w-4" />
                 <span>Add to Apple</span>
+              </DropdownMenuItem>
+              {/* Direct Download for Mobile */}
+              <DropdownMenuItem
+                disabled={exams.length === 0}
+                onClick={async () => {
+                  try {
+                    // Generate UPV-style token URL for download
+                    const { generateUPVTokenUrl } = await import("@/lib/utils");
+                    const tokenPath = await generateUPVTokenUrl(activeFilters, "UPV Exams");
+                    const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
+
+                    // Fetch the iCal content
+                    const response = await fetch(icalUrl);
+                    if (!response.ok) {
+                      throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    const icalContent = await response.text();
+                    
+                    // Create blob and download
+                    const blob = new Blob([icalContent], { type: 'text/calendar' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `upv-exams-${new Date().toISOString().slice(0, 10)}.ics`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+
+                    toast({
+                      title: "Download Started",
+                      description: "Your iCal file is being downloaded.",
+                    });
+                  } catch (error) {
+                    console.error("Error downloading iCal:", error);
+                    toast({
+                      title: "Download Failed",
+                      description: "Please try again later.",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                <span>Download .ics</span>
               </DropdownMenuItem>
               {/* Development: Manual iCal download */}
               {process.env.NODE_ENV === "development" && (
