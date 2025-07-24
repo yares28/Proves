@@ -331,7 +331,7 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                   return;
                 }
                 // Google Calendar subscription link
-                const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`;
+                const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${icalUrl}`;
                 window.open(googleCalendarUrl, '_blank');
               }}
             >
@@ -431,7 +431,7 @@ export function CalendarDisplay({ activeFilters = {} }: { activeFilters?: Record
                     });
                     return;
                   }
-                  const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`;
+                  const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${icalUrl}`;
                   window.open(googleCalendarUrl, '_blank');
                 }}
               >
