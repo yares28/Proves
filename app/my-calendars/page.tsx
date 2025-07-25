@@ -74,20 +74,20 @@ export default function MyCalendarsPage() {
         const transformedCalendars = userCalendars.map((cal: any) => {
           // Ensure filters are properly formatted
           let filters = cal.filters || {};
-          
+
           // Handle case where filters might be stored as a string (shouldn't happen but just in case)
-          if (typeof filters === 'string') {
+          if (typeof filters === "string") {
             try {
               filters = JSON.parse(filters);
             } catch (e) {
-              console.error('Error parsing filters for calendar:', cal.name, e);
+              console.error("Error parsing filters for calendar:", cal.name, e);
               filters = {};
             }
           }
-          
+
           // Ensure all filter values are arrays
-          if (typeof filters === 'object' && filters !== null) {
-            Object.keys(filters).forEach(key => {
+          if (typeof filters === "object" && filters !== null) {
+            Object.keys(filters).forEach((key) => {
               if (filters[key] && !Array.isArray(filters[key])) {
                 filters[key] = [filters[key]];
               }
@@ -97,13 +97,13 @@ export default function MyCalendarsPage() {
               }
             });
           }
-          
-          console.log('🔧 [DEBUG] Transformed calendar filters:', {
+
+          console.log("🔧 [DEBUG] Transformed calendar filters:", {
             calendarName: cal.name,
             originalFilters: cal.filters,
-            transformedFilters: filters
+            transformedFilters: filters,
           });
-          
+
           return {
             id: cal.id,
             name: cal.name,
@@ -138,52 +138,56 @@ export default function MyCalendarsPage() {
         "with filters:",
         calendar.filters
       );
-      
+
       // Debug: Log detailed filter information
-      console.log('🔍 [DEBUG] Calendar filter details:', {
+      console.log("🔍 [DEBUG] Calendar filter details:", {
         filtersType: typeof calendar.filters,
         filtersKeys: Object.keys(calendar.filters || {}),
         filtersValues: calendar.filters,
-        filtersStringified: JSON.stringify(calendar.filters)
+        filtersStringified: JSON.stringify(calendar.filters),
       });
-      
+
       // Ensure filters are in the correct format
       let processedFilters = calendar.filters || {};
-      
+
       // Validate and clean up filters if needed
-      if (typeof processedFilters === 'object' && processedFilters !== null) {
+      if (typeof processedFilters === "object" && processedFilters !== null) {
         // Ensure all filter values are arrays
-        Object.keys(processedFilters).forEach(key => {
+        Object.keys(processedFilters).forEach((key) => {
           if (processedFilters[key] && !Array.isArray(processedFilters[key])) {
             processedFilters[key] = [processedFilters[key]];
           }
         });
-        
-        console.log('🔧 [DEBUG] Processed filters:', processedFilters);
+
+        console.log("🔧 [DEBUG] Processed filters:", processedFilters);
       }
-      
+
       const exams = await getExams(processedFilters);
       console.log(
         `✅ Fetched ${exams.length} exams for calendar:`,
         calendar.name
       );
-      
+
       // Debug: Log sample exam data if no exams found
       if (exams.length === 0) {
-        console.log('⚠️ [DEBUG] No exams found - this might indicate a filter issue');
-        console.log('🔍 [DEBUG] Trying to fetch all exams without filters for comparison...');
-        
+        console.log(
+          "⚠️ [DEBUG] No exams found - this might indicate a filter issue"
+        );
+        console.log(
+          "🔍 [DEBUG] Trying to fetch all exams without filters for comparison..."
+        );
+
         try {
           const allExams = await getExams({});
           console.log(`📊 [DEBUG] Total exams in database: ${allExams.length}`);
           if (allExams.length > 0) {
-            console.log('📋 [DEBUG] Sample exam data:', allExams.slice(0, 3));
+            console.log("📋 [DEBUG] Sample exam data:", allExams.slice(0, 3));
           }
         } catch (debugError) {
-          console.error('❌ [DEBUG] Error fetching all exams:', debugError);
+          console.error("❌ [DEBUG] Error fetching all exams:", debugError);
         }
       }
-      
+
       setSelectedExams(exams);
 
       // Scroll to exams section after a short delay
@@ -278,7 +282,20 @@ export default function MyCalendarsPage() {
     month: number,
     day: number
   ) {
-    const targetDate = new Date(year, month, day).toISOString().split("T")[0];
+    // Create target date string in YYYY-MM-DD format
+    // Note: month is already 0-indexed from indexOf(), so we need to add 1 for the date string
+    const monthStr = (month + 1).toString().padStart(2, "0");
+    const dayStr = day.toString().padStart(2, "0");
+    const targetDate = `${year}-${monthStr}-${dayStr}`;
+
+    console.log("🔍 [DEBUG] getExamsForDate:", {
+      year,
+      month: month + 1, // Show 1-indexed month for clarity
+      day,
+      targetDate,
+      examDates: exams.slice(0, 3).map((e) => e.date),
+    });
+
     return exams.filter((exam) => exam.date === targetDate);
   }
 
