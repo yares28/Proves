@@ -547,6 +547,24 @@ function generateUPVCompatibleICalContent(exams: Exam[], calendarName: string): 
   return icalLines.join('\r\n');
 }
 
+// Helper function to check if a date is in DST for Madrid timezone
+function isDateInDST(date: Date): boolean {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
+  
+  // DST starts last Sunday in March and ends last Sunday in October
+  const marchLastSunday = getLastSundayOfMonth(year, 2); // March
+  const octoberLastSunday = getLastSundayOfMonth(year, 9); // October
+  
+  // Check if date is in DST period (CEST = UTC+2)
+  return (
+    (month > 2 && month < 9) || // April to September
+    (month === 2 && day >= marchLastSunday.getDate()) || // March after last Sunday
+    (month === 9 && day < octoberLastSunday.getDate()) // October before last Sunday
+  );
+}
+
 // Helper function to get Madrid timezone offset in milliseconds
 function getMadridTimezoneOffset(date: Date): number {
   // Madrid is UTC+1 in winter (CET) and UTC+2 in summer (CEST)
@@ -570,31 +588,7 @@ function getMadridTimezoneOffset(date: Date): number {
   return isDST ? 2 * 60 * 60 * 1000 : 1 * 60 * 60 * 1000; // 2 hours or 1 hour
 }
 
-// Helper function to get last Sunday of a month (used by getMadridTimezoneOffset)
-function getLastSundayOfMonth(year: number, month: number): Date {
-  const lastDay = new Date(year, month + 1, 0); // Last day of the month
-  const lastSunday = new Date(lastDay);
-  lastSunday.setDate(lastDay.getDate() - lastDay.getDay()); // Go back to Sunday
-  return lastSunday;
-}
 
-// Helper function to check if a date is in DST for Madrid timezone
-function isDateInDST(date: Date): boolean {
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const day = date.getDate();
-  
-  // DST starts last Sunday in March and ends last Sunday in October
-  const marchLastSunday = getLastSundayOfMonth(year, 2); // March
-  const octoberLastSunday = getLastSundayOfMonth(year, 9); // October
-  
-  // Check if date is in DST period (CEST = UTC+2)
-  return (
-    (month > 2 && month < 9) || // April to September
-    (month === 2 && day >= marchLastSunday.getDate()) || // March after last Sunday
-    (month === 9 && day < octoberLastSunday.getDate()) // October before last Sunday
-  );
-}
 
 // Generate stable ID for exam (for UID consistency)
 function generateStableId(exam: Exam): string {
