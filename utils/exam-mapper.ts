@@ -10,6 +10,7 @@ export function mapExamData(exam: any) {
     subject: exam.subject,
     code: exam.code?.toString() || '',
     location: exam.place || '',
+    comment: exam.comment || '', // Add comment field
     year: exam.year?.toString() || '',
     semester: exam.semester || '',
     school: exam.school || '',

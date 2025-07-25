@@ -6,6 +6,7 @@ export interface Exam {
   time: string
   duration_minutes: number
   location: string
+  comment?: string
   school: string
   degree: string
   year: string

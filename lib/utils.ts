@@ -426,9 +426,39 @@ function generateUPVCompatibleICalContent(exams: Exam[], calendarName: string): 
     const endTime = new Date(startTime);
     endTime.setMinutes(startTime.getMinutes() + exam.duration_minutes);
 
-    // Convert to UTC for UPV format
+    // Convert to UTC for UPV format - simplified approach
     const formatUTCDate = (date: Date) => {
-      return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+      // Extract the date/time components from the parsed date
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hour = String(date.getHours()).padStart(2, '0');
+      const minute = String(date.getMinutes()).padStart(2, '0');
+      const second = String(date.getSeconds()).padStart(2, '0');
+      
+      // Create a date string representing Madrid time and convert to UTC
+      // We treat the parsed time as Madrid local time
+      const madridDateString = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+      
+      try {
+        // Use the browser's built-in timezone conversion
+        // Create a date object and use toLocaleString to get the UTC equivalent
+        const localDate = new Date(madridDateString);
+        
+        // Calculate the Madrid timezone offset for this specific date
+        const isDST = isDateInDST(localDate);
+        const madridOffsetHours = isDST ? 2 : 1; // UTC+2 in summer, UTC+1 in winter
+        
+        // Convert Madrid time to UTC by subtracting the offset
+        const utcTime = localDate.getTime() - (madridOffsetHours * 60 * 60 * 1000);
+        const utcDate = new Date(utcTime);
+        
+        return utcDate.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+      } catch (error) {
+        console.error('Error converting Madrid time to UTC:', error);
+        // Fallback: use the original date
+        return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+      }
     };
 
     // Get colors for this subject
@@ -454,6 +484,19 @@ function generateUPVCompatibleICalContent(exams: Exam[], calendarName: string): 
       return folded.join('\r\n');
     };
 
+    // Create enhanced description with location and comment
+    const descriptionParts = [exam.subject];
+    if (exam.comment && exam.comment.trim()) {
+      descriptionParts.push(exam.comment.trim());
+    }
+    const description = descriptionParts.join(' - ');
+
+    // Ensure location includes both place and comment if available
+    let location = exam.location || '';
+    if (exam.comment && exam.comment.trim() && !location.includes(exam.comment)) {
+      location = location ? `${location} - ${exam.comment}` : exam.comment;
+    }
+
     // Step 3: Canonical template for each exam (exact order from UPV)
     icalLines.push(
       'BEGIN:VEVENT',
@@ -462,9 +505,9 @@ function generateUPVCompatibleICalContent(exams: Exam[], calendarName: string): 
       `DTSTAMP:${nowUtc}`,
       `UID:${uid}`,
       `CREATED:${nowUtc}`,
-      foldLine(`DESCRIPTION:${exam.subject}`),
+      foldLine(`DESCRIPTION:${description}`),
       `LAST-MODIFIED:${nowUtc}`,
-      foldLine(`LOCATION:${exam.location || ''}`),
+      foldLine(`LOCATION:${location}`),
       'SEQUENCE:0',
       'STATUS:CONFIRMED',
       foldLine(`SUMMARY:Examen ${exam.subject}`),
@@ -502,6 +545,55 @@ function generateUPVCompatibleICalContent(exams: Exam[], calendarName: string): 
   
   // Step 4: Emit lines with hard CRLF
   return icalLines.join('\r\n');
+}
+
+// Helper function to get Madrid timezone offset in milliseconds
+function getMadridTimezoneOffset(date: Date): number {
+  // Madrid is UTC+1 in winter (CET) and UTC+2 in summer (CEST)
+  // DST starts last Sunday in March and ends last Sunday in October
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
+  
+  // Calculate DST boundaries for the year
+  const marchLastSunday = getLastSundayOfMonth(year, 2); // March
+  const octoberLastSunday = getLastSundayOfMonth(year, 9); // October
+  
+  // Check if date is in DST period (CEST = UTC+2)
+  const isDST = (
+    (month > 2 && month < 9) || // April to September
+    (month === 2 && day >= marchLastSunday.getDate()) || // March after last Sunday
+    (month === 9 && day < octoberLastSunday.getDate()) // October before last Sunday
+  );
+  
+  // Return offset in milliseconds
+  return isDST ? 2 * 60 * 60 * 1000 : 1 * 60 * 60 * 1000; // 2 hours or 1 hour
+}
+
+// Helper function to get last Sunday of a month (used by getMadridTimezoneOffset)
+function getLastSundayOfMonth(year: number, month: number): Date {
+  const lastDay = new Date(year, month + 1, 0); // Last day of the month
+  const lastSunday = new Date(lastDay);
+  lastSunday.setDate(lastDay.getDate() - lastDay.getDay()); // Go back to Sunday
+  return lastSunday;
+}
+
+// Helper function to check if a date is in DST for Madrid timezone
+function isDateInDST(date: Date): boolean {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
+  
+  // DST starts last Sunday in March and ends last Sunday in October
+  const marchLastSunday = getLastSundayOfMonth(year, 2); // March
+  const octoberLastSunday = getLastSundayOfMonth(year, 9); // October
+  
+  // Check if date is in DST period (CEST = UTC+2)
+  return (
+    (month > 2 && month < 9) || // April to September
+    (month === 2 && day >= marchLastSunday.getDate()) || // March after last Sunday
+    (month === 9 && day < octoberLastSunday.getDate()) // October before last Sunday
+  );
 }
 
 // Generate stable ID for exam (for UID consistency)
