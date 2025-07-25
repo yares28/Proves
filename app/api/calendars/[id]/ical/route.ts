@@ -74,8 +74,26 @@ async function handleRequest(
       filters = {}
     }
     
+    // Debug: Log the calendar data and filters being used
+    console.log('🔍 [API DEBUG] Calendar data loaded:', {
+      id: calendar.id,
+      name: calendar.name,
+      filters,
+      filtersType: typeof filters,
+      filtersKeys: Object.keys(filters || {}),
+      createdAt: calendar.created_at
+    });
+    
     // Fetch exams using the calendar's saved filters
+    console.log('🔄 [API] Calling getExams with filters:', filters);
     const exams = await getExams(filters, supabase)
+    console.log('📊 [API] getExams returned:', exams?.length || 0, 'exams');
+    
+    // Debug: Log sample exam dates
+    if (exams.length > 0) {
+      const sampleExams = exams.slice(0, 5).map(e => ({ subject: e.subject, date: e.date }));
+      console.log('🔍 [API DEBUG] Sample exam dates:', sampleExams);
+    }
     
     // Validate exam data before processing
     if (!Array.isArray(exams)) {

@@ -290,6 +290,14 @@ export function CalendarDisplay({
     }
 
     try {
+      // Debug: Log what we're about to save
+      console.log('🔍 [DEBUG] Saving calendar with data:', {
+        name,
+        activeFilters,
+        currentExamsCount: exams.length,
+        currentExamDates: exams.slice(0, 5).map(e => ({ subject: e.subject, date: e.date }))
+      });
+
       // Get current session for authentication
       const session = await getCurrentSession();
 
