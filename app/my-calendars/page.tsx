@@ -6,7 +6,7 @@ import { getUserCalendars, deleteUserCalendar } from "@/actions/user-calendars"
 import { getExams } from "@/actions/exam-actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Trash2, Eye, X, Clock, MapPin, List, CalendarDays, Loader2, Download } from "lucide-react"
+import { Trash2, Eye, X, Clock, MapPin, List, CalendarDays, Loader2, Download, Copy } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
@@ -370,6 +370,37 @@ export default function MyCalendarsPage() {
     }
   }
 
+  const handleCopyUrl = async (calendar: SavedCalendar) => {
+    try {
+      // Use production domain instead of localhost to prevent issues
+      let baseUrl = window.location.origin;
+      
+      // If we're in development or localhost, use a production URL
+      if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
+        // Try to get production URL from environment or use a default
+        baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
+      }
+      
+      // Generate the iCal subscription URL
+      const icalUrl = `${baseUrl}/api/ical?name=${calendar.name}`
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(icalUrl)
+      
+      toast({
+        title: "¡URL copiada!",
+        description: "El enlace de suscripción se ha copiado al portapapeles. Pégalo en Google Calendar para añadir la suscripción.",
+      })
+    } catch (error) {
+      console.error('❌ Error copying URL:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo copiar la URL al portapapeles.",
+        variant: "destructive"
+      })
+    }
+  }
+
   const getFilterSummary = (filters: Record<string, string[]>) => {
     const filterEntries = Object.entries(filters).filter(([_, values]) => values.length > 0)
     const totalFilters = filterEntries.reduce((sum, [_, values]) => sum + values.length, 0)
@@ -501,6 +532,17 @@ export default function MyCalendarsPage() {
                               height={16}
                               className="w-4 h-4"
                             />
+                          </Button>
+                          
+                          {/* Copy URL Button */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                            onClick={() => handleCopyUrl(calendar)}
+                            title="Copy subscription URL"
+                          >
+                            <Copy className="h-4 w-4" />
                           </Button>
                           
                           {/* Direct Download Button */}
