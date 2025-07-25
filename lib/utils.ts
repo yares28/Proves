@@ -1,7 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { Exam } from "@/types/exam";
-import { fromZonedTime } from "date-fns-tz";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -121,23 +120,15 @@ function parseExamDateTime(
     // Create date properly handling the supplied timezone to avoid double conversion
     let examDate: Date;
 
-    if (timeZone === "Europe/Madrid") {
-      const timeWithSec =
-        timeStr.length === 5 ? `${timeStr}:00` : timeStr;     
-      const localISO = `${dateStr}T${timeWithSec}`;            
-      examDate = fromZonedTime(localISO, "Europe/Madrid");    
-    } else {
-      // For other timezones, use the original logic
-      examDate = new Date(
-        year,
-        month - 1,
-        day,
-        hours,
-        minutes,
-        seconds || 0,
-        0
-      );
-    }
+    examDate = new Date(
+      year,
+      month - 1,
+      day,
+      hours,
+      minutes,
+      seconds ?? 0,
+      0
+    );
 
     // Validate the created date
     if (
