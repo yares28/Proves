@@ -120,15 +120,7 @@ function parseExamDateTime(
     // Create date properly handling the supplied timezone to avoid double conversion
     let examDate: Date;
 
-    examDate = new Date(
-      year,
-      month - 1,
-      day,
-      hours,
-      minutes,
-      seconds ?? 0,
-      0
-    );
+    examDate = new Date(year, month - 1, day, hours, minutes, seconds ?? 0, 0);
 
     // Validate the created date
     if (
@@ -266,28 +258,10 @@ export function generateICalContent(
         .replace(/\.\d{3}Z$/, "Z");
     };
 
-    // Create enhanced description with proper escaping
-    const description = escapeICalText(
-      [
-        `Subject: ${exam.subject}`,
-        `Code: ${exam.code}`,
-        `School: ${exam.school}`,
-        `Degree: ${exam.degree}`,
-        `Year: ${exam.year}`,
-        `Semester: ${exam.semester}`,
-        exam.acronym ? `Acronym: ${exam.acronym}` : "",
-        "",
-        "Duration: " +
-          exam.duration_minutes +
-          " minutes (" +
-          Math.round((exam.duration_minutes / 60) * 10) / 10 +
-          " hours)",
-        "Exported from UPV Exam Calendar",
-        "Export time: " + new Date().toLocaleString(),
-      ]
-        .filter(Boolean)
-        .join("\n")
-    );
+    // Use comment from database if available, otherwise create basic description
+    const description = exam.comment
+      ? escapeICalText(exam.comment)
+      : escapeICalText(`${exam.subject} - Exam`);
 
     // Fold long lines to comply with RFC 5545 (max 75 octets per line)
     const foldLine = (line: string) => {
@@ -315,7 +289,7 @@ export function generateICalContent(
       `DTEND;TZID=${timeZone}:${formatICalLocalDate(endTime, true)}`,
       foldLine(`SUMMARY:${escapeICalText(exam.subject + " - Exam")}`),
       foldLine(`DESCRIPTION:${description}`),
-      foldLine(`LOCATION:${escapeICalText(exam.location || "Location TBD")}`),
+      foldLine(`LOCATION:${escapeICalText(exam.location)}`),
       `CREATED:${formatICalUtcDate(now)}`,
       `LAST-MODIFIED:${formatICalUtcDate(now)}`,
       "STATUS:CONFIRMED",
@@ -451,9 +425,9 @@ export function generateGoogleCalendarUrl(exam: Exam): string {
 
   const formatGoogleDate = (date: Date) => {
     return date
-      .toISOString()                
-      .replace(/[-:]/g, "")         
-      .replace(/\.\d{3}Z$/, "Z");  
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace(/\.\d{3}Z$/, "Z");
   };
 
   const title = encodeURIComponent(`${exam.subject} - Exam`);
