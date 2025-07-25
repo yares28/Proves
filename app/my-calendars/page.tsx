@@ -381,8 +381,8 @@ export default function MyCalendarsPage() {
         baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://upv-cal.vercel.app';
       }
       
-      // Generate the iCal subscription URL
-      const icalUrl = `${baseUrl}/api/ical?name=${calendar.name}`
+      // Generate the iCal subscription URL using the calendar ID to get the specific calendar with its filters
+      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`
       
       // Copy to clipboard
       await navigator.clipboard.writeText(icalUrl)
