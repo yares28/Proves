@@ -409,16 +409,28 @@ export function downloadICalFile(
 }
 
 export function generateGoogleCalendarUrl(exam: Exam): string {
-  // Parse date and time
-  const examDate = new Date(exam.date);
-  const [hours, minutes] = exam.time.split(":").map(Number);
+  // Use the same timezone-aware parsing as iCal generation to ensure consistency
+  const parseResult = parseExamDateTime(exam.date, exam.time, "Europe/Madrid");
 
-  // Set start time
-  const startTime = new Date(examDate);
-  startTime.setHours(hours, minutes, 0, 0);
+  let startTime: Date;
+  let endTime: Date;
+
+  if (!parseResult.isValid) {
+    // Fallback to original parsing if timezone-aware parsing fails
+    console.warn(
+      `Failed to parse exam time with timezone awareness for exam ${exam.id}, falling back to local parsing`
+    );
+    const examDate = new Date(exam.date);
+    const [hours, minutes] = exam.time.split(":").map(Number);
+    startTime = new Date(examDate);
+    startTime.setHours(hours, minutes, 0, 0);
+  } else {
+    // Use timezone-aware parsing result
+    startTime = parseResult.start;
+  }
 
   // Set end time using exam's duration_minutes
-  const endTime = new Date(startTime);
+  endTime = new Date(startTime);
   endTime.setMinutes(startTime.getMinutes() + exam.duration_minutes);
 
   const formatGoogleDate = (date: Date) => {
