@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { Exam } from "@/types/exam";
+import { fromZonedTime } from "date-fns-tz";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -121,18 +122,10 @@ function parseExamDateTime(
     let examDate: Date;
 
     if (timeZone === "Europe/Madrid") {
-      // Database stores times as Madrid local time (15:00 = 3 PM Madrid)
-      // Create local date directly - no timezone conversion needed
-      // The iCal format with TZID will handle timezone display correctly
-      examDate = new Date(
-        year,
-        month - 1,
-        day,
-        hours,
-        minutes,
-        seconds || 0,
-        0
-      );
+      const timeWithSec =
+        timeStr.length === 5 ? `${timeStr}:00` : timeStr;     
+      const localISO = `${dateStr}T${timeWithSec}`;            
+      examDate = fromZonedTime(localISO, "Europe/Madrid");    
     } else {
       // For other timezones, use the original logic
       examDate = new Date(
@@ -603,18 +596,16 @@ function generateUPVCompatibleICalContent(
       0
     );
 
-    // Format as local time for UPV format - subtract 2 hours to compensate for double timezone application
+    // Format as local time for UPV format - no timezone conversion, no Z suffix
     const formatUTCDate = (date: Date) => {
-      // Subtract 2 hours to compensate for Google Calendar's timezone handling
-      // This fixes the issue where 15:00 was showing as 17:00
-      const adjustedDate = new Date(date.getTime() - 2 * 60 * 60 * 1000);
-
-      const year = adjustedDate.getFullYear();
-      const month = String(adjustedDate.getMonth() + 1).padStart(2, "0");
-      const day = String(adjustedDate.getDate()).padStart(2, "0");
-      const hour = String(adjustedDate.getHours()).padStart(2, "0");
-      const minute = String(adjustedDate.getMinutes()).padStart(2, "0");
-      const second = String(adjustedDate.getSeconds()).padStart(2, "0");
+      // Use the local time directly without any timezone conversion
+      // The X-WR-TIMEZONE:Europe/Madrid header will handle the timezone display
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hour = String(date.getHours()).padStart(2, "0");
+      const minute = String(date.getMinutes()).padStart(2, "0");
+      const second = String(date.getSeconds()).padStart(2, "0");
 
       // No Z suffix - this indicates local time, not UTC
       return `${year}${month}${day}T${hour}${minute}${second}`;
