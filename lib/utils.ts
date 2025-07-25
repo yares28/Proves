@@ -544,46 +544,15 @@ function generateUPVCompatibleICalContent(
     const endTime = new Date(startTime);
     endTime.setMinutes(startTime.getMinutes() + exam.duration_minutes);
 
-    // Convert to UTC for UPV format - simplified approach
+    // Convert to UTC for UPV format - no additional timezone conversion needed
+    // since parseExamDateTime already handled the timezone properly
     const formatUTCDate = (date: Date) => {
-      // Extract the date/time components from the parsed date
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const hour = String(date.getHours()).padStart(2, "0");
-      const minute = String(date.getMinutes()).padStart(2, "0");
-      const second = String(date.getSeconds()).padStart(2, "0");
-
-      // Create a date string representing Madrid time and convert to UTC
-      // We treat the parsed time as Madrid local time
-      const madridDateString = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
-
-      try {
-        // Use the browser's built-in timezone conversion
-        // Create a date object and use toLocaleString to get the UTC equivalent
-        const localDate = new Date(madridDateString);
-
-        // Calculate the Madrid timezone offset for this specific date
-        const isDST = isDateInDST(localDate);
-        const madridOffsetHours = isDST ? 2 : 1; // UTC+2 in summer, UTC+1 in winter
-
-        // Convert Madrid time to UTC by subtracting the offset
-        const utcTime =
-          localDate.getTime() - madridOffsetHours * 60 * 60 * 1000;
-        const utcDate = new Date(utcTime);
-
-        return utcDate
-          .toISOString()
-          .replace(/[-:]/g, "")
-          .replace(/\.\d{3}Z$/, "Z");
-      } catch (error) {
-        console.error("Error converting Madrid time to UTC:", error);
-        // Fallback: use the original date
-        return date
-          .toISOString()
-          .replace(/[-:]/g, "")
-          .replace(/\.\d{3}Z$/, "Z");
-      }
+      // Simply convert the date to UTC format without any timezone adjustments
+      // The parseExamDateTime function already handled Madrid timezone correctly
+      return date
+        .toISOString()
+        .replace(/[-:]/g, "")
+        .replace(/\.\d{3}Z$/, "Z");
     };
 
     // Get colors for this subject
