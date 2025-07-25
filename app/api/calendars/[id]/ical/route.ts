@@ -31,23 +31,57 @@ async function handleRequest(
     
     // Validate calendar ID format
     if (!calendarId || typeof calendarId !== 'string') {
+      console.error('❌ [API] Invalid calendar ID format:', calendarId)
       return new NextResponse('Invalid calendar ID', { status: 400 })
     }
+    
+    // Validate UUID format (basic check)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(calendarId)) {
+      console.error('❌ [API] Invalid UUID format for calendar ID:', calendarId)
+      return new NextResponse('Invalid calendar ID format', { status: 400 })
+    }
+    
+    console.log('🔍 [API] Looking for calendar with ID:', calendarId)
     
     // Create Supabase client using service role to bypass RLS
     const supabase = await createAdminClient()
     
-    // Fetch the saved calendar from Supabase
-    const { data: calendar, error: calendarError } = await supabase
+    // First, check if the calendar exists without using .single()
+    const { data: calendars, error: fetchError } = await supabase
       .from('user_calendars')
       .select('*')
       .eq('id', calendarId)
-      .single()
     
-    if (calendarError || !calendar) {
-      console.error('Calendar not found:', calendarError)
+    if (fetchError) {
+      console.error('❌ [API] Database error fetching calendar:', fetchError)
+      return new NextResponse('Database error', { status: 500 })
+    }
+    
+    if (!calendars || calendars.length === 0) {
+      console.error('❌ [API] Calendar not found in database:', calendarId)
+      
+      // Log some debug info to help troubleshoot
+      try {
+        const { data: allCalendars, error: debugError } = await supabase
+          .from('user_calendars')
+          .select('id, name, created_at')
+          .limit(5)
+        
+        if (!debugError && allCalendars) {
+          console.log('🔍 [API DEBUG] Sample calendar IDs in database:', 
+            allCalendars.map(c => ({ id: c.id, name: c.name }))
+          )
+        }
+      } catch (debugErr) {
+        console.error('Debug query failed:', debugErr)
+      }
+      
       return new NextResponse('Calendar not found', { status: 404 })
     }
+    
+    const calendar = calendars[0]
+    console.log('✅ [API] Found calendar:', { id: calendar.id, name: calendar.name })
 
     // Sanitize calendar name to prevent issues
     const sanitizedCalendarName = (calendar.name || 'UPV_Calendar')
