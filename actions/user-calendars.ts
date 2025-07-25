@@ -104,6 +104,14 @@ export async function saveUserCalendar({ name, filters, userId, accessToken, ref
     console.log('✅ [SERVER] User authentication confirmed');
     console.log('🔄 [SERVER] Saving calendar to database');
     
+    // Debug: Log the filters being saved
+    console.log('🔍 [DEBUG] Filters being saved:', {
+      filters,
+      filtersType: typeof filters,
+      filtersKeys: Object.keys(filters || {}),
+      filtersStringified: JSON.stringify(filters)
+    });
+    
     // Insert the calendar with proper error handling
     const { data, error } = await supabase
       .from('user_calendars')
