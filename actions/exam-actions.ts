@@ -97,8 +97,33 @@ export async function getExams(
   // Check cache expiry first
   cache.checkExpiry();
   
+  // Validate and normalize filters
+  const normalizedFilters: ExamFilters = {};
+  
+  if (filters && typeof filters === 'object') {
+    Object.keys(filters).forEach(key => {
+      const value = filters[key];
+      if (value !== null && value !== undefined) {
+        if (Array.isArray(value)) {
+          // Filter out empty strings and null values
+          const cleanedArray = value.filter(v => v !== null && v !== undefined && v !== '');
+          if (cleanedArray.length > 0) {
+            normalizedFilters[key] = cleanedArray;
+          }
+        } else if (typeof value === 'string' && value.trim() !== '') {
+          normalizedFilters[key] = [value.trim()];
+        }
+      }
+    });
+  }
+  
+  console.log('🔧 [EXAM-ACTIONS] Normalized filters:', {
+    original: filters,
+    normalized: normalizedFilters
+  });
+  
   // Generate cache key for this query
-  const cacheKey = cache.getExamsKey(filters);
+  const cacheKey = cache.getExamsKey(normalizedFilters);
   
   // Check if we have cached results for this exact query
   if (cache.exams.has(cacheKey)) {
@@ -108,6 +133,17 @@ export async function getExams(
   
   try {
     console.log('Fetching exams with filters:', filters);
+    
+    // Debug: Log detailed filter information
+    console.log('🔍 [EXAM-ACTIONS DEBUG] Filter details:', {
+      filtersType: typeof filters,
+      filtersKeys: Object.keys(filters || {}),
+      filtersValues: filters,
+      schoolFilter: filters.school,
+      schoolFilterType: typeof filters.school,
+      schoolFilterIsArray: Array.isArray(filters.school)
+    });
+    
     const startTime = performance.now();
     
     // Only select needed columns for better network performance
@@ -118,10 +154,11 @@ export async function getExams(
 
     // Apply filters using a strategy that leverages indexes
     // Order filters from most selective to least selective for best index usage
+    // Use normalized filters for actual querying
     
     // School filter (usually most selective at top level)
-    if (filters.school) {
-      const schools = Array.isArray(filters.school) ? filters.school : [filters.school];
+    if (normalizedFilters.school) {
+      const schools = normalizedFilters.school;
       console.log('Filtering by schools:', schools);
       
       if (schools.length === 1) {
@@ -132,8 +169,8 @@ export async function getExams(
     }
     
     // Degree filter (second level in hierarchy)
-    if (filters.degree) {
-      const degrees = Array.isArray(filters.degree) ? filters.degree : [filters.degree];
+    if (normalizedFilters.degree) {
+      const degrees = normalizedFilters.degree;
       console.log('Filtering by degrees:', degrees);
       
       if (degrees.length === 1) {
@@ -144,8 +181,8 @@ export async function getExams(
     }
     
     // Year filter (third level)
-    if (filters.year) {
-      const years = Array.isArray(filters.year) ? filters.year : [filters.year];
+    if (normalizedFilters.year) {
+      const years = normalizedFilters.year;
       console.log('Filtering by years:', years);
       
       if (years.length === 1) {
@@ -158,8 +195,8 @@ export async function getExams(
     }
     
     // Semester filter (fourth level)
-    if (filters.semester) {
-      const semesters = Array.isArray(filters.semester) ? filters.semester : [filters.semester];
+    if (normalizedFilters.semester) {
+      const semesters = normalizedFilters.semester;
       console.log('Filtering by semesters:', semesters);
       
       if (semesters.length === 1) {
@@ -170,8 +207,8 @@ export async function getExams(
     }
     
     // Subject filter (most specific - using improved matching strategy)
-    if (filters.subject) {
-      const subjects = Array.isArray(filters.subject) ? filters.subject : [filters.subject];
+    if (normalizedFilters.subject) {
+      const subjects = normalizedFilters.subject;
       console.log('Filtering by subjects:', subjects);
       
       if (subjects.length === 1) {
