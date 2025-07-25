@@ -517,8 +517,7 @@ function generateUPVCompatibleICalContent(
     );
     const startTime = parseResult.start;
 
-    // Subtract 1 hour from all exam times for Google Calendar export
-    startTime.setHours(startTime.getHours() - 1);
+    // Use original exam time without any adjustment
 
     const endTime = new Date(startTime);
     endTime.setMinutes(startTime.getMinutes() + exam.duration_minutes);
