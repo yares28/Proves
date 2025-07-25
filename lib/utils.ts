@@ -117,16 +117,38 @@ function parseExamDateTime(
     ) {
       return { start: new Date(), isValid: false };
     }
-    // Create date in local timezone first, then we'll format it correctly for iCal
-    const examDate = new Date(
-      year,
-      month - 1,
-      day,
-      hours,
-      minutes,
-      seconds || 0,
-      0
-    );
+    // Create date properly handling the supplied timezone to avoid double conversion
+    let examDate: Date;
+
+    if (timeZone === "Europe/Madrid") {
+      // For Madrid timezone, create the date as UTC first, then adjust for Madrid offset
+      // This prevents double timezone conversion when server is already in Madrid timezone
+      const utcDate = new Date(
+        Date.UTC(year, month - 1, day, hours, minutes, seconds || 0)
+      );
+
+      // Calculate Madrid offset for this specific date
+      const tempDate = new Date(year, month - 1, day);
+      const isDST = isDateInDST(tempDate);
+      const madridOffsetHours = isDST ? 2 : 1; // UTC+2 in summer, UTC+1 in winter
+
+      // Adjust UTC time by Madrid offset to get the correct local time
+      examDate = new Date(
+        utcDate.getTime() + madridOffsetHours * 60 * 60 * 1000
+      );
+    } else {
+      // For other timezones, use the original logic
+      examDate = new Date(
+        year,
+        month - 1,
+        day,
+        hours,
+        minutes,
+        seconds || 0,
+        0
+      );
+    }
+
     // Validate the created date
     if (
       isNaN(examDate.getTime()) ||
