@@ -121,16 +121,23 @@ function parseExamDateTime(
     let examDate: Date;
 
     if (timeZone === "Europe/Madrid") {
-      // Database stores times as they should appear in Madrid timezone
-      // Create the date as local Madrid time - the system will handle DST automatically
+      // Database stores times as they should appear in Madrid timezone (15:00 = 3 PM Madrid)
+      // We need to create a UTC time that, when Google Calendar converts to Madrid time, shows 15:00
+      // So we subtract the Madrid offset from the time
+      const tempDate = new Date(year, month - 1, day);
+      const isDST = isDateInDST(tempDate);
+      const madridOffsetHours = isDST ? 2 : 1; // UTC+2 in summer, UTC+1 in winter
+
+      // Create UTC time by subtracting Madrid offset
       examDate = new Date(
-        year,
-        month - 1,
-        day,
-        hours,
-        minutes,
-        seconds || 0,
-        0
+        Date.UTC(
+          year,
+          month - 1,
+          day,
+          hours - madridOffsetHours,
+          minutes,
+          seconds || 0
+        )
       );
     } else {
       // For other timezones, use the original logic
