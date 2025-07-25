@@ -424,7 +424,7 @@ function generateUPVCompatibleICalContent(exams: Exam[], calendarName: string): 
     const parseResult = parseExamDateTime(exam.date, exam.time, 'Europe/Madrid');
     const startTime = parseResult.start;
 
-    startTime.setHours(startTime.getHours() - 1);
+    startTime.setHours(startTime.getHours());
 
     
     const endTime = new Date(startTime);
