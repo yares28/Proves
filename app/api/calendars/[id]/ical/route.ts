@@ -84,10 +84,41 @@ async function handleRequest(
       createdAt: calendar.created_at
     });
     
+    // Ensure filters are in the correct format for getExams
+    let processedFilters = filters;
+    if (typeof filters === 'object' && filters !== null) {
+      // Ensure all filter values are arrays
+      processedFilters = {};
+      Object.keys(filters).forEach(key => {
+        const value = filters[key];
+        if (value && !Array.isArray(value)) {
+          processedFilters[key] = [value];
+        } else {
+          processedFilters[key] = value;
+        }
+      });
+      
+      console.log('🔧 [API DEBUG] Processed filters:', processedFilters);
+    }
+    
     // Fetch exams using the calendar's saved filters
-    console.log('🔄 [API] Calling getExams with filters:', filters);
-    const exams = await getExams(filters, supabase)
+    console.log('🔄 [API] Calling getExams with filters:', processedFilters);
+    const exams = await getExams(processedFilters, supabase)
     console.log('📊 [API] getExams returned:', exams?.length || 0, 'exams');
+    
+    // Debug: If no exams found, try fetching all exams to compare
+    if (exams.length === 0) {
+      console.log('⚠️ [API DEBUG] No exams found with filters, testing without filters...');
+      try {
+        const allExams = await getExams({}, supabase);
+        console.log(`📊 [API DEBUG] Total exams in database: ${allExams.length}`);
+        if (allExams.length > 0) {
+          console.log('📋 [API DEBUG] Sample exam data:', allExams.slice(0, 3));
+        }
+      } catch (debugError) {
+        console.error('❌ [API DEBUG] Error fetching all exams:', debugError);
+      }
+    }
     
     // Debug: Log sample exam dates
     if (exams.length > 0) {
