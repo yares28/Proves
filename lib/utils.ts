@@ -238,14 +238,15 @@ export function generateICalContent(
         const year = examDate.getFullYear();
         const month = String(examDate.getMonth() + 1).padStart(2, "0");
         const day = String(examDate.getDate()).padStart(2, "0");
-        
+
         let hour: number, minute: number;
         if (isEndTime) {
           // Calculate end time by adding duration to original exam time
-          const totalMinutes = examHours * 60 + examMinutes + exam.duration_minutes;
+          const totalMinutes =
+            examHours * 60 + examMinutes + exam.duration_minutes;
           hour = Math.floor(totalMinutes / 60);
           minute = totalMinutes % 60;
-          
+
           // Handle day overflow (if exam goes past midnight)
           if (hour >= 24) {
             hour = hour % 24;
@@ -256,7 +257,7 @@ export function generateICalContent(
           hour = examHours;
           minute = examMinutes;
         }
-        
+
         const hourStr = String(hour).padStart(2, "0");
         const minuteStr = String(minute).padStart(2, "0");
         const second = "00";
@@ -578,27 +579,43 @@ function generateUPVCompatibleICalContent(
     // For UPV format, use direct time parsing to avoid timezone conversion issues
     const [examHours, examMinutes] = exam.time.split(":").map(Number);
     const examDate = new Date(exam.date);
-    
+
     // Create start time using original exam time (no timezone conversion)
-    const startTime = new Date(examDate.getFullYear(), examDate.getMonth(), examDate.getDate(), examHours, examMinutes, 0);
-    
+    const startTime = new Date(
+      examDate.getFullYear(),
+      examDate.getMonth(),
+      examDate.getDate(),
+      examHours,
+      examMinutes,
+      0
+    );
+
     // Calculate end time by adding duration
     const totalMinutes = examHours * 60 + examMinutes + exam.duration_minutes;
     const endHour = Math.floor(totalMinutes / 60);
     const endMinute = totalMinutes % 60;
-    const endTime = new Date(examDate.getFullYear(), examDate.getMonth(), examDate.getDate(), endHour, endMinute, 0);
+    const endTime = new Date(
+      examDate.getFullYear(),
+      examDate.getMonth(),
+      examDate.getDate(),
+      endHour,
+      endMinute,
+      0
+    );
 
-    // Format as local time for UPV format - no timezone conversion, no Z suffix
+    // Format as local time for UPV format - subtract 2 hours to compensate for double timezone application
     const formatUTCDate = (date: Date) => {
-      // Use the local time directly without any timezone conversion
-      // The X-WR-TIMEZONE:Europe/Madrid header will handle the timezone display
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const hour = String(date.getHours()).padStart(2, "0");
-      const minute = String(date.getMinutes()).padStart(2, "0");
-      const second = String(date.getSeconds()).padStart(2, "0");
-      
+      // Subtract 2 hours to compensate for Google Calendar's timezone handling
+      // This fixes the issue where 15:00 was showing as 17:00
+      const adjustedDate = new Date(date.getTime() - 2 * 60 * 60 * 1000);
+
+      const year = adjustedDate.getFullYear();
+      const month = String(adjustedDate.getMonth() + 1).padStart(2, "0");
+      const day = String(adjustedDate.getDate()).padStart(2, "0");
+      const hour = String(adjustedDate.getHours()).padStart(2, "0");
+      const minute = String(adjustedDate.getMinutes()).padStart(2, "0");
+      const second = String(adjustedDate.getSeconds()).padStart(2, "0");
+
       // No Z suffix - this indicates local time, not UTC
       return `${year}${month}${day}T${hour}${minute}${second}`;
     };
