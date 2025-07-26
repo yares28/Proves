@@ -29,8 +29,8 @@ const formSchema = z.object({
     .string()
     .min(1, { message: "El nombre es requerido" })
     .max(50, { message: "El nombre no puede exceder 50 caracteres" })
-    .regex(/^[a-zA-Z0-9\s\-_]+$/, {
-      message: "Solo se permiten letras, números, espacios, guiones y guiones bajos"
+    .regex(/^[a-zA-ZÀ-ÿÑñ0-9\s\-_()]+$/, {
+      message: "Solo se permiten letras, números, espacios, guiones, guiones bajos y paréntesis"
     })
 })
 
@@ -57,13 +57,16 @@ export function ExportCalendarDialog({
   })
 
   async function onSubmit(values: ExportCalendarFormValues) {
+    console.log("📝 [ExportDialog] Form submitted with values:", values)
     setIsExporting(true)
     try {
+      console.log("🚀 [ExportDialog] Calling onExport with name:", values.name)
       await onExport(values.name)
+      console.log("✅ [ExportDialog] Export completed successfully")
       onOpenChange(false)
       form.reset() // Reset form after successful export
     } catch (error) {
-      console.error("Export failed:", error)
+      console.error("❌ [ExportDialog] Export failed:", error)
       // Error handling is done in the parent component
     } finally {
       setIsExporting(false)
