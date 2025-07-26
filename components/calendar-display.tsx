@@ -56,7 +56,12 @@ import {
 } from "@/actions/user-calendars";
 import { getCurrentSession, getFreshAuthTokens } from "@/utils/auth-helpers";
 
-const GOOGLE_ICAL_BASE_URL = "https://upv-cal.vercel.app";
+// Use current origin for local development, production URL for production
+const GOOGLE_ICAL_BASE_URL = typeof window !== 'undefined' 
+  ? (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
+    ? window.location.origin 
+    : "https://upv-cal.vercel.app")
+  : "https://upv-cal.vercel.app";
 
 export function CalendarDisplay({
   activeFilters = {},
@@ -353,36 +358,58 @@ export function CalendarDisplay({
   // Export to Google Calendar with modern URL pattern
   const exportToGoogleCalendar = async (calendarName: string) => {
     try {
+      console.log("🔄 Starting Google Calendar export with name:", calendarName);
+      console.log("🔍 Active filters:", activeFilters);
+
       // Generate UPV-style token URL
       const { generateUPVTokenUrl } = await import("@/lib/utils");
+      console.log("📦 Utils imported successfully");
+      
       const tokenPath = await generateUPVTokenUrl(activeFilters, calendarName);
+      console.log("🔑 Generated token path:", tokenPath);
+      
       const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
+      console.log("🌐 Full iCal URL:", icalUrl);
 
-      // Use HEAD request for validation
-      let ok = false;
-      try {
-        ok = await fetch(icalUrl, { method: "HEAD" }).then((r) => r.ok);
-      } catch (error) {
-        ok = false;
-      }
-      if (!ok) {
-        toast({
-          title: "Error en el feed del calendario",
-          description:
-            "Google Calendar no pudo acceder al feed. Por favor intenta más tarde.",
-          variant: "destructive",
-        });
-        return;
+      // Use HEAD request for validation (skip for localhost)
+      const isLocalhost = icalUrl.includes('localhost') || icalUrl.includes('127.0.0.1');
+      
+      if (!isLocalhost) {
+        console.log("🔍 Validating iCal URL with HEAD request...");
+        let ok = false;
+        try {
+          const headResponse = await fetch(icalUrl, { method: "HEAD" });
+          ok = headResponse.ok;
+          console.log("📡 HEAD request response:", headResponse.status, headResponse.statusText);
+        } catch (headError) {
+          console.error("❌ HEAD request failed:", headError);
+          ok = false;
+        }
+        
+        if (!ok) {
+          console.warn("⚠️ HEAD request validation failed");
+          toast({
+            title: "Error en el feed del calendario",
+            description:
+              "Google Calendar no pudo acceder al feed. Por favor intenta más tarde.",
+            variant: "destructive",
+          });
+          return;
+        }
+      } else {
+        console.log("🏠 Localhost detected, skipping HEAD request validation");
       }
 
       // Construct calendar feed URL using webcal protocol for better calendar app integration
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
+      console.log("📱 Calendar feed URL:", calendarFeed);
 
       // Use Google Calendar's modern subscription URL with /r?cid= pattern
       // This opens the "Add this calendar?" dialog with Add/Cancel options
       const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(
         calendarFeed
       )}`;
+      console.log("🔗 Final Google Calendar URL:", googleCalendarUrl);
 
       // Open Google Calendar in a new tab with proper security attributes
       window.open(googleCalendarUrl, "_blank", "noopener,noreferrer");
@@ -391,13 +418,20 @@ export function CalendarDisplay({
         title: "Redirigiendo a Google Calendar",
         description: "Se abrirá Google Calendar con el enlace de suscripción.",
       });
+      
+      console.log("✅ Google Calendar export completed successfully");
     } catch (error) {
-      console.error("❌ Error opening Google Calendar:", error);
+      console.error("❌ Error in exportToGoogleCalendar:", error);
+      console.error("📋 Error stack:", error instanceof Error ? error.stack : 'No stack trace');
+      
       toast({
-        title: "Error",
-        description: "No se pudo abrir Google Calendar.",
+        title: "Error de exportación",
+        description: error instanceof Error ? error.message : "No se pudo abrir Google Calendar.",
         variant: "destructive",
       });
+      
+      // Re-throw the error so the ExportCalendarDialog can handle it
+      throw error;
     }
   };
 
@@ -470,7 +504,7 @@ export function CalendarDisplay({
                   // Generate UPV-style token URL
                   const { generateUPVTokenUrl } = await import("@/lib/utils");
                   const tokenPath = await generateUPVTokenUrl(activeFilters, "UPV Exams");
-                  const icalUrl = `https://upv-cal.vercel.app${tokenPath}`;
+                  const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
                   const webcalUrl = icalUrl.replace(/^https?:/, "webcal:");
                   window.location.href = webcalUrl;
                 } catch (error) {
@@ -636,7 +670,7 @@ export function CalendarDisplay({
                     // Generate UPV-style token URL
                     const { generateUPVTokenUrl } = await import("@/lib/utils");
                     const tokenPath = await generateUPVTokenUrl(activeFilters, "UPV Exams");
-                    const icalUrl = `https://upv-cal.vercel.app${tokenPath}`;
+                    const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
                     const webcalUrl = icalUrl.replace(/^https?:/, "webcal:");
                     window.location.href = webcalUrl;
                   } catch (error) {

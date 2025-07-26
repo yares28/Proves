@@ -823,6 +823,9 @@ export async function generateUPVTokenUrl(
   filters: Record<string, string[]>,
   calendarName: string = "UPV Exams"
 ): Promise<string> {
+  console.log("🔧 [generateUPVTokenUrl] Starting with filters:", filters);
+  console.log("🔧 [generateUPVTokenUrl] Calendar name:", calendarName);
+
   // Build query string
   const params = new URLSearchParams();
   params.set("name", calendarName);
@@ -845,6 +848,7 @@ export async function generateUPVTokenUrl(
   }
 
   const queryString = params.toString();
+  console.log("🔧 [generateUPVTokenUrl] Generated query string:", queryString);
 
   // Generate token (client-side hash since we can't use crypto in browser)
   let hash = 0;
@@ -854,17 +858,29 @@ export async function generateUPVTokenUrl(
     hash = hash & hash;
   }
   const token = Math.abs(hash).toString(16).toUpperCase().padStart(16, "0");
+  console.log("🔧 [generateUPVTokenUrl] Generated token:", token);
 
   // Store the mapping by calling our API
   try {
-    await fetch("/api/ical/store-token", {
+    console.log("🔧 [generateUPVTokenUrl] Storing token mapping...");
+    const response = await fetch("/api/ical/store-token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token, queryString }),
     });
+
+    if (!response.ok) {
+      throw new Error(`Token storage failed: ${response.status} ${response.statusText}`);
+    }
+
+    const responseText = await response.text();
+    console.log("🔧 [generateUPVTokenUrl] Token storage response:", responseText);
   } catch (error) {
-    console.error("Failed to store token mapping:", error);
+    console.error("❌ [generateUPVTokenUrl] Failed to store token mapping:", error);
+    throw new Error(`Token storage failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 
-  return `/ical/${token}.ics`;
+  const tokenUrl = `/ical/${token}.ics`;
+  console.log("🔧 [generateUPVTokenUrl] Final token URL:", tokenUrl);
+  return tokenUrl;
 }
