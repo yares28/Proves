@@ -19,6 +19,12 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
     const filtersParam = searchParams.get('filters')
     const calendarName = searchParams.get('name') || 'UPV Exams'
     
+    console.log(`🌐 [ICAL-API] ${method} request to iCal endpoint`);
+    console.log(`🔍 [ICAL-API] Full URL: ${request.url}`);
+    console.log(`📝 [ICAL-API] Calendar name: ${calendarName}`);
+    console.log(`🔧 [ICAL-API] Filters param: ${filtersParam}`);
+    console.log(`📊 [ICAL-API] All search params:`, Object.fromEntries(searchParams.entries()));
+    
     // Sanitize calendar name to prevent issues
     const sanitizedCalendarName = calendarName.replace(/[^\w\s-]/g, '').trim() || 'UPV_Exams';
     
@@ -80,7 +86,18 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
       if (years.length > 0) filters.year = years
       if (semesters.length > 0) filters.semester = semesters
       if (subjects.length > 0) filters.subject = subjects
+      
+      console.log(`🔧 [ICAL-API] Parsed individual parameters:`, {
+        schools: schools.length,
+        degrees: degrees.length, 
+        years: years.length,
+        semesters: semesters.length,
+        subjects: subjects.length
+      });
     }
+    
+    console.log(`✅ [ICAL-API] Final filters object:`, filters);
+    console.log(`📏 [ICAL-API] Number of filter categories:`, Object.keys(filters).length);
     
     // Use service role client so anonymous calendar apps can read data
     const supabase = await createAdminClient()
@@ -92,9 +109,17 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
     
     // Guarantee at least one valid VEVENT if no exams found - use UPV format
     if (exams.length === 0) {
+      console.warn(`⚠️ [ICAL-API] No exams found for filters:`, filters);
+      console.log(`🔍 [ICAL-API] Generating "No Exams Found" calendar event`);
+      
       const now = new Date();
       const nowUtc = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
       const endUtc = new Date(now.getTime() + 60 * 60 * 1000).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+      
+      // Create a more informative description about the filters used
+      const filterDesc = Object.keys(filters).length > 0 
+        ? `Filters applied: ${Object.entries(filters).map(([key, values]) => `${key}=(${Array.isArray(values) ? values.join(',') : values})`).join('; ')}`
+        : 'No filters applied - showing all available exams';
       
       const emptyContent = [
         'BEGIN:VCALENDAR',
@@ -102,26 +127,29 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
         'VERSION:2.0',
         'CALSCALE:GREGORIAN',
         'METHOD:PUBLISH',
-        `X-WR-CALNAME:${sanitizedCalendarName}`,
-        'X-APPLE-CALENDAR-COLOR:#0252D4',
+        `X-WR-CALNAME:${sanitizedCalendarName} (No Exams)`,
+        'X-APPLE-CALENDAR-COLOR:#FF6B35',
+        'X-WR-TIMEZONE:Europe/Madrid',
         'BEGIN:VEVENT',
         `DTSTART:${nowUtc}`,
         `DTEND:${endUtc}`,
         `DTSTAMP:${nowUtc}`,
         `UID:no-exams-${Date.now()}@upv-cal`,
         `CREATED:${nowUtc}`,
-        'DESCRIPTION:No exams match your current filters or there are no exams available. Please adjust your filters and try again, or check back later for new exam schedules.',
+        `DESCRIPTION:No exams found for the specified criteria. ${filterDesc}. Please check your filters or try again later when new exam schedules are available.`,
         `LAST-MODIFIED:${nowUtc}`,
         'LOCATION:',
         'SEQUENCE:0',
         'STATUS:TENTATIVE',
-        'SUMMARY:No Exams Found',
+        'SUMMARY:No Exams Found - Check Filters',
         'TRANSP:TRANSPARENT',
-        'UPV_BGCOLOR:#0252D4',
+        'UPV_BGCOLOR:#FF6B35',
         'UPV_FGCOLOR:#ffffff',
         'END:VEVENT',
         'END:VCALENDAR',
       ].join('\r\n');
+      
+      console.log(`📤 [ICAL-API] Returning "No Exams" calendar (${emptyContent.length} chars)`);
       
       return new NextResponse(emptyContent, { 
         status: 200, 

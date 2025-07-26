@@ -55,10 +55,22 @@ export async function POST(request: NextRequest) {
 
 // Get query string from token
 export function getQueryStringFromToken(token: string): string | null {
-  if (!global.tokenCache) return null;
+  console.log(`🔍 [TOKEN-STORE] Looking up token: ${token}`);
+  
+  if (!global.tokenCache) {
+    console.error(`❌ [TOKEN-STORE] Global token cache not initialized`);
+    return null;
+  }
+  
+  const totalTokens = Object.keys(global.tokenCache).length;
+  console.log(`📊 [TOKEN-STORE] Total tokens in cache: ${totalTokens}`);
   
   const entry = global.tokenCache[token];
-  if (!entry) return null;
+  if (!entry) {
+    console.error(`❌ [TOKEN-STORE] Token ${token} not found in cache`);
+    console.log(`🔑 [TOKEN-STORE] Available tokens:`, Object.keys(global.tokenCache).slice(0, 5));
+    return null;
+  }
   
   // Check if token has expired
   if (entry.expires < Date.now()) {
@@ -67,5 +79,6 @@ export function getQueryStringFromToken(token: string): string | null {
     return null;
   }
   
+  console.log(`✅ [TOKEN-STORE] Token ${token} found, returning query string`);
   return entry.queryString;
 }
