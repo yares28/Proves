@@ -2,9 +2,12 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import type { ExamFilters } from "@/types/exam"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar, Clock, MapPin, School, BookOpen } from "lucide-react"
+import { Calendar, Clock, MapPin, School, BookOpen, Share2, Copy, Download, ExternalLink } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { getExams } from "@/actions/exam-actions"
+import { ExportButton } from "@/components/export-button"
 
 export default async function ExamsPage({
   searchParams,
@@ -29,31 +32,37 @@ export default async function ExamsPage({
         <div className="container mx-auto px-4 md:px-6">
           <h1 className="mb-8 text-3xl font-bold tracking-tight md:text-4xl">Exam Results</h1>
 
-          <div className="mb-6 flex flex-wrap gap-2">
-            {filters.acronym && (
-              <Badge variant="secondary" className="text-sm">
-                Acronym: {filters.acronym}
-              </Badge>
-            )}
-            {filters.school && (
-              <Badge variant="secondary" className="text-sm">
-                School: {filters.school}
-              </Badge>
-            )}
-            {filters.degree && (
-              <Badge variant="secondary" className="text-sm">
-                Degree: {filters.degree}
-              </Badge>
-            )}
-            {filters.year && (
-              <Badge variant="secondary" className="text-sm">
-                Year: {filters.year}
-              </Badge>
-            )}
-            {filters.semester && (
-              <Badge variant="secondary" className="text-sm">
-                Semester: {filters.semester}
-              </Badge>
+          <div className="mb-6 flex items-center justify-between">
+            <div className="flex flex-wrap gap-2">
+              {filters.acronym && (
+                <Badge variant="secondary" className="text-sm">
+                  Acronym: {filters.acronym}
+                </Badge>
+              )}
+              {filters.school && (
+                <Badge variant="secondary" className="text-sm">
+                  School: {filters.school}
+                </Badge>
+              )}
+              {filters.degree && (
+                <Badge variant="secondary" className="text-sm">
+                  Degree: {filters.degree}
+                </Badge>
+              )}
+              {filters.year && (
+                <Badge variant="secondary" className="text-sm">
+                  Year: {filters.year}
+                </Badge>
+              )}
+              {filters.semester && (
+                <Badge variant="secondary" className="text-sm">
+                  Semester: {filters.semester}
+                </Badge>
+              )}
+            </div>
+            
+            {exams.length > 0 && (
+              <ExportButton exams={exams} filters={filters} />
             )}
           </div>
 

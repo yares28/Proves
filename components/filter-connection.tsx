@@ -12,6 +12,8 @@ export function FilterConnection() {
     setActiveFilters(filters)
   }, [])
 
+
+
   return (
     <div className="grid grid-cols-1 gap-10 md:grid-cols-[350px_1fr]">
       <FilterSidebar onFiltersChange={handleFiltersChange} />

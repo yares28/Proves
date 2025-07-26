@@ -33,7 +33,6 @@ type ActiveFilters = Record<string, string[]>;
 export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?: (filters: ActiveFilters) => void }) {
   const [activeFilters, setActiveFilters] = useState<ActiveFilters>({})
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({})
-  const [allFiltersSearch, setAllFiltersSearch] = useState("")
   const [expandedItems, setExpandedItems] = useState<string[]>([]) // Start with nothing expanded
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [existingNames, setExistingNames] = useState<string[]>([])
@@ -138,8 +137,7 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
     hasSelectedSemesters,
     hasSelectedYears,
     // Watch for search queries that might filter options
-    JSON.stringify(searchQueries),
-    allFiltersSearch
+    JSON.stringify(searchQueries)
   ]);
   
   // Check if a category has all its required dependencies selected
@@ -229,10 +227,7 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
       option.toLowerCase().includes(searchQuery)
     );
     
-    // Apply global search if any
-    const options = allFiltersSearch 
-      ? filteredOptions.filter(option => option.toLowerCase().includes(allFiltersSearch.toLowerCase())) 
-      : filteredOptions;
+    const options = filteredOptions;
     
     setActiveFilters(prev => {
       const newFilters = { ...prev };
@@ -261,10 +256,7 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
       option.toLowerCase().includes(searchQuery)
     );
     
-    // Also filter options globally if allFiltersSearch is set
-    const finalFiltered = allFiltersSearch 
-      ? filtered.filter(option => option.toLowerCase().includes(allFiltersSearch.toLowerCase())) 
-      : filtered;
+    const finalFiltered = filtered;
     
     // Debug: Logging for School category specifically
     if (category.field === 'school') {
@@ -311,6 +303,26 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
       const lastDep = missingNames.pop();
       return `Selecciona ${missingNames.join(', ')} y ${lastDep} primero`;
     }
+  };
+
+  // Helper function to extract acronym from subject name
+  const getSubjectAcronym = (subjectName: string): string => {
+    // Extract acronym from subject name (e.g., "Programación I (PROG)" -> "PROG")
+    const acronymMatch = subjectName.match(/\(([A-Z]+)\)/);
+    if (acronymMatch) {
+      return acronymMatch[1];
+    }
+    
+    // If no acronym in parentheses, try to extract from the beginning
+    const words = subjectName.split(' ');
+    if (words.length >= 2) {
+      // Take first few letters of each word
+      const acronym = words.slice(0, 3).map(word => word.charAt(0).toUpperCase()).join('');
+      return acronym;
+    }
+    
+    // Fallback: return first 4 characters
+    return subjectName.substring(0, 4).toUpperCase();
   };
 
   // Update the function signature to accept any MouseEvent
@@ -556,7 +568,7 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
                     variant="secondary"
                     className="flex items-center gap-1"
                   >
-                    {value}
+                    {category === 'subject' ? getSubjectAcronym(value) : value}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -572,15 +584,7 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
           </div>
         )}
 
-        <div className="relative">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar todos los filtros..."
-            value={allFiltersSearch}
-            onChange={(e) => setAllFiltersSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+
 
         <Accordion 
           type="multiple" 
@@ -592,12 +596,6 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
             <AccordionItem key={category.field} value={category.field}>
               <AccordionTrigger className="text-sm font-medium">
                 <span className="flex-1">{category.name}</span>
-                {/* Remove the buttons from inside the trigger */}
-                {activeFilters[category.field]?.length > 0 && (
-                  <Badge variant="outline" className="mr-2 text-xs">
-                    {activeFilters[category.field].length}
-                  </Badge>
-                )}
               </AccordionTrigger>
               <AccordionContent>
                 {/* Add the buttons at the top of content instead */}
@@ -633,7 +631,7 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
                   </Card>
                 )}
                 
-                {category.searchable && hasRequiredDependencies(category) && (
+                {category.searchable && hasRequiredDependencies(category) && category.field === 'subject' && (
                   <div className="mb-2">
                     <Input
                       placeholder={`Buscar ${category.name.toLowerCase()}...`}

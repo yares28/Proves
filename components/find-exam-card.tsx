@@ -11,14 +11,17 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { getSchools } from "@/actions/exam-actions"
+import { getSchools, getDegrees } from "@/actions/exam-actions"
 
 export function FindExamCard() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [school, setSchool] = useState("")
+  const [degree, setDegree] = useState("")
   const [schools, setSchools] = useState<string[]>([])
+  const [degrees, setDegrees] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingDegrees, setLoadingDegrees] = useState(false)
   const [error, setError] = useState("")
   const [fetchError, setFetchError] = useState<string | null>(null)
 
@@ -41,6 +44,31 @@ export function FindExamCard() {
     fetchSchools()
   }, [])
 
+  // Fetch degrees when school changes
+  useEffect(() => {
+    async function fetchDegrees() {
+      if (!school || school === "all") {
+        setDegrees([])
+        setDegree("")
+        return
+      }
+
+      try {
+        setLoadingDegrees(true)
+        const degreesData = await getDegrees(school)
+        console.log("Fetched degrees for school:", school, degreesData)
+        setDegrees(degreesData)
+      } catch (error) {
+        console.error("Error fetching degrees:", error)
+        setDegrees([])
+      } finally {
+        setLoadingDegrees(false)
+      }
+    }
+
+    fetchDegrees()
+  }, [school])
+
   const validateAcronym = (value: string) => {
     return value.trim().length > 0 && value.trim().length <= 10;
   }
@@ -62,6 +90,7 @@ export function FindExamCard() {
     // Change parameter name from 'q' to 'acronym' to be more specific
     params.append("acronym", trimmedQuery)
     if (school && school !== "all") params.append("school", school)
+    if (degree && degree !== "all") params.append("degree", degree)
 
     router.push(`/exams?${params.toString()}`)
   }
@@ -136,6 +165,51 @@ export function FindExamCard() {
                 {!loading && (
                   <p className="text-xs text-muted-foreground">
                     {schools.length} escuelas disponibles
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="degree" className="text-sm font-medium">
+                  Carrera
+                </Label>
+                <Select 
+                  value={degree} 
+                  onValueChange={setDegree} 
+                  disabled={loadingDegrees || !school || school === "all"}
+                >
+                  <SelectTrigger id="degree" className="w-full h-9">
+                    <SelectValue placeholder={
+                      !school || school === "all" 
+                        ? "Selecciona una escuela primero" 
+                        : loadingDegrees 
+                          ? "Cargando carreras..." 
+                          : "Seleccionar carrera"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    <SelectItem value="all">Todas las Carreras</SelectItem>
+                    {loadingDegrees ? (
+                      <div className="flex items-center justify-center py-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary mr-2" />
+                        <span className="text-sm">Cargando...</span>
+                      </div>
+                    ) : degrees.length === 0 ? (
+                      <div className="p-2 text-xs text-muted-foreground">
+                        No se encontraron carreras para esta escuela
+                      </div>
+                    ) : (
+                      degrees.map((degreeName) => (
+                        <SelectItem key={degreeName} value={degreeName}>
+                          {degreeName}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {!loadingDegrees && school && school !== "all" && (
+                  <p className="text-xs text-muted-foreground">
+                    {degrees.length} carreras disponibles
                   </p>
                 )}
               </div>
