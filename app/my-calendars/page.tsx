@@ -22,7 +22,6 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { getFreshAuthTokens } from "@/utils/auth-helpers";
-import { GoogleCalendarInstructions } from "@/components/ui/google-calendar-instructions";
 
 interface SavedCalendar {
   id: string;
@@ -35,8 +34,6 @@ export default function MyCalendarsPage() {
   const { user } = useAuth();
   const [calendars, setCalendars] = useState<SavedCalendar[]>([]);
   const [loading, setLoading] = useState(true);
-  const [instructionsOpen, setInstructionsOpen] = useState(false);
-  const [currentIcalUrl, setCurrentIcalUrl] = useState("");
   const [selectedCalendar, setSelectedCalendar] = useState<any>(null);
   const [selectedExams, setSelectedExams] = useState<any[]>([]);
   const [examsLoading, setExamsLoading] = useState(false);
@@ -343,7 +340,7 @@ export default function MyCalendarsPage() {
     }
   };
 
-  const handleGoogleCalendarExport = async (calendar: SavedCalendar) => {
+  const exportExamsToGoogleCalendar = async (calendar: SavedCalendar) => {
     try {
       // Use production domain instead of localhost to prevent Google Calendar refresh loops
       let baseUrl = window.location.origin;
@@ -355,55 +352,28 @@ export default function MyCalendarsPage() {
           process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
       }
 
-      // For Google Calendar, construct a direct iCal URL using the calendar-specific endpoint
+      // Construct iCal calendar feed URL using webcal protocol for better calendar app integration
       const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
+      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
 
-      // Validate the iCal feed before providing instructions
-      try {
-        const response = await fetch(icalUrl, { method: 'HEAD' });
-        if (!response.ok) {
-          throw new Error('Calendar feed is not accessible');
-        }
-      } catch (error) {
-        console.error('❌ Calendar feed validation failed:', error);
-        toast({
-          title: "Error",
-          description: "El calendario no está disponible en este momento. Inténtalo más tarde.",
-          variant: "destructive",
-        });
-        return;
-      }
+      // Use Google Calendar's modern subscription URL with /r?cid= pattern
+      // This opens the "Add this calendar?" dialog with Add/Cancel options
+      const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(
+        calendarFeed
+      )}`;
 
-      // Copy URL to clipboard for easy pasting
-      try {
-        await navigator.clipboard.writeText(icalUrl);
-        
-        // Show instructions modal instead of alert
-        setCurrentIcalUrl(icalUrl);
-        setInstructionsOpen(true);
-        
-        toast({
-          title: "URL copiada al portapapeles",
-          description: "Se han mostrado las instrucciones para añadir el calendario.",
-        });
-      } catch (clipboardError) {
-        // Fallback if clipboard API is not available
-        console.warn('Clipboard API not available:', clipboardError);
-        
-        // Still show the modal even if clipboard fails
-        setCurrentIcalUrl(icalUrl);
-        setInstructionsOpen(true);
-        
-        toast({
-          title: "Instrucciones mostradas",
-          description: "Copia manualmente la URL del cuadro de diálogo.",
-        });
-      }
+      // Open Google Calendar in a new tab with proper security attributes
+      window.open(googleCalendarUrl, "_blank", "noopener,noreferrer");
+
+      toast({
+        title: "Redirigiendo a Google Calendar",
+        description: "Se abrirá Google Calendar con el enlace de suscripción.",
+      });
     } catch (error) {
       console.error("❌ Error opening Google Calendar:", error);
       toast({
         title: "Error",
-        description: "No se pudo procesar la exportación a Google Calendar.",
+        description: "No se pudo abrir Google Calendar.",
         variant: "destructive",
       });
     }
@@ -713,7 +683,7 @@ export default function MyCalendarsPage() {
                             variant="ghost"
                             size="sm"
                             className="h-8 w-8 p-0"
-                            onClick={() => handleGoogleCalendarExport(calendar)}
+                            onClick={() => exportExamsToGoogleCalendar(calendar)}
                             title="Add to Google Calendar"
                           >
                             <Image
@@ -1053,12 +1023,6 @@ export default function MyCalendarsPage() {
           </div>
         )}
       </div>
-
-      <GoogleCalendarInstructions
-        isOpen={instructionsOpen}
-        onClose={() => setInstructionsOpen(false)}
-        icalUrl={currentIcalUrl}
-      />
     </div>
   );
 }

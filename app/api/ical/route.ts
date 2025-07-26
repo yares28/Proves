@@ -7,11 +7,6 @@ import { createAdminClient } from '@/lib/supabase/server'
 function getOptimalHeaders(filename: string, contentLength?: number) {
   return {
     'Content-Type': 'text/calendar; charset=utf-8',
-    'Cache-Control': 'no-cache, must-revalidate',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'X-Content-Type-Options': 'nosniff',
     ...(contentLength ? { 'Content-Length': String(contentLength) } : {}),
   };
 }
