@@ -98,9 +98,36 @@ export function CalendarDisplay({
     console.log("ETSINF Filter Active:", hasETSINFFilter);
   }, [activeFilters, hasETSINFFilter]);
 
+  // Check if filters are meaningful (beyond just school/degree)
+  const hasMeaningfulFilters = () => {
+    if (!activeFilters || Object.keys(activeFilters).length === 0) {
+      return false;
+    }
+    
+    // Check if there are any filters other than school and degree
+    const meaningfulFilterKeys = Object.keys(activeFilters).filter(key => 
+      key !== 'school' && key !== 'degree' && 
+      activeFilters[key] && activeFilters[key].length > 0
+    );
+    
+    return meaningfulFilterKeys.length > 0;
+  };
+
   // Fetch exams when filters change
   useEffect(() => {
     const fetchExams = async () => {
+      // Only fetch exams if we have meaningful filters
+      if (!hasMeaningfulFilters()) {
+        console.log("CalendarDisplay - No meaningful filters selected, clearing exams");
+        setExams([]);
+        // Set up default months for current academic year
+        const currentYear = getCurrentYear();
+        const fallbackMonths = generateAcademicYearMonths(currentYear);
+        setMonths(fallbackMonths);
+        setAcademicYear({ startYear: currentYear, endYear: currentYear + 1 });
+        return;
+      }
+
       try {
         console.log(
           "CalendarDisplay - Fetching exams with filters:",
@@ -1075,10 +1102,21 @@ export function CalendarDisplay({
               ) : (
                 <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
                   <Calendar className="h-12 w-12 mb-4 opacity-20" />
-                  <p>No exams found for the selected filters.</p>
-                  <p className="text-sm mt-2">
-                    Try adjusting your filter criteria to see exams.
-                  </p>
+                  {!hasMeaningfulFilters() ? (
+                    <>
+                      <p>Select your exam criteria to view the calendar</p>
+                      <p className="text-sm mt-2">
+                        Choose your year, semester, or specific subjects to see your exam schedule.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p>No exams found for the selected filters.</p>
+                      <p className="text-sm mt-2">
+                        Try adjusting your filter criteria to see exams.
+                      </p>
+                    </>
+                  )}
                 </div>
               )}
             </div>

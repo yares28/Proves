@@ -83,13 +83,14 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
     });
   }, [selectedSchools, selectedDegrees, selectedSemesters, selectedYears, subjects]);
   
-  // Define filter categories with dependencies (memoized to prevent unnecessary re-renders)
+  // Define filter categories with more flexible dependencies
   const filterCategories: FilterCategory[] = [
     { name: "Escuelas", field: "school", options: schools, searchable: true },
     { name: "Carreras", field: "degree", options: degrees, searchable: true, dependsOn: ["school"] },
     { name: "Semestres", field: "semester", options: semesters, searchable: false, dependsOn: ["school", "degree"] },
     { name: "Años del Curso", field: "year", options: years.map(String), searchable: false, dependsOn: ["school", "degree", "semester"] },
-    { name: "Asignaturas", field: "subject", options: subjects, searchable: true, dependsOn: ["school", "degree", "semester", "year"] },
+    // More flexible: subjects only need school OR degree (not both AND all others)
+    { name: "Asignaturas", field: "subject", options: subjects, searchable: true, dependsOn: ["school"] },
   ]
 
   // Auto-expansion logic: open categories with options, close empty ones
@@ -145,6 +146,12 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
   const hasRequiredDependencies = (category: FilterCategory): boolean => {
     if (!category.dependsOn) return true;
     
+    // Special case for subjects: allow if we have school OR degree (more flexible)
+    if (category.field === 'subject') {
+      return (activeFilters.school && activeFilters.school.length > 0) ||
+             (activeFilters.degree && activeFilters.degree.length > 0);
+    }
+    
     return category.dependsOn.every(dependency => {
       return activeFilters[dependency] && activeFilters[dependency].length > 0;
     });
@@ -158,26 +165,19 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
       // Add the new filter value
       newFilters[category] = [...(prev[category] || []), value];
       
-      // Clear child filters when parent filters change
+      // More selective clearing of child filters when parent filters change
       if (category === "school") {
-        // When school changes, clear degree, semester, year and subject filters
+        // When school changes, only clear degree (keep other filters that might still be valid)
         delete newFilters.degree;
-        delete newFilters.semester;
-        delete newFilters.year;
-        delete newFilters.subject;
       } else if (category === "degree") {
-        // When degree changes, clear semester, year and subject filters
+        // When degree changes, clear semester and year (but keep subjects as they may still be valid)
         delete newFilters.semester;
         delete newFilters.year;
-        delete newFilters.subject;
       } else if (category === "semester") {
-        // When semester changes, clear year and subject filters
+        // When semester changes, clear year only
         delete newFilters.year;
-        delete newFilters.subject;
-      } else if (category === "year") {
-        // When year changes, clear subject filters
-        delete newFilters.subject;
       }
+      // Note: We don't automatically clear subjects anymore - let the backend handle invalid combinations
       
       // Call onFiltersChange after state update
       setTimeout(() => onFiltersChange(newFilters), 0);
@@ -192,22 +192,19 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
         [category]: prev[category].filter(f => f !== value)
       };
       
-      // If all filters of a category are removed, also clear dependent filters
+      // More selective clearing when all filters of a category are removed
       if (category === "school" && newFilters.school.length === 0) {
+        // Only clear degree when all schools are removed
         delete newFilters.degree;
-        delete newFilters.semester;
-        delete newFilters.year;
-        delete newFilters.subject;
       } else if (category === "degree" && newFilters.degree.length === 0) {
+        // Clear semester and year when all degrees are removed
         delete newFilters.semester;
         delete newFilters.year;
-        delete newFilters.subject;
       } else if (category === "semester" && newFilters.semester.length === 0) {
+        // Clear year when all semesters are removed
         delete newFilters.year;
-        delete newFilters.subject;
-      } else if (category === "year" && newFilters.year.length === 0) {
-        delete newFilters.subject;
       }
+      // Note: Keep subjects even when parent filters are removed - they might still be valid
       
       // Call onFiltersChange after state update
       setTimeout(() => onFiltersChange(newFilters), 0);
