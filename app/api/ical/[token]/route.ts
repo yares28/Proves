@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getExams } from "@/actions/exam-actions";
 import { generateICalContent } from "@/lib/utils";
 import { createAdminClient } from "@/lib/supabase/server";
-import { tokenStore } from "../store-token/route";
+import { getQueryStringFromToken } from "../store-token/route";
 
 // Enhanced headers for better calendar app compatibility
 function getOptimalHeaders(contentLength?: number) {
@@ -13,10 +13,7 @@ function getOptimalHeaders(contentLength?: number) {
   };
 }
 
-// Get query string from token
-function getQueryStringFromToken(token: string): string | null {
-  return tokenStore.get(token) || null;
-}
+// Note: getQueryStringFromToken function is now imported from the store-token route
 
 async function handleRequest(
   request: NextRequest,
