@@ -37,10 +37,34 @@ export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<st
   // Check if ETSINF is in the schools filter
   const hasETSINFFilter = activeFilters?.school?.includes("ETSINF")
 
+  // Check if filters are meaningful (beyond just school/degree)
+  const hasMeaningfulFilters = () => {
+    if (!activeFilters || Object.keys(activeFilters).length === 0) {
+      return false;
+    }
+    
+    // Check if there are any filters other than school and degree
+    const meaningfulFilterKeys = Object.keys(activeFilters).filter(key => 
+      key !== 'school' && key !== 'degree' && 
+      activeFilters[key] && activeFilters[key].length > 0
+    );
+    
+    return meaningfulFilterKeys.length > 0;
+  };
+
   useEffect(() => {
     const fetchExams = async () => {
+      setIsLoading(true)
+      
+      // Only fetch exams if we have meaningful filters
+      if (!hasMeaningfulFilters()) {
+        console.log("ExamListView - No meaningful filters selected, clearing exams")
+        setExams([])
+        setIsLoading(false)
+        return
+      }
+
       try {
-        setIsLoading(true)
         console.log("ExamListView - Fetching with filters:", activeFilters)
         const data = await getExams(activeFilters)
         console.log(`ExamListView - Fetched ${data.length} exams:`, data.slice(0, 2)) // Log the first 2 exams
@@ -246,9 +270,9 @@ export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<st
                 ) : (
                   <tr>
                     <td colSpan={6} className="h-24 text-center border-b p-4">
-                      {Object.keys(activeFilters).length > 0 ? 
-                        "No se encontraron exámenes para los filtros seleccionados." :
-                        "No se encontraron exámenes. Intenta seleccionar algunos filtros."
+                      {!hasMeaningfulFilters() ? 
+                        "Selecciona tu año, semestre o asignaturas específicas para ver los exámenes." :
+                        "No se encontraron exámenes para los filtros seleccionados."
                       }
                     </td>
                   </tr>

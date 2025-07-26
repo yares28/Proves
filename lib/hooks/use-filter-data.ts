@@ -199,18 +199,34 @@ export function useFilterData(
     selectedSemesters.length
   ])
   
-  // Fetch subject data when selectedYears changes
+  // Fetch subject data when any relevant filter changes
   useEffect(() => {
-    // Skip if relevant filters haven't changed or prerequisites aren't met
-    if ((selectedYearsStr === prevSelectedYearsStr && prevSelectedYearsStr !== "[]") || 
-        selectedSchools.length === 0 || 
-        selectedDegrees.length === 0 || 
-        selectedSemesters.length === 0 ||
-        selectedYears.length === 0) {
+    // More flexible subject fetching - fetch when we have at least school OR degree selected
+    const hasMinimumForSubjects = selectedSchools.length > 0 || selectedDegrees.length > 0;
+    
+    // Skip if no meaningful filters are selected or if nothing has changed
+    if (!hasMinimumForSubjects) {
+      // Clear subjects if no meaningful filters
+      setData(prev => ({ ...prev, subjects: [] }));
       return;
     }
     
-    // Update ref with current selectedYears
+    // Check if any relevant filter has changed
+    const filtersChanged = 
+      selectedSchoolsStr !== prevSelectedSchoolsStr ||
+      selectedDegreesStr !== prevSelectedDegreesStr ||
+      selectedSemestersStr !== prevSelectedSemestersStr ||
+      selectedYearsStr !== prevSelectedYearsStr;
+    
+    if (!filtersChanged) {
+      console.log('Skipping subjects fetch - no relevant filters changed');
+      return;
+    }
+    
+    // Update refs with current values
+    prevSelectedSchoolsRef.current = [...selectedSchools];
+    prevSelectedDegreesRef.current = [...selectedDegrees];
+    prevSelectedSemestersRef.current = [...selectedSemesters];
     prevSelectedYearsRef.current = [...selectedYears];
     
     const fetchSubjectData = async () => {
@@ -219,12 +235,13 @@ export function useFilterData(
           selectedSchools,
           selectedDegrees, 
           selectedSemesters,
-          selectedYears
+          selectedYears,
+          hasMinimumForSubjects
         });
         
         setIsLoading(true)
         
-        // Fetch subjects filtered by schools, degrees, semesters and years
+        // Fetch subjects filtered by available filters (allow partial selections)
         const subjects = await getSubjects(
           selectedSchools, 
           selectedDegrees, 
