@@ -829,27 +829,37 @@ export async function generateUPVTokenUrl(
   // Use direct API route with parameters instead of token-based approach
   // This is more reliable for serverless environments
   const params = new URLSearchParams();
-  params.set("name", encodeURIComponent(calendarName));
+  
+  // URLSearchParams automatically handles encoding, so we don't need to double-encode
+  params.set("name", calendarName);
 
-  // Add individual filter parameters
+  // Add individual filter parameters - URLSearchParams handles encoding automatically
   if (filters.school && filters.school.length > 0) {
-    filters.school.forEach((school) => params.append("school", encodeURIComponent(school)));
+    filters.school.forEach((school) => params.append("school", school));
   }
   if (filters.degree && filters.degree.length > 0) {
-    filters.degree.forEach((degree) => params.append("degree", encodeURIComponent(degree)));
+    filters.degree.forEach((degree) => params.append("degree", degree));
   }
   if (filters.year && filters.year.length > 0) {
-    filters.year.forEach((year) => params.append("year", encodeURIComponent(year)));
+    filters.year.forEach((year) => params.append("year", year));
   }
   if (filters.semester && filters.semester.length > 0) {
-    filters.semester.forEach((semester) => params.append("semester", encodeURIComponent(semester)));
+    filters.semester.forEach((semester) => params.append("semester", semester));
   }
   if (filters.subject && filters.subject.length > 0) {
-    filters.subject.forEach((subject) => params.append("subject", encodeURIComponent(subject)));
+    filters.subject.forEach((subject) => params.append("subject", subject));
   }
 
   const queryString = params.toString();
   console.log("🔧 [generateUPVTokenUrl] Generated query string:", queryString);
+  console.log("🔧 [generateUPVTokenUrl] Total filter categories:", Object.keys(filters).length);
+  console.log("🔧 [generateUPVTokenUrl] Filter details:", {
+    schools: filters.school?.length || 0,
+    degrees: filters.degree?.length || 0,
+    years: filters.year?.length || 0,
+    semesters: filters.semester?.length || 0,
+    subjects: filters.subject?.length || 0
+  });
 
   // Use direct API route instead of token-based approach for better reliability
   const directUrl = `/api/ical?${queryString}`;
