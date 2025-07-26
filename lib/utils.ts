@@ -171,17 +171,20 @@ export function generateICalContent(
   const invalidExams: { exam: Exam; reason: string }[] = [];
 
   exams.forEach((exam) => {
+    const hasTime = Boolean(exam.time && exam.time.trim().length);
     // Validate required fields
-    if (!exam.date || !exam.time || !exam.duration_minutes || !exam.subject) {
+    if (!exam.date || !exam.subject) {
       invalidExams.push({ exam, reason: "Missing required fields" });
       return;
     }
 
-    // Parse and validate date/time
-    const parseResult = parseExamDateTime(exam.date, exam.time, timeZone);
-    if (!parseResult.isValid) {
-      invalidExams.push({ exam, reason: "Invalid date/time format" });
-      return;
+    // Parse and validate date/time ONLY when a clock‑time exists
+    if (hasTime) {
+      const parseResult = parseExamDateTime(exam.date, exam.time, timeZone);
+      if (!parseResult.isValid) {
+        invalidExams.push({ exam, reason: "Invalid date/time format" });
+        return;
+      }
     }
 
     validExams.push(exam);
@@ -196,13 +199,15 @@ export function generateICalContent(
   }
 
   validExams.forEach((exam) => {
-    // Use robust date parsing
-    const parseResult = parseExamDateTime(exam.date, exam.time, timeZone);
-    const startTime = parseResult.start;
-
-    // Set end time using exam's duration_minutes
-    const endTime = new Date(startTime);
-    endTime.setMinutes(startTime.getMinutes() + exam.duration_minutes);
+    const hasTime = Boolean(exam.time && exam.time.trim().length);
+    let startTime: Date | undefined;
+    let endTime: Date | undefined;
+    if (hasTime) {
+      const parseResult = parseExamDateTime(exam.date, exam.time, timeZone);
+      startTime = parseResult.start;
+      endTime = new Date(startTime);
+      endTime.setMinutes(startTime.getMinutes() + exam.duration_minutes);
+    }
 
     // Format dates for iCal - LOCAL TIME FORMAT (no Z suffix when using TZID)
     const formatICalLocalDate = (date: Date, isEndTime: boolean = false) => {
@@ -282,20 +287,48 @@ export function generateICalContent(
 
     const now = new Date();
 
-    icalLines.push(
-      "BEGIN:VEVENT",
-      `UID:exam-${exam.id}-${exam.date}-${exam.time}@upv-exam-calendar.com`,
-      `DTSTART;TZID=${timeZone}:${formatICalLocalDate(startTime, false)}`,
-      `DTEND;TZID=${timeZone}:${formatICalLocalDate(endTime, true)}`,
-      foldLine(`SUMMARY:${escapeICalText(exam.subject + " - Exam")}`),
-      foldLine(`DESCRIPTION:${description}`),
-      foldLine(`LOCATION:${escapeICalText(exam.location)}`),
-      `CREATED:${formatICalUtcDate(now)}`,
-      `LAST-MODIFIED:${formatICalUtcDate(now)}`,
-      "STATUS:CONFIRMED",
-      "TRANSP:OPAQUE",
-      "CATEGORIES:EXAM,UNIVERSITY"
-    );
+    if (hasTime) {
+      // --- original code for timed exams (unchanged) ---
+      icalLines.push(
+        "BEGIN:VEVENT",
+        `UID:exam-${exam.id}-${exam.date}-${exam.time}@upv-exam-calendar.com`,
+        `DTSTART;TZID=${timeZone}:${formatICalLocalDate(startTime!, false)}`,
+        `DTEND;TZID=${timeZone}:${formatICalLocalDate(endTime!, true)}`,
+        foldLine(`SUMMARY:${escapeICalText(exam.subject + " - Exam")}`),
+        foldLine(`DESCRIPTION:${description}`),
+        foldLine(`LOCATION:${escapeICalText(exam.location || "")}`),
+        `CREATED:${formatICalUtcDate(now)}`,
+        `LAST-MODIFIED:${formatICalUtcDate(now)}`,
+        "STATUS:CONFIRMED",
+        "TRANSP:OPAQUE",
+        "CATEGORIES:EXAM,UNIVERSITY"
+      );
+    } else {
+      // --- new code for all-day exams when hour is unknown ---
+      const startDate = exam.date.replace(/-/g, ""); // e.g. 20251031
+      const endObj = new Date(exam.date); // +1 day
+      endObj.setDate(endObj.getDate() + 1);
+      const endDate = endObj.toISOString().slice(0, 10).replace(/-/g, "");
+      icalLines.push(
+        "BEGIN:VEVENT",
+        `UID:exam-${exam.id}-${exam.date}-allday@upv-exam-calendar.com`,
+        `DTSTART;VALUE=DATE:${startDate}`,
+        `DTEND;VALUE=DATE:${endDate}`,
+        foldLine(
+          `SUMMARY:${escapeICalText(
+            exam.subject + " - Exam (hora por confirmar)"
+          )}`
+        ),
+        foldLine(`DESCRIPTION:${description}`),
+        foldLine(`LOCATION:${escapeICalText(exam.location || "")}`),
+        `CREATED:${formatICalUtcDate(now)}`,
+        `LAST-MODIFIED:${formatICalUtcDate(now)}`,
+        "STATUS:CONFIRMED",
+        "TRANSP:OPAQUE",
+        "CATEGORIES:EXAM,UNIVERSITY"
+        // Google expects end = next day
+      );
+    }
 
     // Add reminders/alarms
     reminderMinutes.forEach((minutes) => {
@@ -516,88 +549,95 @@ function generateUPVCompatibleICalContent(
   // Filter and process valid exams
   const validExams: Exam[] = [];
   exams.forEach((exam) => {
-    if (!exam.date || !exam.time || !exam.duration_minutes || !exam.subject) {
+    const hasTime = Boolean(exam.time && exam.time.trim().length);
+    if (!exam.date || !exam.subject) {
       return;
     }
 
-    const parseResult = parseExamDateTime(
-      exam.date,
-      exam.time,
-      "Europe/Madrid"
-    );
-    if (!parseResult.isValid) {
-      return;
+    if (hasTime) {
+      const parseResult = parseExamDateTime(
+        exam.date,
+        exam.time,
+        "Europe/Madrid"
+      );
+      if (!parseResult.isValid) {
+        return;
+      }
     }
 
     validExams.push(exam);
   });
 
-  // Generate events
+  // Format as local time for UPV format - no timezone conversion, no Z suffix
+  const formatUTCDate = (date: Date) => {
+    // Use the local time directly without any timezone conversion
+    // The X-WR-TIMEZONE:Europe/Madrid header will handle the timezone display
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hour = String(date.getHours()).padStart(2, "0");
+    const minute = String(date.getMinutes()).padStart(2, "0");
+    const second = String(date.getSeconds()).padStart(2, "0");
+
+    // No Z suffix - this indicates local time, not UTC
+    return `${year}${month}${day}T${hour}${minute}${second}`;
+  };
+
+  // Fold long lines (RFC 5545 compliance)
+  const foldLine = (line: string) => {
+    if (line.length <= 75) return line;
+    const folded = [];
+    let start = 0;
+    while (start < line.length) {
+      if (start === 0) {
+        folded.push(line.substring(0, 75));
+        start = 75;
+      } else {
+        folded.push(" " + line.substring(start, start + 74));
+        start += 74;
+      }
+    }
+    return folded.join("\r\n");
+  };
+
+  // Step 3: Process each valid exam
   validExams.forEach((exam) => {
-    // For UPV format, use direct time parsing to avoid timezone conversion issues
-    const [examHours, examMinutes] = exam.time.split(":").map(Number);
-    const examDate = new Date(exam.date);
+    const hasTime = Boolean(exam.time && exam.time.trim().length);
+    let startTime: Date | undefined;
+    let endTime: Date | undefined;
 
-    // Create start time using original exam time (no timezone conversion)
-    const startTime = new Date(
-      examDate.getFullYear(),
-      examDate.getMonth(),
-      examDate.getDate(),
-      examHours,
-      examMinutes,
-      0
-    );
+    if (hasTime) {
+      const [examHours, examMinutes] = exam.time.split(":").map(Number);
+      const examDate = new Date(exam.date);
 
-    // Calculate end time by adding duration
-    const totalMinutes = examHours * 60 + examMinutes + exam.duration_minutes;
-    const endHour = Math.floor(totalMinutes / 60);
-    const endMinute = totalMinutes % 60;
-    const endTime = new Date(
-      examDate.getFullYear(),
-      examDate.getMonth(),
-      examDate.getDate(),
-      endHour,
-      endMinute,
-      0
-    );
+      startTime = new Date(
+        examDate.getFullYear(),
+        examDate.getMonth(),
+        examDate.getDate(),
+        examHours,
+        examMinutes,
+        0
+      );
 
-    // Format as local time for UPV format - no timezone conversion, no Z suffix
-    const formatUTCDate = (date: Date) => {
-      // Use the local time directly without any timezone conversion
-      // The X-WR-TIMEZONE:Europe/Madrid header will handle the timezone display
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const hour = String(date.getHours()).padStart(2, "0");
-      const minute = String(date.getMinutes()).padStart(2, "0");
-      const second = String(date.getSeconds()).padStart(2, "0");
-
-      // No Z suffix - this indicates local time, not UTC
-      return `${year}${month}${day}T${hour}${minute}${second}`;
-    };
+      // Calculate end time by adding duration
+      const totalMinutes = examHours * 60 + examMinutes + exam.duration_minutes;
+      const endHour = Math.floor(totalMinutes / 60);
+      const endMinute = totalMinutes % 60;
+      endTime = new Date(
+        examDate.getFullYear(),
+        examDate.getMonth(),
+        examDate.getDate(),
+        endHour,
+        endMinute,
+        0
+      );
+    }
 
     // Get colors for this subject
     const colors = subjectColors[exam.subject] || defaultColors;
 
     // Generate stable UID
     const uid = `${generateStableId(exam)}@upv-cal`;
-
-    // Fold long lines (RFC 5545 compliance)
-    const foldLine = (line: string) => {
-      if (line.length <= 75) return line;
-      const folded = [];
-      let start = 0;
-      while (start < line.length) {
-        if (start === 0) {
-          folded.push(line.substring(0, 75));
-          start = 75;
-        } else {
-          folded.push(" " + line.substring(start, start + 74));
-          start += 74;
-        }
-      }
-      return folded.join("\r\n");
-    };
 
     // Create enhanced description with location and comment
     const descriptionParts = [exam.subject];
@@ -616,25 +656,53 @@ function generateUPVCompatibleICalContent(
       location = location ? `${location} - ${exam.comment}` : exam.comment;
     }
 
-    // Step 3: Canonical template for each exam (exact order from UPV)
-    icalLines.push(
-      "BEGIN:VEVENT",
-      `DTSTART:${formatUTCDate(startTime)}`,
-      `DTEND:${formatUTCDate(endTime)}`,
-      `DTSTAMP:${nowUtc}`,
-      `UID:${uid}`,
-      `CREATED:${nowUtc}`,
-      foldLine(`DESCRIPTION:${description}`),
-      `LAST-MODIFIED:${nowUtc}`,
-      foldLine(`LOCATION:${escapeICalText(location)}`),
-      "SEQUENCE:0",
-      "STATUS:CONFIRMED",
-      foldLine(`SUMMARY:Examen ${exam.subject}`),
-      "TRANSP:OPAQUE",
-      `UPV_BGCOLOR:${colors.bg}`,
-      `UPV_FGCOLOR:${colors.fg}`,
-      "END:VEVENT"
-    );
+    // Canonical template for each exam (exact order from UPV)
+    if (hasTime && startTime && endTime) {
+      // --- original code for timed exams (unchanged) ---
+      icalLines.push(
+        "BEGIN:VEVENT",
+        `DTSTART:${formatUTCDate(startTime)}`,
+        `DTEND:${formatUTCDate(endTime)}`,
+        `DTSTAMP:${nowUtc}`,
+        `UID:${uid}`,
+        `CREATED:${nowUtc}`,
+        foldLine(`DESCRIPTION:${description}`),
+        `LAST-MODIFIED:${nowUtc}`,
+        foldLine(`LOCATION:${escapeICalText(location)}`),
+        "SEQUENCE:0",
+        "STATUS:CONFIRMED",
+        foldLine(`SUMMARY:Examen ${exam.subject}`),
+        "TRANSP:OPAQUE",
+        `UPV_BGCOLOR:${colors.bg}`,
+        `UPV_FGCOLOR:${colors.fg}`,
+        "END:VEVENT"
+      );
+    } else {
+      // --- new code for all-day exams when hour is unknown ---
+      const startDate = exam.date.replace(/-/g, ""); // e.g. 20251031
+      const endObj = new Date(exam.date); // +1 day
+      endObj.setDate(endObj.getDate() + 1);
+      const endDate = endObj.toISOString().slice(0, 10).replace(/-/g, "");
+      icalLines.push(
+        "BEGIN:VEVENT",
+        `DTSTART;VALUE=DATE:${startDate}`,
+        `DTEND;VALUE=DATE:${endDate}`,
+        `DTSTAMP:${nowUtc}`,
+        `UID:${uid}`,
+        `CREATED:${nowUtc}`,
+        foldLine(`DESCRIPTION:${description}`),
+        `LAST-MODIFIED:${nowUtc}`,
+        foldLine(`LOCATION:${escapeICalText(location)}`),
+        "SEQUENCE:0",
+        "STATUS:CONFIRMED",
+        foldLine(`SUMMARY:Examen ${exam.subject} (hora por confirmar)`),
+        "TRANSP:OPAQUE",
+        `UPV_BGCOLOR:${colors.bg}`,
+        `UPV_FGCOLOR:${colors.fg}`,
+        "END:VEVENT"
+        // Google expects end = next day
+      );
+    }
   });
 
   // Handle empty exam list
