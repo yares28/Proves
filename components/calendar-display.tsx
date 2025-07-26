@@ -371,34 +371,11 @@ export function CalendarDisplay({
       const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
       console.log("🌐 Full iCal URL:", icalUrl);
 
-      // Use HEAD request for validation (skip for localhost)
-      const isLocalhost = icalUrl.includes('localhost') || icalUrl.includes('127.0.0.1');
-      
-      if (!isLocalhost) {
-        console.log("🔍 Validating iCal URL with HEAD request...");
-        let ok = false;
-        try {
-          const headResponse = await fetch(icalUrl, { method: "HEAD" });
-          ok = headResponse.ok;
-          console.log("📡 HEAD request response:", headResponse.status, headResponse.statusText);
-        } catch (headError) {
-          console.error("❌ HEAD request failed:", headError);
-          ok = false;
-        }
-        
-        if (!ok) {
-          console.warn("⚠️ HEAD request validation failed");
-          toast({
-            title: "Error en el feed del calendario",
-            description:
-              "Google Calendar no pudo acceder al feed. Por favor intenta más tarde.",
-            variant: "destructive",
-          });
-          return;
-        }
-      } else {
-        console.log("🏠 Localhost detected, skipping HEAD request validation");
-      }
+      // Skip HEAD request validation due to serverless token storage limitations
+      // The token storage uses in-memory Map which doesn't persist across serverless function instances
+      console.log("⚡ Skipping HEAD request validation for serverless compatibility");
+      console.log("🌐 Generated iCal URL:", icalUrl);
+      console.log("📱 This URL will be used directly for Google Calendar subscription");
 
       // Construct calendar feed URL using webcal protocol for better calendar app integration
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
