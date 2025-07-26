@@ -22,6 +22,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { getFreshAuthTokens } from "@/utils/auth-helpers";
+import { GoogleCalendarInstructions } from "@/components/ui/google-calendar-instructions";
 
 interface SavedCalendar {
   id: string;
@@ -34,6 +35,8 @@ export default function MyCalendarsPage() {
   const { user } = useAuth();
   const [calendars, setCalendars] = useState<SavedCalendar[]>([]);
   const [loading, setLoading] = useState(true);
+  const [instructionsOpen, setInstructionsOpen] = useState(false);
+  const [currentIcalUrl, setCurrentIcalUrl] = useState("");
   const [selectedCalendar, setSelectedCalendar] = useState<any>(null);
   const [selectedExams, setSelectedExams] = useState<any[]>([]);
   const [examsLoading, setExamsLoading] = useState(false);
@@ -353,27 +356,54 @@ export default function MyCalendarsPage() {
       }
 
       // For Google Calendar, construct a direct iCal URL using the calendar-specific endpoint
-      // This will open Google Calendar's "Add calendar?" dialog with our URL pre-filled
       const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
 
-      // Use Google Calendar's direct subscription URL - this opens the dialog
-      // with the URL pre-filled so the user can simply click "Add"
-      const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(
-        icalUrl
-      )}`;
+      // Validate the iCal feed before providing instructions
+      try {
+        const response = await fetch(icalUrl, { method: 'HEAD' });
+        if (!response.ok) {
+          throw new Error('Calendar feed is not accessible');
+        }
+      } catch (error) {
+        console.error('❌ Calendar feed validation failed:', error);
+        toast({
+          title: "Error",
+          description: "El calendario no está disponible en este momento. Inténtalo más tarde.",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      // Open Google Calendar in a new tab
-      window.open(googleCalendarUrl, "_blank");
-
-      toast({
-        title: "Redirigiendo a Google Calendar",
-        description: "Se abrirá Google Calendar con el enlace de suscripción.",
-      });
+      // Copy URL to clipboard for easy pasting
+      try {
+        await navigator.clipboard.writeText(icalUrl);
+        
+        // Show instructions modal instead of alert
+        setCurrentIcalUrl(icalUrl);
+        setInstructionsOpen(true);
+        
+        toast({
+          title: "URL copiada al portapapeles",
+          description: "Se han mostrado las instrucciones para añadir el calendario.",
+        });
+      } catch (clipboardError) {
+        // Fallback if clipboard API is not available
+        console.warn('Clipboard API not available:', clipboardError);
+        
+        // Still show the modal even if clipboard fails
+        setCurrentIcalUrl(icalUrl);
+        setInstructionsOpen(true);
+        
+        toast({
+          title: "Instrucciones mostradas",
+          description: "Copia manualmente la URL del cuadro de diálogo.",
+        });
+      }
     } catch (error) {
       console.error("❌ Error opening Google Calendar:", error);
       toast({
         title: "Error",
-        description: "No se pudo abrir Google Calendar.",
+        description: "No se pudo procesar la exportación a Google Calendar.",
         variant: "destructive",
       });
     }
@@ -1023,6 +1053,12 @@ export default function MyCalendarsPage() {
           </div>
         )}
       </div>
+
+      <GoogleCalendarInstructions
+        isOpen={instructionsOpen}
+        onClose={() => setInstructionsOpen(false)}
+        icalUrl={currentIcalUrl}
+      />
     </div>
   );
 }
