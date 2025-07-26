@@ -29,8 +29,43 @@ async function handleRequest(
 
     // Get original query string from token
     const originalQuery = getQueryStringFromToken(token);
+    console.log(`🔍 [TOKEN-API] Looking up token: ${token}`);
+    console.log(`🔍 [TOKEN-API] Found query string: ${originalQuery || 'NOT FOUND'}`);
+    
     if (!originalQuery) {
-      return new NextResponse("Token not found", { status: 404 });
+      console.error(`❌ [TOKEN-API] Token ${token} not found in storage`);
+      
+      // Instead of returning 404, return a calendar with helpful message
+      const notFoundCalendar = [
+        "BEGIN:VCALENDAR",
+        "PRODID:-//UPV-Cal//Exam API 1.0//ES",
+        "VERSION:2.0",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        "X-WR-CALNAME:Token Not Found - UPV Exams",
+        "X-APPLE-CALENDAR-COLOR:#FF0000",
+        "X-WR-TIMEZONE:Europe/Madrid",
+        "BEGIN:VEVENT",
+        "DTSTART:20250101T120000Z",
+        "DTEND:20250101T130000Z",
+        "DTSTAMP:" + new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z"),
+        "UID:token-not-found@upv-cal",
+        "CREATED:" + new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z"),
+        "SUMMARY:Token Not Found",
+        "DESCRIPTION:This calendar token has expired or was not found. Please generate a new calendar export from upv-cal.vercel.app",
+        "LAST-MODIFIED:" + new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z"),
+        "LOCATION:",
+        "SEQUENCE:0",
+        "STATUS:CONFIRMED",
+        "TRANSP:OPAQUE",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n");
+      
+      return new NextResponse(notFoundCalendar, {
+        status: 200, // Return 200 so Google Calendar can display the error message
+        headers: getOptimalHeaders(Buffer.byteLength(notFoundCalendar, "utf8")),
+      });
     }
 
     // Parse the original query string
