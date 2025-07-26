@@ -65,8 +65,10 @@ const GOOGLE_ICAL_BASE_URL = typeof window !== 'undefined'
 
 export function CalendarDisplay({
   activeFilters = {},
+  onExamsChange,
 }: {
   activeFilters?: Record<string, string[]>;
+  onExamsChange?: (exams: any[]) => void;
 }) {
   const [selectedDay, setSelectedDay] = useState<{
     month: string;
@@ -97,6 +99,13 @@ export function CalendarDisplay({
     console.log("CalendarDisplay - Active Filters:", activeFilters);
     console.log("ETSINF Filter Active:", hasETSINFFilter);
   }, [activeFilters, hasETSINFFilter]);
+
+  // Notify parent component when exams change
+  useEffect(() => {
+    if (onExamsChange) {
+      onExamsChange(exams);
+    }
+  }, [exams, onExamsChange]);
 
   // Check if filters are meaningful (beyond just school/degree)
   const hasMeaningfulFilters = () => {
@@ -473,338 +482,19 @@ export function CalendarDisplay({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ViewToggle view={view} onChange={setView} />
+          
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10 px-3 py-1.5 gap-2 rounded-sm text-sm font-medium"
+            disabled={exams.length === 0}
+            onClick={() => setExportDialogOpen(true)}
+          >
+            <Share2 className="h-4 w-4" />
+            <span>Exportar</span>
+          </Button>
 
-          <div className="hidden sm:flex sm:gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-10 gap-1.5 rounded-md"
-              onClick={openSaveDialog}
-            >
-              <Save className="h-4 w-4" />
-              <span>Save View</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-10 gap-1.5 rounded-md"
-              disabled={exams.length === 0}
-              onClick={() => setExportDialogOpen(true)}
-            >
-              <Calendar className="h-4 w-4" />
-              <span>Add to Google</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-10 gap-1.5 rounded-md"
-              disabled={exams.length === 0}
-              onClick={async () => {
-                try {
-                  if (
-                    window.location.origin.includes("localhost") ||
-                    window.location.origin.includes("127.0.0.1")
-                  ) {
-                    toast({
-                      title: "Cannot Export from Localhost",
-                      description:
-                        "Apple Calendar cannot access localhost. Please use the production site.",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
 
-                  // Generate UPV-style token URL
-                  const { generateUPVTokenUrl } = await import("@/lib/utils");
-                  const tokenPath = await generateUPVTokenUrl(activeFilters, "UPV Exams");
-                  const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
-                  const webcalUrl = icalUrl.replace(/^https?:/, "webcal:");
-                  window.location.href = webcalUrl;
-                } catch (error) {
-                  console.error("Error generating token URL:", error);
-                  toast({
-                    title: "Error generating calendar link",
-                    description: "Please try again later.",
-                    variant: "destructive",
-                  });
-                }
-              }}
-            >
-              <Download className="h-4 w-4" />
-              <span>Add to Apple</span>
-            </Button>
-            {/* Direct Download Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-10 gap-1.5 rounded-md"
-              disabled={exams.length === 0}
-              onClick={async () => {
-                try {
-                  // Build direct API URL with current filters
-                  const params = new URLSearchParams();
-                  params.set("name", "UPV Exams");
-
-                  // Add individual filter parameters
-                  if (activeFilters.school && activeFilters.school.length > 0) {
-                    activeFilters.school.forEach((school) =>
-                      params.append("school", school)
-                    );
-                  }
-                  if (activeFilters.degree && activeFilters.degree.length > 0) {
-                    activeFilters.degree.forEach((degree) =>
-                      params.append("degree", degree)
-                    );
-                  }
-                  if (activeFilters.year && activeFilters.year.length > 0) {
-                    activeFilters.year.forEach((year) =>
-                      params.append("year", year)
-                    );
-                  }
-                  if (activeFilters.semester && activeFilters.semester.length > 0) {
-                    activeFilters.semester.forEach((semester) =>
-                      params.append("semester", semester)
-                    );
-                  }
-                  if (activeFilters.subject && activeFilters.subject.length > 0) {
-                    activeFilters.subject.forEach((subject) =>
-                      params.append("subject", subject)
-                    );
-                  }
-
-                  const icalUrl = `${GOOGLE_ICAL_BASE_URL}/api/ical?${params.toString()}`;
-                  console.log("📥 Downloading from:", icalUrl);
-
-                  // Fetch the iCal content
-                  const response = await fetch(icalUrl);
-                  if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                  }
-                  
-                  const icalContent = await response.text();
-                  console.log("📄 Downloaded content length:", icalContent.length);
-                  
-                  // Validate content
-                  if (!icalContent.includes("BEGIN:VCALENDAR")) {
-                    throw new Error("Invalid iCal content received");
-                  }
-                  
-                  // Create blob and download
-                  const blob = new Blob([icalContent], { type: 'text/calendar;charset=utf-8' });
-                  const url = URL.createObjectURL(blob);
-                  
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `upv-exams-${new Date().toISOString().slice(0, 10)}.ics`;
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
-
-                  toast({
-                    title: "Download Started",
-                    description: `Downloaded ${(icalContent.match(/BEGIN:VEVENT/g) || []).length} exams to your device.`,
-                  });
-                } catch (error) {
-                  console.error("Error downloading iCal:", error);
-                  toast({
-                    title: "Download Failed",
-                    description: error instanceof Error ? error.message : "Please try again later.",
-                    variant: "destructive",
-                  });
-                }
-              }}
-            >
-              <Download className="h-4 w-4" />
-              <span>Download .ics</span>
-            </Button>
-            {/* Development: Manual iCal download */}
-            {process.env.NODE_ENV === "development" && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-10 gap-1.5 rounded-md border-orange-300 text-orange-600"
-                disabled={exams.length === 0}
-                onClick={() => {
-                  import("@/lib/utils").then(
-                    ({ generateICalContent, downloadICalFile }) => {
-                      const icalContent = generateICalContent(exams, {
-                        calendarName: "UPV Exams (Dev)",
-                        timeZone: "Europe/Madrid",
-                        reminderMinutes: [24 * 60, 60],
-                      });
-                      downloadICalFile(icalContent, "upv-exams-dev.ics");
-                    }
-                  );
-                }}
-                title="Development: Download .ics file for inspection"
-              >
-                <Download className="h-4 w-4" />
-                <span>Dev Download</span>
-              </Button>
-            )}
-          </div>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-10 sm:hidden">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={openSaveDialog}>
-                <Save className="mr-2 h-4 w-4" />
-                <span>Save View</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={exams.length === 0}
-                onClick={() => setExportDialogOpen(true)}
-              >
-                <Calendar className="mr-2 h-4 w-4" />
-                <span>Add to Google</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={exams.length === 0}
-                onClick={async () => {
-                  try {
-                    if (
-                      window.location.origin.includes("localhost") ||
-                      window.location.origin.includes("127.0.0.1")
-                    ) {
-                      toast({
-                        title: "Cannot Export from Localhost",
-                        description:
-                          "Apple Calendar cannot access localhost. Please use the production site.",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-
-                    // Generate UPV-style token URL
-                    const { generateUPVTokenUrl } = await import("@/lib/utils");
-                    const tokenPath = await generateUPVTokenUrl(activeFilters, "UPV Exams");
-                    const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
-                    const webcalUrl = icalUrl.replace(/^https?:/, "webcal:");
-                    window.location.href = webcalUrl;
-                  } catch (error) {
-                    console.error("Error generating token URL:", error);
-                    toast({
-                      title: "Error generating calendar link",
-                      description: "Please try again later.",
-                      variant: "destructive",
-                    });
-                  }
-                }}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                <span>Add to Apple</span>
-              </DropdownMenuItem>
-              {/* Direct Download for Mobile */}
-              <DropdownMenuItem
-                disabled={exams.length === 0}
-                onClick={async () => {
-                  try {
-                    // Build direct API URL with current filters
-                    const params = new URLSearchParams();
-                    params.set("name", "UPV Exams");
-
-                    // Add individual filter parameters
-                    if (activeFilters.school && activeFilters.school.length > 0) {
-                      activeFilters.school.forEach((school) =>
-                        params.append("school", school)
-                      );
-                    }
-                    if (activeFilters.degree && activeFilters.degree.length > 0) {
-                      activeFilters.degree.forEach((degree) =>
-                        params.append("degree", degree)
-                      );
-                    }
-                    if (activeFilters.year && activeFilters.year.length > 0) {
-                      activeFilters.year.forEach((year) =>
-                        params.append("year", year)
-                      );
-                    }
-                    if (activeFilters.semester && activeFilters.semester.length > 0) {
-                      activeFilters.semester.forEach((semester) =>
-                        params.append("semester", semester)
-                      );
-                    }
-                    if (activeFilters.subject && activeFilters.subject.length > 0) {
-                      activeFilters.subject.forEach((subject) =>
-                        params.append("subject", subject)
-                      );
-                    }
-
-                    const icalUrl = `${GOOGLE_ICAL_BASE_URL}/api/ical?${params.toString()}`;
-                    console.log("📥 Mobile downloading from:", icalUrl);
-
-                    // Fetch the iCal content
-                    const response = await fetch(icalUrl);
-                    if (!response.ok) {
-                      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                    
-                    const icalContent = await response.text();
-                    console.log("📄 Mobile downloaded content length:", icalContent.length);
-                    
-                    // Validate content
-                    if (!icalContent.includes("BEGIN:VCALENDAR")) {
-                      throw new Error("Invalid iCal content received");
-                    }
-                    
-                    // Create blob and download
-                    const blob = new Blob([icalContent], { type: 'text/calendar;charset=utf-8' });
-                    const url = URL.createObjectURL(blob);
-                    
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `upv-exams-${new Date().toISOString().slice(0, 10)}.ics`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-
-                    toast({
-                      title: "Download Started",
-                      description: `Downloaded ${(icalContent.match(/BEGIN:VEVENT/g) || []).length} exams to your device.`,
-                    });
-                  } catch (error) {
-                    console.error("Error downloading iCal:", error);
-                    toast({
-                      title: "Download Failed",
-                      description: error instanceof Error ? error.message : "Please try again later.",
-                      variant: "destructive",
-                    });
-                  }
-                }}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                <span>Download .ics</span>
-              </DropdownMenuItem>
-              {/* Development: Manual iCal download */}
-              {process.env.NODE_ENV === "development" && (
-                <DropdownMenuItem
-                  disabled={exams.length === 0}
-                  onClick={() => {
-                    import("@/lib/utils").then(
-                      ({ generateICalContent, downloadICalFile }) => {
-                        const icalContent = generateICalContent(exams, {
-                          calendarName: "UPV Exams (Dev)",
-                          timeZone: "Europe/Madrid",
-                          reminderMinutes: [24 * 60, 60],
-                        });
-                        downloadICalFile(icalContent, "upv-exams-dev.ics");
-                      }
-                    );
-                  }}
-                  className="text-orange-600"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  <span>Dev Download .ics</span>
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
 
@@ -838,6 +528,16 @@ export function CalendarDisplay({
                 {visibleMonths.map((monthIndex) => {
                   const month = months[monthIndex];
                   if (!month) return null;
+
+                  // Check if this month has any exams
+                  const monthHasExams = exams.some((exam) => {
+                    const examDate = new Date(exam.date);
+                    return examDate.getMonth() === month.monthNumber - 1 && 
+                           examDate.getFullYear() === month.year;
+                  });
+
+                  // Skip rendering if month has no exams
+                  if (!monthHasExams) return null;
 
                   return (
                     <Card

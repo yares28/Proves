@@ -31,7 +31,7 @@ export default function RootLayout({
         <ErrorBoundary>
           <ThemeProvider
             attribute="class"
-            defaultTheme="light"
+            defaultTheme="dark"
             storageKey="upv-theme"
             enableSystem
             disableTransitionOnChange
