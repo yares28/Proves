@@ -604,7 +604,7 @@ function generateUPVCompatibleICalContent(
     if (exam.comment && exam.comment.trim()) {
       descriptionParts.push(exam.comment.trim());
     }
-    const description = descriptionParts.join(" - ");
+    const description = escapeICalText(descriptionParts.join(" - "));
 
     // Ensure location includes both place and comment if available
     let location = exam.location || "";
@@ -626,7 +626,7 @@ function generateUPVCompatibleICalContent(
       `CREATED:${nowUtc}`,
       foldLine(`DESCRIPTION:${description}`),
       `LAST-MODIFIED:${nowUtc}`,
-      foldLine(`LOCATION:${location}`),
+      foldLine(`LOCATION:${escapeICalText(location)}`),
       "SEQUENCE:0",
       "STATUS:CONFIRMED",
       foldLine(`SUMMARY:Examen ${exam.subject}`),
