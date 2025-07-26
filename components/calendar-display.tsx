@@ -39,6 +39,7 @@ import {
   generateAcademicYearMonths,
 } from "@/utils/date-utils";
 import { SaveCalendarDialog } from "@/components/save-calendar-dialog";
+import { ExportCalendarDialog } from "@/components/export-calendar-dialog";
 
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
@@ -78,6 +79,7 @@ export function CalendarDisplay({
     endYear: number;
   } | null>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [existingNames, setExistingNames] = useState<string[]>([]);
   const { user, syncToken } = useAuth();
   const { toast } = useToast();
@@ -348,6 +350,57 @@ export function CalendarDisplay({
     }
   };
 
+  // Export to Google Calendar with modern URL pattern
+  const exportToGoogleCalendar = async (calendarName: string) => {
+    try {
+      // Generate UPV-style token URL
+      const { generateUPVTokenUrl } = await import("@/lib/utils");
+      const tokenPath = await generateUPVTokenUrl(activeFilters, calendarName);
+      const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
+
+      // Use HEAD request for validation
+      let ok = false;
+      try {
+        ok = await fetch(icalUrl, { method: "HEAD" }).then((r) => r.ok);
+      } catch (error) {
+        ok = false;
+      }
+      if (!ok) {
+        toast({
+          title: "Error en el feed del calendario",
+          description:
+            "Google Calendar no pudo acceder al feed. Por favor intenta más tarde.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Construct calendar feed URL using webcal protocol for better calendar app integration
+      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
+
+      // Use Google Calendar's modern subscription URL with /r?cid= pattern
+      // This opens the "Add this calendar?" dialog with Add/Cancel options
+      const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(
+        calendarFeed
+      )}`;
+
+      // Open Google Calendar in a new tab with proper security attributes
+      window.open(googleCalendarUrl, "_blank", "noopener,noreferrer");
+
+      toast({
+        title: "Redirigiendo a Google Calendar",
+        description: "Se abrirá Google Calendar con el enlace de suscripción.",
+      });
+    } catch (error) {
+      console.error("❌ Error opening Google Calendar:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo abrir Google Calendar.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -389,46 +442,7 @@ export function CalendarDisplay({
               size="sm"
               className="h-10 gap-1.5 rounded-md"
               disabled={exams.length === 0}
-              onClick={async () => {
-                try {
-                  // Generate UPV-style token URL
-                  const { generateUPVTokenUrl } = await import("@/lib/utils");
-                  const tokenPath = await generateUPVTokenUrl(activeFilters, "UPV Exams");
-                  const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
-
-                  // Use HEAD request for validation
-                  let ok = false;
-                  try {
-                    ok = await fetch(icalUrl, { method: "HEAD" }).then(
-                      (r) => r.ok
-                    );
-                  } catch (error) {
-                    ok = false;
-                  }
-                  if (!ok) {
-                    toast({
-                      title: "Calendar feed is empty or unreachable.",
-                      description:
-                        "Google Calendar could not access the feed. Please try again later.",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-
-                  // Google Calendar subscription link
-                  const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(
-                    icalUrl
-                  )}`;
-                  window.open(googleCalendarUrl, "_blank", "noopener,noreferrer");
-                } catch (error) {
-                  console.error("Error generating token URL:", error);
-                  toast({
-                    title: "Error generating calendar link",
-                    description: "Please try again later.",
-                    variant: "destructive",
-                  });
-                }
-              }}
+              onClick={() => setExportDialogOpen(true)}
             >
               <Calendar className="h-4 w-4" />
               <span>Add to Google</span>
@@ -597,49 +611,7 @@ export function CalendarDisplay({
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={exams.length === 0}
-                onClick={async () => {
-                  try {
-                    // Generate UPV-style token URL
-                    const { generateUPVTokenUrl } = await import("@/lib/utils");
-                    const tokenPath = await generateUPVTokenUrl(activeFilters, "UPV Exams");
-                    const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
-
-                    // Use HEAD request for validation
-                    let ok = false;
-                    try {
-                      ok = await fetch(icalUrl, { method: "HEAD" }).then(
-                        (r) => r.ok
-                      );
-                    } catch (error) {
-                      ok = false;
-                    }
-                    if (!ok) {
-                      toast({
-                        title: "Calendar feed is empty or unreachable.",
-                        description:
-                          "Google Calendar could not access the feed. Please try again later.",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-
-                    const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(
-                      icalUrl
-                    )}`;
-                    window.open(
-                      googleCalendarUrl,
-                      "_blank",
-                      "noopener,noreferrer"
-                    );
-                  } catch (error) {
-                    console.error("Error generating token URL:", error);
-                    toast({
-                      title: "Error generating calendar link",
-                      description: "Please try again later.",
-                      variant: "destructive",
-                    });
-                  }
-                }}
+                onClick={() => setExportDialogOpen(true)}
               >
                 <Calendar className="mr-2 h-4 w-4" />
                 <span>Add to Google</span>
@@ -789,14 +761,21 @@ export function CalendarDisplay({
         </div>
       </div>
 
-      {/* Add SaveCalendarDialog component */}
-      <SaveCalendarDialog
-        open={saveDialogOpen}
-        onOpenChange={setSaveDialogOpen}
-        filters={activeFilters}
-        onSave={handleSaveCalendar}
-        existingNames={existingNames}
-      />
+              {/* Add SaveCalendarDialog component */}
+        <SaveCalendarDialog
+          open={saveDialogOpen}
+          onOpenChange={setSaveDialogOpen}
+          filters={activeFilters}
+          onSave={handleSaveCalendar}
+          existingNames={existingNames}
+        />
+
+        {/* Add ExportCalendarDialog component */}
+        <ExportCalendarDialog
+          open={exportDialogOpen}
+          onOpenChange={setExportDialogOpen}
+          onExport={exportToGoogleCalendar}
+        />
 
       <AnimatePresence mode="wait">
         {view === "calendar" ? (
@@ -1100,23 +1079,4 @@ export function CalendarDisplay({
   );
 }
 
-function MoreHorizontal(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="1" />
-      <circle cx="19" cy="12" r="1" />
-      <circle cx="5" cy="12" r="1" />
-    </svg>
-  );
-}
+
