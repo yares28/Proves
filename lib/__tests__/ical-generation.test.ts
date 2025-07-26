@@ -247,3 +247,132 @@ describe('iCalendar Generation', () => {
     });
   });
 });
+
+describe('Location and Comment Handling', () => {
+  const baseExam: Exam = {
+    id: 'test-1',
+    date: '2024-03-15',
+    time: '10:00',
+    duration_minutes: 120,
+    subject: 'Test Subject',
+    code: '12345',
+    location: '',
+    comment: '',
+    year: '1',
+    semester: 'A',
+    school: 'ETSINF',
+    degree: 'Test Degree',
+    acronym: 'TS'
+  };
+
+  it('should handle exam with both place and comment correctly', () => {
+    const exam = {
+      ...baseExam,
+      location: '1G 0.1, 1G 0.2, 1G 0.4',
+      comment: 'Primer parcial'
+    };
+
+    const icalContent = generateICalContent([exam], { useUPVFormat: true });
+    
+    // Should have place in location field (without comma escaping)
+    expect(icalContent).toContain('LOCATION:1G 0.1, 1G 0.2, 1G 0.4');
+    // Should have subject and comment in description
+    expect(icalContent).toMatch(/DESCRIPTION:Test Subject - Primer parcial/);
+    // Should not duplicate comment in location unless it contains location keywords
+    expect(icalContent).not.toContain('LOCATION:1G 0.1, 1G 0.2, 1G 0.4 - Primer parcial');
+  });
+
+  it('should handle exam with only comment (no place) correctly', () => {
+    const exam = {
+      ...baseExam,
+      location: '',
+      comment: 'Parcial 1: prácticas: 1h+15 min descanso+ Parcial 1 teoría: 1h 30\''
+    };
+
+    const icalContent = generateICalContent([exam], { useUPVFormat: true });
+    
+    // Location should be empty when no place is provided
+    expect(icalContent).toMatch(/LOCATION:\s*$/m);
+    // Should have subject and comment in description (may be line-folded)
+    expect(icalContent).toMatch(/DESCRIPTION:Test Subject - Parcial 1: prácticas/);
+    // Should NOT put comment in location field
+    expect(icalContent).not.toContain('LOCATION:Parcial 1: prácticas');
+  });
+
+  it('should handle exam with only place (no comment) correctly', () => {
+    const exam = {
+      ...baseExam,
+      location: '1G 0.1, 1G 0.2',
+      comment: ''
+    };
+
+    const icalContent = generateICalContent([exam], { useUPVFormat: true });
+    
+    // Should have place in location field (without comma escaping)
+    expect(icalContent).toContain('LOCATION:1G 0.1, 1G 0.2');
+    // Should have only subject in description (no comment)
+    expect(icalContent).toMatch(/DESCRIPTION:Test Subject\s*$/m);
+    expect(icalContent).not.toContain('DESCRIPTION:Test Subject -');
+  });
+
+  it('should handle exam with neither place nor comment', () => {
+    const exam = {
+      ...baseExam,
+      location: '',
+      comment: ''
+    };
+
+    const icalContent = generateICalContent([exam], { useUPVFormat: true });
+    
+    // Location should be empty
+    expect(icalContent).toMatch(/LOCATION:\s*$/m);
+    // Should have only subject in description
+    expect(icalContent).toMatch(/DESCRIPTION:Test Subject\s*$/m);
+    expect(icalContent).not.toContain('DESCRIPTION:Test Subject -');
+  });
+
+  it('should combine place and comment when comment contains location keywords', () => {
+    const exam = {
+      ...baseExam,
+      location: 'Edificio 1G',
+      comment: 'Aula 0.1 - Examen parcial'
+    };
+
+    const icalContent = generateICalContent([exam], { useUPVFormat: true });
+    
+    // Should combine place and location-specific comment
+    expect(icalContent).toContain('LOCATION:Edificio 1G - Aula 0.1 - Examen parcial');
+    // Should still have both in description
+    expect(icalContent).toContain('DESCRIPTION:Test Subject - Aula 0.1 - Examen parcial');
+  });
+
+  it('should handle whitespace-only location and comment fields', () => {
+    const exam = {
+      ...baseExam,
+      location: '   ',
+      comment: '  \t  '
+    };
+
+    const icalContent = generateICalContent([exam], { useUPVFormat: true });
+    
+    // Should treat whitespace-only as empty
+    expect(icalContent).toMatch(/LOCATION:\s*$/m);
+    expect(icalContent).toMatch(/DESCRIPTION:Test Subject\s*$/m);
+    expect(icalContent).not.toContain('DESCRIPTION:Test Subject -');
+  });
+
+  it('should work correctly with regular (non-UPV) format', () => {
+    const exam = {
+      ...baseExam,
+      location: '1G 0.1',
+      comment: 'Test comment'
+    };
+
+    const icalContent = generateICalContent([exam], { useUPVFormat: false });
+    
+    // Regular format should just use location as-is
+    expect(icalContent).toContain('LOCATION:1G 0.1');
+    // Should have comment in description
+    expect(icalContent).toContain('DESCRIPTION:Test comment');
+  });
+});
