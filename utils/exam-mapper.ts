@@ -5,7 +5,7 @@ export function mapExamData(exam: any) {
   return {
     id: exam.exam_instance_id,
     date: exam.exam_date,
-    time: exam.exam_time,
+    time: exam.exam_time || '',
     duration_minutes: exam.duration_minutes || 120,
     subject: exam.subject,
     code: exam.code?.toString() || '',
