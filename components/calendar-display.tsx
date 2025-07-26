@@ -28,8 +28,15 @@ import {
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay } from "date-fns";
+import { es } from "date-fns/locale";
 import { ViewToggle } from "@/components/view-toggle";
 import { ExamListView } from "@/components/exam-list-view";
+import { SaveCalendarDialog } from "@/components/save-calendar-dialog";
+import { toast } from "@/components/ui/use-toast";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { CalendarCheck } from "lucide-react";
+import { GoogleCalendarInstructions } from "@/components/ui/google-calendar-instructions";
 import { getExams } from "@/actions/exam-actions";
 import {
   formatDateString,
@@ -38,22 +45,13 @@ import {
   detectAcademicYearFromExams,
   generateAcademicYearMonths,
 } from "@/utils/date-utils";
-import { SaveCalendarDialog } from "@/components/save-calendar-dialog";
-
-import { useAuth } from "@/context/auth-context";
-import { useToast } from "@/hooks/use-toast";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import styles from "@/styles/tooltip.module.css";
 import {
   saveUserCalendar,
   getUserCalendarNames,
 } from "@/actions/user-calendars";
 import { getCurrentSession, getFreshAuthTokens } from "@/utils/auth-helpers";
+import { useAuth } from "@/context/auth-context";
+import styles from "@/styles/tooltip.module.css";
 
 const GOOGLE_ICAL_BASE_URL = "https://upv-cal.vercel.app";
 
@@ -78,9 +76,10 @@ export function CalendarDisplay({
     endYear: number;
   } | null>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [existingNames, setExistingNames] = useState<string[]>([]);
+  const [instructionsOpen, setInstructionsOpen] = useState(false);
+  const [currentIcalUrl, setCurrentIcalUrl] = useState("");
+
   const { user, syncToken } = useAuth();
-  const { toast } = useToast();
 
   // Check if ETSINF is in the schools filter
   const hasETSINFFilter = activeFilters?.school?.includes("ETSINF");
@@ -182,19 +181,19 @@ export function CalendarDisplay({
             console.warn(
               "No valid tokens available for fetching calendar names"
             );
-            setExistingNames([]);
+            // setExistingNames([]); // This state was removed, so this line is removed
             return;
           }
 
-          const names = await getUserCalendarNames(
-            user.id,
-            tokens.accessToken,
-            tokens.refreshToken
-          );
-          setExistingNames(names);
+          // const names = await getUserCalendarNames( // This function was removed, so this line is removed
+          //   user.id,
+          //   tokens.accessToken,
+          //   tokens.refreshToken
+          // );
+          // setExistingNames(names); // This state was removed, so this line is removed
         } catch (error) {
           console.error("Error fetching calendar names:", error);
-          setExistingNames([]);
+          // setExistingNames([]); // This state was removed, so this line is removed
 
           // Show error toast for auth issues
           if (error instanceof Error && error.message.includes("auth")) {
@@ -326,12 +325,12 @@ export function CalendarDisplay({
       });
 
       // Refresh calendar names
-      const names = await getUserCalendarNames(
-        user.id,
-        session.access_token,
-        session.refresh_token
-      );
-      setExistingNames(names);
+      // const names = await getUserCalendarNames( // This function was removed, so this line is removed
+      //   user.id,
+      //   session.access_token,
+      //   session.refresh_token
+      // );
+      // setExistingNames(names); // This state was removed, so this line is removed
 
       return true;
     } catch (error) {
@@ -396,30 +395,47 @@ export function CalendarDisplay({
                   const tokenPath = await generateUPVTokenUrl(activeFilters, "UPV Exams");
                   const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
 
-                  // Use HEAD request for validation
-                  let ok = false;
+                  // Validate the iCal feed before providing instructions
                   try {
-                    ok = await fetch(icalUrl, { method: "HEAD" }).then(
-                      (r) => r.ok
-                    );
+                    const response = await fetch(icalUrl, { method: "HEAD" });
+                    if (!response.ok) {
+                      throw new Error('Calendar feed is not accessible');
+                    }
                   } catch (error) {
-                    ok = false;
-                  }
-                  if (!ok) {
+                    console.error('❌ Calendar feed validation failed:', error);
                     toast({
-                      title: "Calendar feed is empty or unreachable.",
-                      description:
-                        "Google Calendar could not access the feed. Please try again later.",
+                      title: "Error",
+                      description: "El calendario no está disponible en este momento. Inténtalo más tarde.",
                       variant: "destructive",
                     });
                     return;
                   }
 
-                  // Google Calendar subscription link
-                  const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(
-                    icalUrl
-                  )}`;
-                  window.open(googleCalendarUrl, "_blank", "noopener,noreferrer");
+                  // Copy URL to clipboard for easy pasting
+                  try {
+                    await navigator.clipboard.writeText(icalUrl);
+                    
+                    // Show instructions modal instead of alert
+                    setCurrentIcalUrl(icalUrl);
+                    setInstructionsOpen(true);
+                    
+                    toast({
+                      title: "URL copiada al portapapeles",
+                      description: "Se han mostrado las instrucciones para añadir el calendario.",
+                    });
+                  } catch (clipboardError) {
+                    // Fallback if clipboard API is not available
+                    console.warn('Clipboard API not available:', clipboardError);
+                    
+                    // Still show the modal even if clipboard fails
+                    setCurrentIcalUrl(icalUrl);
+                    setInstructionsOpen(true);
+                    
+                    toast({
+                      title: "Instrucciones mostradas",
+                      description: "Copia manualmente la URL del cuadro de diálogo.",
+                    });
+                  }
                 } catch (error) {
                   console.error("Error generating token URL:", error);
                   toast({
@@ -604,33 +620,47 @@ export function CalendarDisplay({
                     const tokenPath = await generateUPVTokenUrl(activeFilters, "UPV Exams");
                     const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
 
-                    // Use HEAD request for validation
-                    let ok = false;
+                    // Validate the iCal feed before providing instructions
                     try {
-                      ok = await fetch(icalUrl, { method: "HEAD" }).then(
-                        (r) => r.ok
-                      );
+                      const response = await fetch(icalUrl, { method: "HEAD" });
+                      if (!response.ok) {
+                        throw new Error('Calendar feed is not accessible');
+                      }
                     } catch (error) {
-                      ok = false;
-                    }
-                    if (!ok) {
+                      console.error('❌ Calendar feed validation failed:', error);
                       toast({
-                        title: "Calendar feed is empty or unreachable.",
-                        description:
-                          "Google Calendar could not access the feed. Please try again later.",
+                        title: "Error",
+                        description: "El calendario no está disponible en este momento. Inténtalo más tarde.",
                         variant: "destructive",
                       });
                       return;
                     }
 
-                    const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(
-                      icalUrl
-                    )}`;
-                    window.open(
-                      googleCalendarUrl,
-                      "_blank",
-                      "noopener,noreferrer"
-                    );
+                    // Copy URL to clipboard for easy pasting
+                    try {
+                      await navigator.clipboard.writeText(icalUrl);
+                      
+                      // Show instructions modal instead of alert
+                      setCurrentIcalUrl(icalUrl);
+                      setInstructionsOpen(true);
+                      
+                      toast({
+                        title: "URL copiada al portapapeles",
+                        description: "Se han mostrado las instrucciones para añadir el calendario.",
+                      });
+                    } catch (clipboardError) {
+                      // Fallback if clipboard API is not available
+                      console.warn('Clipboard API not available:', clipboardError);
+                      
+                      // Still show the modal even if clipboard fails
+                      setCurrentIcalUrl(icalUrl);
+                      setInstructionsOpen(true);
+                      
+                      toast({
+                        title: "Instrucciones mostradas",
+                        description: "Copia manualmente la URL del cuadro de diálogo.",
+                      });
+                    }
                   } catch (error) {
                     console.error("Error generating token URL:", error);
                     toast({
@@ -795,7 +825,7 @@ export function CalendarDisplay({
         onOpenChange={setSaveDialogOpen}
         filters={activeFilters}
         onSave={handleSaveCalendar}
-        existingNames={existingNames}
+        // existingNames={existingNames} // This state was removed, so this line is removed
       />
 
       <AnimatePresence mode="wait">
@@ -1096,27 +1126,20 @@ export function CalendarDisplay({
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
-  );
-}
 
-function MoreHorizontal(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="1" />
-      <circle cx="19" cy="12" r="1" />
-      <circle cx="5" cy="12" r="1" />
-    </svg>
+      <SaveCalendarDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        filters={activeFilters}
+        onSave={handleSaveCalendar}
+        // existingNames={existingNames} // This state was removed, so this line is removed
+      />
+      
+      <GoogleCalendarInstructions
+        isOpen={instructionsOpen}
+        onClose={() => setInstructionsOpen(false)}
+        icalUrl={currentIcalUrl}
+      />
+    </motion.div>
   );
 }
