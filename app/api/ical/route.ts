@@ -25,8 +25,8 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
     console.log(`🔧 [ICAL-API] Filters param: ${filtersParam}`);
     console.log(`📊 [ICAL-API] All search params:`, Object.fromEntries(searchParams.entries()));
     
-    // Sanitize calendar name to prevent issues
-    const sanitizedCalendarName = calendarName.replace(/[^\w\s-]/g, '').trim() || 'UPV_Exams';
+    // Sanitize calendar name to prevent issues but allow more characters for Spanish
+    const sanitizedCalendarName = calendarName.replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim() || 'UPV_Exams';
     
     // For HEAD requests, we can return early with just headers
     if (method === 'HEAD') {
@@ -98,6 +98,15 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
     
     console.log(`✅ [ICAL-API] Final filters object:`, filters);
     console.log(`📏 [ICAL-API] Number of filter categories:`, Object.keys(filters).length);
+    console.log(`🔍 [ICAL-API] Filter analysis:`, {
+      hasSchools: (filters.school?.length || 0) > 0,
+      hasDegrees: (filters.degree?.length || 0) > 0,
+      hasYears: (filters.year?.length || 0) > 0,
+      hasSemesters: (filters.semester?.length || 0) > 0,
+      hasSubjects: (filters.subject?.length || 0) > 0,
+      hasAnyFilters: Object.values(filters).some(arr => Array.isArray(arr) && arr.length > 0),
+      isEmpty: Object.keys(filters).length === 0
+    });
     
     // Use service role client so anonymous calendar apps can read data
     const supabase = await createAdminClient()

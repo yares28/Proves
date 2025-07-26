@@ -360,6 +360,15 @@ export function CalendarDisplay({
     try {
       console.log("🔄 Starting Google Calendar export with name:", calendarName);
       console.log("🔍 Active filters:", activeFilters);
+      console.log("🔍 Active filters details:", {
+        totalCategories: Object.keys(activeFilters).length,
+        schools: activeFilters.school?.length || 0,
+        degrees: activeFilters.degree?.length || 0,
+        years: activeFilters.year?.length || 0,
+        semesters: activeFilters.semester?.length || 0,
+        subjects: activeFilters.subject?.length || 0,
+        hasAnyFilters: Object.values(activeFilters).some(arr => arr && arr.length > 0)
+      });
 
       // Generate UPV-style token URL
       const { generateUPVTokenUrl } = await import("@/lib/utils");
