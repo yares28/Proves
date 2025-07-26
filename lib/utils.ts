@@ -23,6 +23,16 @@ function escapeICalText(text: string): string {
     .replace(/\r/g, ""); // Remove carriage returns
 }
 
+// Helper function to escape location fields (less aggressive escaping)
+function escapeICalLocation(text: string): string {
+  return text
+    .replace(/\\/g, "\\\\") // Escape backslashes first
+    .replace(/;/g, "\\;") // Escape semicolons
+    // Note: We don't escape commas in location as they're commonly used for room lists
+    .replace(/\n/g, "\\n") // Escape newlines
+    .replace(/\r/g, ""); // Remove carriage returns
+}
+
 // Generate dynamic timezone component with accurate DST rules
 function generateTimezoneComponent(timeZone: string): string[] {
   const currentYear = new Date().getFullYear();
@@ -296,7 +306,7 @@ export function generateICalContent(
         `DTEND;TZID=${timeZone}:${formatICalLocalDate(endTime!, true)}`,
         foldLine(`SUMMARY:${escapeICalText(exam.subject + " - Exam")}`),
         foldLine(`DESCRIPTION:${description}`),
-        foldLine(`LOCATION:${escapeICalText(exam.location || "")}`),
+        foldLine(`LOCATION:${escapeICalLocation(exam.location || "")}`),
         `CREATED:${formatICalUtcDate(now)}`,
         `LAST-MODIFIED:${formatICalUtcDate(now)}`,
         "STATUS:CONFIRMED",
@@ -320,7 +330,7 @@ export function generateICalContent(
           )}`
         ),
         foldLine(`DESCRIPTION:${description}`),
-        foldLine(`LOCATION:${escapeICalText(exam.location || "")}`),
+        foldLine(`LOCATION:${escapeICalLocation(exam.location || "")}`),
         `CREATED:${formatICalUtcDate(now)}`,
         `LAST-MODIFIED:${formatICalUtcDate(now)}`,
         "STATUS:CONFIRMED",
@@ -646,14 +656,26 @@ function generateUPVCompatibleICalContent(
     }
     const description = escapeICalText(descriptionParts.join(" - "));
 
-    // Ensure location includes both place and comment if available
-    let location = exam.location || "";
+    // Handle location field properly - keep place and comment separate
+    // Location should only contain the physical place, not comments
+    let location = "";
+    
+    // Use the actual place from database if available
+    if (exam.location && exam.location.trim()) {
+      location = exam.location.trim();
+    }
+    
+    // For UPV format, we keep location minimal and clean
+    // Comments are already in the description field
+    // Only combine if place exists and comment provides location-specific context
     if (
-      exam.comment &&
+      location && 
+      exam.comment && 
       exam.comment.trim() &&
-      !location.includes(exam.comment)
+      // Only add comment to location if it seems like location info (contains room/building indicators)
+      /\b(?:aula|sala|lab|edificio|planta|piso|\d+[A-Z]|\d+\.\d+|bloque)\b/i.test(exam.comment)
     ) {
-      location = location ? `${location} - ${exam.comment}` : exam.comment;
+      location = `${location} - ${exam.comment.trim()}`;
     }
 
     // Canonical template for each exam (exact order from UPV)
@@ -668,7 +690,7 @@ function generateUPVCompatibleICalContent(
         `CREATED:${nowUtc}`,
         foldLine(`DESCRIPTION:${description}`),
         `LAST-MODIFIED:${nowUtc}`,
-        foldLine(`LOCATION:${escapeICalText(location)}`),
+        foldLine(`LOCATION:${escapeICalLocation(location)}`),
         "SEQUENCE:0",
         "STATUS:CONFIRMED",
         foldLine(`SUMMARY:Examen ${exam.subject}`),
@@ -692,7 +714,7 @@ function generateUPVCompatibleICalContent(
         `CREATED:${nowUtc}`,
         foldLine(`DESCRIPTION:${description}`),
         `LAST-MODIFIED:${nowUtc}`,
-        foldLine(`LOCATION:${escapeICalText(location)}`),
+        foldLine(`LOCATION:${escapeICalLocation(location)}`),
         "SEQUENCE:0",
         "STATUS:CONFIRMED",
         foldLine(`SUMMARY:Examen ${exam.subject} (hora por confirmar)`),

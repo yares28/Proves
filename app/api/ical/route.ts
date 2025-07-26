@@ -50,7 +50,7 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
     }
     
     // Parse filters from URL parameters with better error handling
-    let filters = {}
+    let filters: Record<string, any> = {}
     
     // First try to parse JSON filters parameter (for backward compatibility)
     if (filtersParam) {
