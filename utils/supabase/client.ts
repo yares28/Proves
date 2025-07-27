@@ -9,11 +9,39 @@ export function createClient() {
     {
       auth: {
         // Use secure server-side session management
-        persistSession: false, // Don't persist on client
-        autoRefreshToken: false, // Handle refresh server-side
+        persistSession: true, // Enable session persistence for OAuth
+        autoRefreshToken: true, // Enable auto refresh for OAuth
         detectSessionInUrl: true,
-        // Remove localStorage usage completely
-        storage: undefined
+        // Custom storage that works with our hybrid approach
+        storage: {
+          getItem: (key) => {
+            if (typeof window === "undefined") return null
+            // For client-side, we'll use a minimal localStorage approach
+            // but the main session management happens server-side
+            try {
+              const stored = localStorage.getItem(key)
+              return stored
+            } catch {
+              return null
+            }
+          },
+          setItem: (key, value) => {
+            if (typeof window === "undefined") return
+            try {
+              localStorage.setItem(key, value)
+            } catch {
+              // Ignore localStorage errors
+            }
+          },
+          removeItem: (key) => {
+            if (typeof window === "undefined") return
+            try {
+              localStorage.removeItem(key)
+            } catch {
+              // Ignore localStorage errors
+            }
+          }
+        }
       }
     }
   )

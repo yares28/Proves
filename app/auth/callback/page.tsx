@@ -51,24 +51,16 @@ function AuthCallbackContent() {
         return
       }
       
-      // Handle Supabase auth callback (PKCE flow)
+      // Handle Supabase auth callback (OAuth flow)
       if (code && !state?.includes('google-calendar')) {
         setIsSupabaseAuth(true)
         authPerformanceTracker.stage('Intercambiando código por sesión', 1)
         
         try {
-          console.log('🔄 Processing Supabase PKCE auth callback...')
+          console.log('🔄 Processing Supabase OAuth callback...')
           
-          // Set up timeout for better performance
-          const exchangePromise = supabase.auth.exchangeCodeForSession(code)
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('timeout')), 10000)
-          )
-          
-          const { data, error: supabaseError } = await Promise.race([
-            exchangePromise, 
-            timeoutPromise
-          ]) as any
+          // Try to exchange code for session
+          const { data, error: supabaseError } = await supabase.auth.exchangeCodeForSession(code)
           
           if (supabaseError) {
             console.error('❌ Supabase auth error:', supabaseError.message)
@@ -80,6 +72,8 @@ function AuthCallbackContent() {
               userMessage = 'Código de autorización expirado. Intenta de nuevo.'
             } else if (supabaseError.message.includes('network')) {
               userMessage = 'Error de conexión. Verifica tu internet e intenta de nuevo.'
+            } else if (supabaseError.message.includes('code verifier')) {
+              userMessage = 'Error de configuración de autenticación. Intenta de nuevo.'
             }
             
             setError(userMessage)

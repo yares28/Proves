@@ -44,6 +44,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
             variant="outline"
             size="sm"
             onClick={handleMyCalendars}
+            disabled={activeTab === "register"}
             className="flex items-center gap-2"
           >
             <Calendar className="h-4 w-4" />

@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation"
 export function UserButton() {
   const { user, signOut } = useAuth()
   const [showAuthDialog, setShowAuthDialog] = useState(false)
+  const [isSigningOut, setIsSigningOut] = useState(false)
   const router = useRouter()
 
   if (!user) {
@@ -68,9 +69,21 @@ export function UserButton() {
           <span>Configuración</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => signOut()}>
+        <DropdownMenuItem 
+          onClick={async () => {
+            setIsSigningOut(true)
+            try {
+              await signOut()
+            } catch (error) {
+              console.error('Sign out error:', error)
+            } finally {
+              setIsSigningOut(false)
+            }
+          }}
+          disabled={isSigningOut}
+        >
           <LogOut className="mr-2 h-4 w-4" />
-          <span>Cerrar Sesión</span>
+          <span>{isSigningOut ? "Cerrando..." : "Cerrar Sesión"}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

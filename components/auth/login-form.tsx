@@ -14,8 +14,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, Eye, EyeOff } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { createClient } from "@/utils/supabase/client"
-import { FastGoogleAuth } from "./fast-google-auth"
+import { EnhancedGoogleAuth } from "./enhanced-google-auth"
 import { AuthPerformanceMonitor } from "../auth-performance-monitor"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 const supabase = createClient()
 
@@ -95,7 +96,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   }
 
   return (
-    <div className="space-y-6 py-4">
+    <div className="space-y-6">
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -103,88 +104,94 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         </Alert>
       )}
       
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input placeholder="Ingresa tu email" {...field} disabled={isLoading} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Contraseña</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <Input 
-                      type={showPassword ? "text" : "password"} 
-                      placeholder="Ingresa tu contraseña" 
-                      {...field} 
-                      disabled={isLoading} 
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                      disabled={isLoading}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
-          <FormField
-            control={form.control}
-            name="rememberMe"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
-                <div className="space-y-1 leading-none">
-                  <FormLabel>
-                    Recordarme por 30 días
-                  </FormLabel>
-                </div>
-              </FormItem>
-            )}
-          />
-          
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> Espera por favor
-              </>
-            ) : (
-              "Iniciar Sesión"
-            )}
-          </Button>
-        </form>
-      </Form>
+      <Card>
+        <CardHeader>
+          <CardTitle>Iniciar Sesión</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="m@example.com" {...field} disabled={isLoading} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contraseña</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input 
+                          type={showPassword ? "text" : "password"}  
+                          {...field} 
+                          disabled={isLoading} 
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                          disabled={isLoading}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="rememberMe"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>
+                        Recordarme
+                      </FormLabel>
+                    </div>
+                  </FormItem>
+                )}
+              />
+              
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> Espera por favor
+                  </>
+                ) : (
+                  "Iniciar Sesión"
+                )}
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
       
       <div className="relative flex items-center">
         <div className="flex-grow border-t"></div>
@@ -192,13 +199,16 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         <div className="flex-grow border-t"></div>
       </div>
       
-      <FastGoogleAuth 
-        mode="fast"
-        onSuccess={onSuccess}
-        onError={(error: string) => setError(error)}
-        className="w-full"
-        variant="outline"
-      />
+      <Card>
+        <CardContent className="pt-6">
+          <EnhancedGoogleAuth 
+            onSuccess={onSuccess}
+            onError={(error: string) => setError(error)}
+            className="w-full"
+            variant="outline"
+          />
+        </CardContent>
+      </Card>
       
       <AuthPerformanceMonitor />
     </div>

@@ -12,6 +12,8 @@ import * as z from "zod"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, CheckCircle, Eye, EyeOff } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { EnhancedGoogleAuth } from "./enhanced-google-auth"
 
 const formSchema = z.object({
   fullName: z.string().min(2, { message: "El nombre completo debe tener al menos 2 caracteres" }),
@@ -79,21 +81,28 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
     }
   }
 
+  // Prevent copy-paste in sensitive fields
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault()
+  }
+
   if (success) {
     return (
-      <div className="space-y-6 py-4">
-        <Alert>
-          <CheckCircle className="h-4 w-4" />
-          <AlertDescription>
-            ¡Cuenta creada exitosamente! Revisa tu email para confirmar tu cuenta.
-          </AlertDescription>
-        </Alert>
-      </div>
+      <Card>
+        <CardContent className="pt-6">
+          <Alert>
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription>
+              ¡Cuenta creada exitosamente! Revisa tu email para confirmar tu cuenta.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
     )
   }
 
   return (
-    <div className="space-y-6 py-4">
+    <div className="space-y-6">
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -101,117 +110,151 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
         </Alert>
       )}
       
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <FormField
-            control={form.control}
-            name="fullName"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Nombre Completo</FormLabel>
-                <FormControl>
-                  <Input placeholder="Ingresa tu nombre completo" {...field} disabled={isLoading} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+      <Card>
+        <CardHeader>
+          <CardTitle>Crear Cuenta</CardTitle>
+          <CardDescription>
+            Completa el formulario para crear tu cuenta
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="fullName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nombre Completo</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ingresa tu nombre completo" {...field} disabled={isLoading} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Ingresa tu email" 
+                        {...field} 
+                        disabled={isLoading}
+                        onPaste={handlePaste}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contraseña</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input 
+                          type={showPassword ? "text" : "password"} 
+                          placeholder="Ingresa tu contraseña" 
+                          {...field} 
+                          disabled={isLoading}
+                          onPaste={handlePaste}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                          disabled={isLoading}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirmar Contraseña</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input 
+                          type={showConfirmPassword ? "text" : "password"} 
+                          placeholder="Confirma tu contraseña" 
+                          {...field} 
+                          disabled={isLoading}
+                          onPaste={handlePaste}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          disabled={isLoading}
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> Espera por favor
+                  </>
+                ) : (
+                  "Crear Cuenta"
+                )}
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+      
+      <div className="relative flex items-center">
+        <div className="flex-grow border-t"></div>
+        <span className="mx-4 flex-shrink text-xs text-muted-foreground">O CONTINÚA CON</span>
+        <div className="flex-grow border-t"></div>
+      </div>
+      
+      <Card>
+        <CardContent className="pt-6">
+          <EnhancedGoogleAuth 
+            onSuccess={onSuccess}
+            onError={(error: string) => setError(error)}
+            className="w-full"
+            variant="outline"
           />
-          
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input placeholder="Ingresa tu email" {...field} disabled={isLoading} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Contraseña</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <Input 
-                      type={showPassword ? "text" : "password"} 
-                      placeholder="Ingresa tu contraseña" 
-                      {...field} 
-                      disabled={isLoading} 
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                      disabled={isLoading}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
-          <FormField
-            control={form.control}
-            name="confirmPassword"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Confirmar Contraseña</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <Input 
-                      type={showConfirmPassword ? "text" : "password"} 
-                      placeholder="Confirma tu contraseña" 
-                      {...field} 
-                      disabled={isLoading} 
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      disabled={isLoading}
-                    >
-                      {showConfirmPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> Espera por favor
-              </>
-            ) : (
-              "Crear Cuenta"
-            )}
-          </Button>
-        </form>
-      </Form>
+        </CardContent>
+      </Card>
     </div>
   )
 } 
