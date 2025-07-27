@@ -17,11 +17,18 @@ import {
   Loader2,
   Download,
   Copy,
+  MoreHorizontal,
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { getFreshAuthTokens } from "@/utils/auth-helpers";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface SavedCalendar {
   id: string;
@@ -678,73 +685,6 @@ export default function MyCalendarsPage() {
                         </Button>
 
                         <div className="flex items-center gap-1">
-                          {/* Export buttons */}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={() => exportExamsToGoogleCalendar(calendar)}
-                            title="Add to Google Calendar"
-                          >
-                            <Image
-                              src="/google-cal.png"
-                              alt="Google Calendar"
-                              width={20}
-                              height={20}
-                              className="w-5 h-5"
-                            />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={() => handleAppleCalendarExport(calendar)}
-                            title="Add to Apple Calendar"
-                          >
-                            <Image
-                              src="/apple-cal.png"
-                              alt="Apple Calendar"
-                              width={16}
-                              height={16}
-                              className="w-4 h-4"
-                            />
-                          </Button>
-
-                          {/* Copy URL Button */}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
-                            onClick={() => handleCopyUrl(calendar)}
-                            title="Copy subscription URL"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-
-                          {/* Direct Download Button */}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
-                            onClick={() => handleDirectDownload(calendar)}
-                            title="Download .ics file"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-
-                          {/* Development: Manual iCal download */}
-                          {process.env.NODE_ENV === "development" && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 text-orange-600"
-                              onClick={() => handleDevIcalDownload(calendar)}
-                              title="Development: Download .ics file"
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          )}
-
                           {/* View button */}
                           <Button
                             variant="ghost"
@@ -755,6 +695,62 @@ export default function MyCalendarsPage() {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
+
+                          {/* Export options dropdown */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                title="Más opciones"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem
+                                onClick={() => exportExamsToGoogleCalendar(calendar)}
+                                className="flex items-center gap-2"
+                              >
+                                <Image
+                                  src="/google-cal.png"
+                                  alt="Google Calendar"
+                                  width={20}
+                                  height={20}
+                                  className="w-5 h-5"
+                                />
+                                <span>Google Calendar</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleAppleCalendarExport(calendar)}
+                                className="flex items-center gap-2"
+                              >
+                                <Image
+                                  src="/apple-cal.png"
+                                  alt="Apple Calendar"
+                                  width={14}
+                                  height={14}
+                                  className="w-3.5 h-3.5"
+                                />
+                                <span>Apple Calendar</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleCopyUrl(calendar)}
+                                className="flex items-center gap-2"
+                              >
+                                <Copy className="h-4 w-4" />
+                                <span>Copiar URL</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDirectDownload(calendar)}
+                                className="flex items-center gap-2"
+                              >
+                                <Download className="h-4 w-4" />
+                                <span>Descargar .ics</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                     </div>

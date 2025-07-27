@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef } f
 import { createClient } from "@/utils/supabase/client"
 import { useRouter } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
+import { useToast } from "@/hooks/use-toast"
 
 // Use the SSR-compatible client
 const supabase = createClient()
@@ -26,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const { toast } = useToast()
 
   // Enhanced session refresh with exponential backoff
   const refreshSession = useCallback(async (): Promise<boolean> => {
@@ -71,6 +73,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Clear authentication data
   const clearAuthData = useCallback(async () => {
     try {
+      console.log('🔄 Clearing authentication data...')
+      
+      // Clear refresh timeout
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current)
         refreshTimeoutRef.current = null
@@ -78,10 +83,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Clear localStorage data
       if (typeof window !== "undefined") {
-        localStorage.removeItem('supabase.auth.token')
-        localStorage.removeItem('oauth_provider_token')
-        localStorage.removeItem('oauth_provider_refresh_token')
+        try {
+          // Clear all Supabase-related localStorage items
+          const keysToRemove = [
+            'supabase.auth.token',
+            'oauth_provider_token',
+            'oauth_provider_refresh_token',
+            'sb-access-token',
+            'sb-refresh-token',
+            'sb-expires-at'
+          ]
+          
+          keysToRemove.forEach(key => {
+            try {
+              localStorage.removeItem(key)
+            } catch (e) {
+              // Ignore individual localStorage errors
+            }
+          })
+          
+          // Also clear any other Supabase-related keys
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('sb-') || key.includes('supabase')) {
+              try {
+                localStorage.removeItem(key)
+              } catch (e) {
+                // Ignore individual localStorage errors
+              }
+            }
+          })
+          
+          console.log('✅ Local storage cleared')
+        } catch (localStorageError) {
+          console.warn('⚠️ Failed to clear localStorage:', localStorageError)
+        }
       }
+      
+      console.log('✅ Authentication data cleared successfully')
     } catch (error) {
       console.error('❌ Error clearing auth data:', error)
     }
@@ -92,10 +130,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          // Use PKCE flow with our application's callback route
-          redirectTo: `${window.location.origin}/auth/callback`,
           // Add proper Google scopes for better compatibility
-          scopes: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid',
+          scopes: 'openid email profile',
           // Request refresh token for Google
           queryParams: {
             access_type: 'offline',
@@ -109,11 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error
       }
 
-      // For PKCE flow, signInWithOAuth returns a URL to redirect to
-      if (data?.url) {
-        console.log('🔄 Redirecting to provider...')
-        window.location.href = data.url
-      }
+      console.log('✅ OAuth sign-in initiated successfully')
     } catch (error: any) {
       console.error('❌ Sign-in with provider failed:', error)
       throw error
@@ -150,11 +182,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         console.log('✅ User signed in:', session.user.email)
       } else if (event === 'SIGNED_OUT') {
+        console.log('🔄 User signed out event received')
         setUser(null)
         
         // Clear stored provider tokens
-        localStorage.removeItem('oauth_provider_token')
-        localStorage.removeItem('oauth_provider_refresh_token')
+        try {
+          localStorage.removeItem('oauth_provider_token')
+          localStorage.removeItem('oauth_provider_refresh_token')
+        } catch (error) {
+          console.warn('⚠️ Failed to clear localStorage:', error)
+        }
         
         // Clear refresh timeout
         if (refreshTimeoutRef.current) {
@@ -290,15 +327,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signOut() {
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) {
-        console.error('❌ Sign out error:', error.message)
+      console.log('🔄 Signing out user...')
+      
+      // First, try to sign out from Supabase (this might fail if no session exists)
+      try {
+        const { error } = await supabase.auth.signOut()
+        if (error) {
+          console.warn('⚠️ Supabase sign out warning:', error.message)
+          // Don't throw here, continue with local cleanup
+        }
+      } catch (supabaseError) {
+        console.warn('⚠️ Supabase sign out failed, continuing with local cleanup:', supabaseError)
       }
       
+      // Clear local auth data
       await clearAuthData()
+      
+      // Clear server-side session via API
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          credentials: 'include'
+        })
+        console.log('✅ Server-side session cleared')
+      } catch (apiError) {
+        console.warn('⚠️ Failed to clear server-side session:', apiError)
+        // Continue anyway, local cleanup is more important
+      }
+      
+      // Update local state
+      setUser(null)
+      
+      // Show success message
+      toast({
+        title: "Sesión cerrada",
+        description: "Has cerrado sesión exitosamente.",
+      })
+      
+      // Redirect to home page
       router.push("/")
+      
+      console.log('✅ Sign out completed successfully')
     } catch (error) {
       console.error('❌ Unexpected sign out error:', error)
+      
+      // Show error message to user
+      toast({
+        title: "Error al cerrar sesión",
+        description: "Ocurrió un error inesperado, pero se ha limpiado la sesión local.",
+        variant: "destructive",
+      })
+      
+      // Even if there's an error, try to clear local state and redirect
+      setUser(null)
+      router.push("/")
     }
   }
 

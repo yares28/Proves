@@ -56,12 +56,8 @@ import {
 } from "@/actions/user-calendars";
 import { getCurrentSession, getFreshAuthTokens } from "@/utils/auth-helpers";
 
-// Use current origin for local development, production URL for production
-const GOOGLE_ICAL_BASE_URL = typeof window !== 'undefined' 
-  ? (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
-    ? window.location.origin 
-    : "https://upv-cal.vercel.app")
-  : "https://upv-cal.vercel.app";
+// Default URL for SSR - will be updated on client
+const DEFAULT_GOOGLE_ICAL_BASE_URL = "https://upv-cal.vercel.app";
 
 export function CalendarDisplay({
   activeFilters = {},
@@ -88,8 +84,16 @@ export function CalendarDisplay({
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [existingNames, setExistingNames] = useState<string[]>([]);
+  const [googleIcalBaseUrl, setGoogleIcalBaseUrl] = useState(DEFAULT_GOOGLE_ICAL_BASE_URL);
   const { user, syncToken } = useAuth();
   const { toast } = useToast();
+
+  // Set the correct URL on client-side to avoid hydration mismatch
+  useEffect(() => {
+    const isLocalhost = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
+    const baseUrl = isLocalhost ? window.location.origin : DEFAULT_GOOGLE_ICAL_BASE_URL;
+    setGoogleIcalBaseUrl(baseUrl);
+  }, []);
 
   // Check if ETSINF is in the schools filter
   const hasETSINFFilter = activeFilters?.school?.includes("ETSINF");
@@ -413,7 +417,7 @@ export function CalendarDisplay({
       const tokenPath = await generateUPVTokenUrl(activeFilters, calendarName);
       console.log("🔑 Generated token path:", tokenPath);
       
-      const icalUrl = `${GOOGLE_ICAL_BASE_URL}${tokenPath}`;
+      const icalUrl = `${googleIcalBaseUrl}${tokenPath}`;
       console.log("🌐 Full iCal URL:", icalUrl);
 
       // Skip HEAD request validation due to serverless token storage limitations

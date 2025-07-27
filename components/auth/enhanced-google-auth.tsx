@@ -41,21 +41,10 @@ export function EnhancedGoogleAuth({
     try {
       console.log('🔄 Initiating Google OAuth authentication...')
       
-      // Generate nonce for security (optional but recommended)
-      const generateNonce = async (): Promise<string> => {
-        const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
-        return nonce
-      }
-
-      const nonce = await generateNonce()
-      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectTo || `${window.location.origin}/auth/callback`,
-          // Add proper Google scopes for better compatibility
-          scopes: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid',
-          // Request refresh token for Google
+          scopes: 'openid email profile',
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
