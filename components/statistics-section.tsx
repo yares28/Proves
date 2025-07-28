@@ -3,23 +3,27 @@
 import { motion } from "framer-motion"
 import { Card, CardContent } from "@/components/ui/card"
 import { Users, Calendar, School, BookOpen } from "lucide-react"
+import CountUp from './ui/countup'
 
 const stats = [
   {
     icon: Calendar,
-    value: "15,000+",
+    value: 2000,
+    displayValue: "2,000+",
     label: "Exámenes Registrados",
     description: "Disponibles en nuestra base de datos",
   },
   {
     icon: School,
-    value: "14",
+    value: 14,
+    displayValue: "14",
     label: "Escuelas",
     description: "Conectadas a nuestra plataforma",
   },
   {
     icon: BookOpen,
-    value: "500+",
+    value: 200,
+    displayValue: "200+",
     label: "Asignaturas",
     description: "De todas las escuelas",
   },
@@ -89,7 +93,18 @@ export function StatisticsSection() {
                   <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 transition-all duration-300 group-hover:bg-primary/20">
                     <stat.icon className="h-8 w-8 text-primary" />
                   </div>
-                  <div className="mb-2 text-4xl font-bold tracking-tight">{stat.value}</div>
+                  <div className="mb-2 text-4xl font-bold tracking-tight">
+                    <CountUp
+                      from={0}
+                      to={stat.value}
+                      separator=","
+                      direction="up"
+                      duration={2}
+                      delay={0.5 + (index * 0.2)}
+                      className="count-up-text"
+                    />
+                    {stat.displayValue.includes('+') && '+'}
+                  </div>
                   <div className="mb-1 font-medium text-center">{stat.label}</div>
                   <div className="text-sm text-muted-foreground text-center">{stat.description}</div>
                 </CardContent>
