@@ -744,7 +744,6 @@ export function CalendarDisplay({
                 })}
               </TooltipProvider>
             </div>
-
             <div className="mt-8 rounded-lg border bg-card p-5 shadow-sm">
               {exams.length > 0 ? (
                 <div className="space-y-4">
