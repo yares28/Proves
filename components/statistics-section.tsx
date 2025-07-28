@@ -6,20 +6,14 @@ import { Users, Calendar, School, BookOpen } from "lucide-react"
 
 const stats = [
   {
-    icon: Users,
-    value: "5,000+",
-    label: "Usuarios Activos",
-    description: "Estudiantes usando la plataforma",
-  },
-  {
     icon: Calendar,
     value: "15,000+",
     label: "Exámenes Registrados",
-    description: "En todos los departamentos",
+    description: "Disponibles en nuestra base de datos",
   },
   {
     icon: School,
-    value: "25+",
+    value: "14",
     label: "Escuelas",
     description: "Conectadas a nuestra plataforma",
   },
@@ -27,7 +21,7 @@ const stats = [
     icon: BookOpen,
     value: "500+",
     label: "Asignaturas",
-    description: "Disponibles en nuestra base de datos",
+    description: "De todas las escuelas",
   },
 ]
 
@@ -76,11 +70,11 @@ export function StatisticsSection() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="mx-auto max-w-2xl text-lg text-muted-foreground"
           >
-            Únete a miles de estudiantes que usan el Calendario de Exámenes UPV para mantenerse organizados y nunca perderse un examen importante.
+            Únete a cientos de estudiantes que usan el Calendario de Exámenes UPV para mantenerse organizados y nunca perderse un examen importante.
           </motion.p>
         </div>
 
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="flex flex-wrap justify-center gap-8">
           {stats.map((stat, index) => (
             <motion.div
               key={stat.label}
@@ -88,16 +82,16 @@ export function StatisticsSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.1 * index }}
-              className="group"
+              className="group w-64 h-64"
             >
-              <Card className="overflow-hidden border-none bg-white/80 shadow-lg backdrop-blur-sm transition-all duration-300 hover:shadow-xl dark:bg-emerald-900/50">
-                <CardContent className="flex flex-col items-center p-8 text-center">
+              <Card className="overflow-hidden border-none bg-white/80 shadow-lg backdrop-blur-sm transition-all duration-300 hover:shadow-xl dark:bg-emerald-900/50 h-full">
+                <CardContent className="flex flex-col items-center justify-center p-8 text-center h-full">
                   <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 transition-all duration-300 group-hover:bg-primary/20">
                     <stat.icon className="h-8 w-8 text-primary" />
                   </div>
                   <div className="mb-2 text-4xl font-bold tracking-tight">{stat.value}</div>
-                  <div className="mb-1 font-medium">{stat.label}</div>
-                  <div className="text-sm text-muted-foreground">{stat.description}</div>
+                  <div className="mb-1 font-medium text-center">{stat.label}</div>
+                  <div className="text-sm text-muted-foreground text-center">{stat.description}</div>
                 </CardContent>
               </Card>
             </motion.div>

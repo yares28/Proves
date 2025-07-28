@@ -4,10 +4,12 @@ import { useEffect, useState } from "react"
 import { useTheme } from "next-themes"
 import { Moon, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useSettings } from "@/context/settings-context"
 
 export function ThemeToggle() {
   const [mounted, setMounted] = useState(false)
   const { theme, setTheme } = useTheme()
+  const { settings, updateSettings } = useSettings()
 
   // Only render after mounting to avoid hydration mismatch
   useEffect(() => {
@@ -15,12 +17,30 @@ export function ThemeToggle() {
   }, [])
 
   const toggleTheme = () => {
-    // Toggle between light and dark modes
-    if (theme === "dark") {
-      setTheme("light")
+    // Determine the next theme based on current settings
+    let nextTheme: 'light' | 'dark' | 'system'
+    
+    if (settings.theme === 'system') {
+      // If system, toggle between light and dark
+      const currentTheme = theme === 'dark' ? 'dark' : 'light'
+      nextTheme = currentTheme === 'dark' ? 'light' : 'dark'
+    } else if (settings.theme === 'light') {
+      nextTheme = 'dark'
     } else {
-      setTheme("dark")
+      nextTheme = 'light'
     }
+    
+    // Update both the theme and settings
+    setTheme(nextTheme)
+    updateSettings({ theme: nextTheme })
+  }
+
+  // Get the current effective theme for display
+  const getCurrentTheme = () => {
+    if (settings.theme === 'system') {
+      return theme === 'dark' ? 'dark' : 'light'
+    }
+    return settings.theme
   }
 
   // Don't render until mounted to prevent hydration mismatch
@@ -37,6 +57,8 @@ export function ThemeToggle() {
       </Button>
     )
   }
+
+  const currentTheme = getCurrentTheme()
 
   return (
     <Button 
