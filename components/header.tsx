@@ -9,13 +9,14 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { UserButton } from "@/components/auth/user-button"
+import { useSettings } from "@/context/settings-context"
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
-  const [language, setLanguage] = useState("es")
   const [mounted, setMounted] = useState(false)
   const { theme, setTheme } = useTheme()
+  const { settings, updateSettings } = useSettings()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -30,18 +31,33 @@ export function Header() {
   }, [])
 
   const toggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark")
+    // Determine the next theme based on current settings
+    let nextTheme: 'light' | 'dark' | 'system'
+    
+    if (settings.theme === 'system') {
+      // If system, toggle between light and dark
+      const currentTheme = theme === 'dark' ? 'dark' : 'light'
+      nextTheme = currentTheme === 'dark' ? 'light' : 'dark'
+    } else if (settings.theme === 'light') {
+      nextTheme = 'dark'
+    } else {
+      nextTheme = 'light'
+    }
+    
+    // Update both the theme and settings
+    setTheme(nextTheme)
+    updateSettings({ theme: nextTheme })
   }
 
-  const handleLanguageChange = (newLanguage: string) => {
-    setLanguage(newLanguage)
-    console.log(`Language changed to: ${newLanguage}`)
+  const handleLanguageChange = (newLanguage: 'es' | 'en') => {
+    updateSettings({ language: newLanguage })
   }
 
   // Determine which logo to use based on theme
   const getHeaderLogo = () => {
     if (!mounted) return "/logo-full.png" // Default fallback during SSR
-    return theme === "light" ? "/logo-full2-light.png" : "/logo-full.png"
+    const currentTheme = settings.theme === 'system' ? theme : settings.theme
+    return currentTheme === "light" ? "/logo-full2-light.png" : "/logo-full.png"
   }
 
   return (
@@ -80,13 +96,13 @@ export function Header() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem 
                 onClick={() => handleLanguageChange("es")}
-                className={language === "es" ? "bg-accent" : ""}
+                className={settings.language === "es" ? "bg-accent" : ""}
               >
                 🇪🇸 Español
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={() => handleLanguageChange("en")}
-                className={language === "en" ? "bg-accent" : ""}
+                className={settings.language === "en" ? "bg-accent" : ""}
               >
                 🇺🇸 English
               </DropdownMenuItem>
@@ -96,7 +112,7 @@ export function Header() {
           <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Cambiar tema">
             {!mounted ? (
               <Sun className="h-4 w-4" />
-            ) : theme === "dark" ? (
+            ) : (settings.theme === 'system' ? theme : settings.theme) === "dark" ? (
               <Sun className="h-4 w-4" />
             ) : (
               <Moon className="h-4 w-4" />

@@ -7,9 +7,11 @@ import { FindExamCard } from "@/components/find-exam-card"
 import { useTheme } from "next-themes"
 import { useState, useEffect } from "react"
 import Image from "next/image"
+import { useSettings } from "@/context/settings-context"
 
 export function HeroSection() {
   const { theme } = useTheme()
+  const { settings } = useSettings()
   const [mounted, setMounted] = useState(false)
 
   // Only render after mounting to prevent hydration mismatch
@@ -20,7 +22,8 @@ export function HeroSection() {
   // Determine which logo to use based on theme
   const getHeroLogo = () => {
     if (!mounted) return "/logo-full2.png" // Default fallback during SSR
-    return theme === "light" ? "/logo-full-light.png" : "/logo-full2.png"
+    const currentTheme = settings.theme === 'system' ? theme : settings.theme
+    return currentTheme === "light" ? "/logo-full-light.png" : "/logo-full2.png"
   }
 
   return (

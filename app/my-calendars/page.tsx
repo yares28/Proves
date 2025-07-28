@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   Trash2,
   Eye,
+  EyeOff,
   X,
   Clock,
   MapPin,
@@ -135,6 +136,13 @@ export default function MyCalendarsPage() {
   }, [user?.id, toast]);
 
   async function handleViewCalendar(calendar: any) {
+    // If the same calendar is already selected, toggle it off
+    if (selectedCalendar?.id === calendar.id) {
+      setSelectedCalendar(null);
+      setSelectedExams([]);
+      return;
+    }
+
     setExamsLoading(true);
     setSelectedCalendar(calendar);
 
@@ -331,6 +339,13 @@ export default function MyCalendarsPage() {
       );
 
       setCalendars((prev) => prev.filter((cal) => cal.id !== calendarId));
+      
+      // If the deleted calendar was being viewed, close the view
+      if (selectedCalendar?.id === calendarId) {
+        setSelectedCalendar(null);
+        setSelectedExams([]);
+      }
+      
       toast({
         title: "¡Éxito!",
         description: `Calendario "${calendarName}" eliminado correctamente.`,
@@ -610,37 +625,7 @@ export default function MyCalendarsPage() {
           MIS CALENDARIOS
         </h1>
 
-        {/* Calendar Export Help Section */}
-        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 mt-0.5">
-              <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
-                <svg
-                  className="w-3 h-3 text-white"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                Añadir a tu calendario
-              </h3>
-              <p className="text-sm text-blue-700 dark:text-blue-200">
-                Haz clic en <strong>Google Calendar</strong> o{" "}
-                <strong>Apple Calendar</strong> para abrir tu aplicación de
-                calendario y añadir automáticamente la suscripción. Los exámenes
-                se actualizarán automáticamente.
-              </p>
-            </div>
-          </div>
-        </div>
+        
 
         <div className="space-y-6">
           {loading ? (
@@ -691,9 +676,13 @@ export default function MyCalendarsPage() {
                             size="sm"
                             className="h-8 w-8 p-0"
                             onClick={() => handleViewCalendar(calendar)}
-                            title="Ver calendario"
+                            title={selectedCalendar?.id === calendar.id ? "Ocultar calendario" : "Ver calendario"}
                           >
-                            <Eye className="h-4 w-4" />
+                            {selectedCalendar?.id === calendar.id ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
                           </Button>
 
                           {/* Export options dropdown */}
@@ -816,7 +805,7 @@ export default function MyCalendarsPage() {
               </div>
             ) : selectedExams.length > 0 ? (
               viewMode === "calendar" ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {Object.entries(groupExamsByMonth(selectedExams)).map(
                     ([month, exams]) => {
                       // Extract year and month from the month key
@@ -853,8 +842,8 @@ export default function MyCalendarsPage() {
 
                       return (
                         <Card key={month} className="overflow-hidden">
-                          <CardHeader className="bg-muted/30 pb-3">
-                            <CardTitle className="text-lg font-semibold">
+                          <CardHeader className="bg-muted/30 pb-2">
+                            <CardTitle className="text-sm font-semibold">
                               {month}
                             </CardTitle>
                             <p className="text-xs text-muted-foreground">
@@ -862,13 +851,13 @@ export default function MyCalendarsPage() {
                               {exams.length === 1 ? "examen" : "exámenes"}
                             </p>
                           </CardHeader>
-                          <CardContent className="p-4">
+                          <CardContent className="p-3">
                             {/* Calendar Header */}
-                            <div className="grid grid-cols-7 gap-1 mb-2">
+                            <div className="grid grid-cols-7 gap-0.5 mb-1">
                               {weekDays.map((day) => (
                                 <div
                                   key={day}
-                                  className="text-center text-xs font-medium text-muted-foreground py-1"
+                                  className="text-center text-xs font-medium text-muted-foreground py-0.5"
                                 >
                                   {day}
                                 </div>
@@ -876,13 +865,13 @@ export default function MyCalendarsPage() {
                             </div>
 
                             {/* Calendar Grid */}
-                            <div className="grid grid-cols-7 gap-1">
+                            <div className="grid grid-cols-7 gap-0.5">
                               {calendarDays.map((day, index) => {
                                 if (day === null) {
                                   return (
                                     <div
                                       key={`empty-${index}`}
-                                      className="h-16 border rounded"
+                                      className="h-14 border rounded"
                                     ></div>
                                   );
                                 }
@@ -898,31 +887,31 @@ export default function MyCalendarsPage() {
                                 return (
                                   <div
                                     key={day}
-                                    className={`h-16 border rounded p-1 flex flex-col items-center ${
+                                    className={`h-14 border rounded p-0.5 flex flex-col items-center justify-between ${
                                       hasExams
                                         ? "bg-primary/10 border-primary/30"
                                         : "bg-background hover:bg-muted/20"
                                     } transition-colors`}
                                   >
-                                    <div className="text-xs font-medium mb-1 text-center">
+                                    <div className="text-xs font-medium text-center">
                                       {day}
                                     </div>
                                     {hasExams && (
-                                      <div className="space-y-0.5">
+                                      <div className="w-full flex flex-col gap-0.5 min-h-0">
                                         {dayExams
                                           .slice(0, 1)
                                           .map((exam, examIndex) => (
                                             <div
                                               key={`${exam.id}-${examIndex}`}
-                                              className="text-xs bg-primary/20 text-primary px-0.5 py-0.5 rounded truncate text-center"
+                                              className="text-xs bg-primary/20 text-primary px-1 py-0.5 rounded truncate text-center w-full"
                                               title={`${exam.subject} - ${exam.time} - ${exam.location}`}
                                             >
                                               {exam.acronym ||
-                                                exam.subject.substring(0, 6)}
+                                                exam.subject.substring(0, 4)}
                                             </div>
                                           ))}
                                         {dayExams.length > 1 && (
-                                          <div className="text-xs text-muted-foreground px-0.5 text-center">
+                                          <div className="text-xs text-muted-foreground px-1 text-center w-full">
                                             +{dayExams.length - 1}
                                           </div>
                                         )}

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/react'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AuthProvider } from '@/context/auth-context'
+import { SettingsProvider } from '@/context/settings-context'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { Toaster } from "@/components/ui/toaster"
 import './globals.css'
@@ -37,8 +38,10 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <AuthProvider>
-              {children}
-              <Toaster />
+              <SettingsProvider>
+                {children}
+                <Toaster />
+              </SettingsProvider>
             </AuthProvider>
           </ThemeProvider>
         </ErrorBoundary>
