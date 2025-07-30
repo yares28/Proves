@@ -411,14 +411,6 @@ export default function ProfilePage() {
                       disabled
                       className="flex-1 h-10"
                     />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-10 min-w-[140px] px-4"
-                      onClick={() => setShowEmailDialog(true)}
-                    >
-                      Cambiar email
-                    </Button>
                   </div>
                 </div>
               </div>
