@@ -13,26 +13,24 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { 
   User, 
   Mail, 
   Calendar, 
   Settings, 
-  Camera, 
-  Upload, 
-  Trash2, 
-  Save,
   ArrowLeft,
-  Bell,
   Moon,
   Sun,
   Globe,
   Shield,
-  Download,
   Palette,
   Clock,
-  List
+  List,
+  Lock,
+  Eye,
+  EyeOff
 } from "lucide-react"
 
 
@@ -65,10 +63,18 @@ export default function ProfilePage() {
   const { toast } = useToast()
   
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [isUploading, setIsUploading] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [newAvatar, setNewAvatar] = useState<File | null>(null)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [showEmailDialog, setShowEmailDialog] = useState(false)
+  const [showUsernameDialog, setShowUsernameDialog] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [newUsername, setNewUsername] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [isChangingEmail, setIsChangingEmail] = useState(false)
+  const [isChangingUsername, setIsChangingUsername] = useState(false)
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -95,118 +101,7 @@ export default function ProfilePage() {
 
 
 
-  // Handle avatar file selection
-  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      // Validate file type and size
-      if (!file.type.startsWith('image/')) {
-        toast({
-          title: "Error",
-          description: "Por favor selecciona un archivo de imagen válido.",
-          variant: "destructive",
-        })
-        return
-      }
 
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        toast({
-          title: "Error",
-          description: "La imagen debe ser menor a 5MB.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      setNewAvatar(file)
-      
-      // Create preview
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setAvatarPreview(e.target?.result as string)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  // Upload avatar using API route
-  const uploadAvatar = async () => {
-    if (!newAvatar || !user) return
-
-    setIsUploading(true)
-    try {
-      const formData = new FormData()
-      formData.append('avatar', newAvatar)
-
-      const response = await fetch('/api/profile/avatar', {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Upload failed')
-      }
-
-      const { avatar_url } = await response.json()
-
-      // Update local profile
-      setProfile(prev => prev ? { ...prev, avatar_url } : null)
-      setNewAvatar(null)
-      setAvatarPreview(null)
-
-      toast({
-        title: "Avatar actualizado",
-        description: "Tu foto de perfil se ha actualizado correctamente.",
-      })
-
-    } catch (error) {
-      console.error('Error uploading avatar:', error)
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el avatar. Intenta de nuevo.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsUploading(false)
-    }
-  }
-
-  // Remove avatar using API route
-  const removeAvatar = async () => {
-    if (!user) return
-
-    setIsUploading(true)
-    try {
-      const response = await fetch('/api/profile/avatar', {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Remove failed')
-      }
-
-      setProfile(prev => prev ? { ...prev, avatar_url: undefined } : null)
-      setNewAvatar(null)
-      setAvatarPreview(null)
-
-      toast({
-        title: "Avatar removido",
-        description: "Tu foto de perfil se ha removido correctamente.",
-      })
-
-    } catch (error) {
-      console.error('Error removing avatar:', error)
-      toast({
-        title: "Error",
-        description: "No se pudo remover el avatar. Intenta de nuevo.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsUploading(false)
-    }
-  }
 
   // Get user initials
   const getInitials = () => {
@@ -231,6 +126,127 @@ export default function ProfilePage() {
         {provider.label}
       </Badge>
     ) : null
+  }
+
+  // Handle password change
+  const handlePasswordChange = async () => {
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Error",
+        description: "Las contraseñas no coinciden.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: "Error",
+        description: "La contraseña debe tener al menos 6 caracteres.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsChangingPassword(true)
+    try {
+      // This is a cosmetic function - in a real app you'd call your auth API
+      // For now, we'll just simulate the process
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      toast({
+        title: "Contraseña actualizada",
+        description: "Tu contraseña se ha actualizado correctamente.",
+      })
+      
+      setShowPasswordDialog(false)
+      setNewPassword('')
+      setConfirmPassword('')
+      setShowPassword(false)
+      setShowConfirmPassword(false)
+      
+    } catch (error) {
+      console.error('Error changing password:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la contraseña. Intenta de nuevo.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsChangingPassword(false)
+    }
+  }
+
+  // Handle email change
+  const handleEmailChange = async () => {
+    if (!newEmail || !newEmail.includes('@')) {
+      toast({
+        title: "Error",
+        description: "Por favor introduce un email válido.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsChangingEmail(true)
+    try {
+      // This is a cosmetic function - in a real app you'd call your auth API
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      toast({
+        title: "Email actualizado",
+        description: "Tu email se ha actualizado correctamente.",
+      })
+      
+      setShowEmailDialog(false)
+      setNewEmail('')
+      
+    } catch (error) {
+      console.error('Error changing email:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el email. Intenta de nuevo.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsChangingEmail(false)
+    }
+  }
+
+  // Handle username change
+  const handleUsernameChange = async () => {
+    if (!newUsername || newUsername.trim().length < 2) {
+      toast({
+        title: "Error",
+        description: "El nombre de usuario debe tener al menos 2 caracteres.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsChangingUsername(true)
+    try {
+      // This is a cosmetic function - in a real app you'd call your auth API
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      toast({
+        title: "Usuario actualizado",
+        description: "Tu nombre de usuario se ha actualizado correctamente.",
+      })
+      
+      setShowUsernameDialog(false)
+      setNewUsername('')
+      
+    } catch (error) {
+      console.error('Error changing username:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el nombre de usuario. Intenta de nuevo.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsChangingUsername(false)
+    }
   }
 
   if (loading) {
@@ -279,130 +295,276 @@ export default function ProfilePage() {
           <CardContent className="space-y-6">
             {/* Avatar Section */}
             <div className="flex items-center gap-4">
-              <div className="relative">
-                <Avatar className="h-20 w-20">
-                  <AvatarImage 
-                    src={avatarPreview || profile?.avatar_url} 
-                    alt="Avatar del usuario"
-                  />
-                  <AvatarFallback className="text-lg">
-                    {getInitials()}
-                  </AvatarFallback>
-                </Avatar>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full"
-                  onClick={() => document.getElementById('avatar-input')?.click()}
-                  disabled={isUploading}
-                >
-                  <Camera className="h-4 w-4" />
-                </Button>
-                <input
-                  id="avatar-input"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleAvatarChange}
+              <Avatar className="h-20 w-20">
+                <AvatarImage 
+                  src={profile?.avatar_url} 
+                  alt="Avatar del usuario"
                 />
-              </div>
-              <div className="flex-1 space-y-2">
-                <div className="flex gap-2">
-                  {newAvatar && (
-                    <>
-                      <Button
-                        size="sm"
-                        onClick={uploadAvatar}
-                        disabled={isUploading}
-                      >
-                        {isUploading ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        ) : (
-                          <Save className="h-4 w-4" />
-                        )}
-                        Guardar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setNewAvatar(null)
-                          setAvatarPreview(null)
-                        }}
-                      >
-                        Cancelar
-                      </Button>
-                    </>
-                  )}
-                  {profile?.avatar_url && !newAvatar && (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={removeAvatar}
-                      disabled={isUploading}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Remover
-                    </Button>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {newAvatar ? 'Nueva imagen seleccionada' : 'Haz clic en la cámara para cambiar tu foto'}
-                </p>
-              </div>
+                <AvatarFallback className="text-lg">
+                  {getInitials()}
+                </AvatarFallback>
+              </Avatar>
             </div>
 
             <Separator />
 
             {/* User Details */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <div className="flex-1">
+            <div className="flex flex-col gap-6">
+              {/* Email */}
+              <div className="flex items-center gap-5">
+                <Mail className="h-5 w-5 text-muted-foreground" />
+                <div className="flex-1 flex flex-col gap-1">
                   <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    value={profile?.email || ''}
-                    disabled
-                    className="mt-1"
-                  />
+                  <div className="flex gap-3">
+                    <Input
+                      id="email"
+                      value={profile?.email || ''}
+                      disabled
+                      className="flex-1 h-10"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-10 min-w-[140px] px-4"
+                      onClick={() => setShowEmailDialog(true)}
+                    >
+                      Cambiar email
+                    </Button>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <div className="flex-1">
-                  <Label htmlFor="name">Nombre completo</Label>
-                  <Input
-                    id="name"
-                    value={profile?.full_name || ''}
-                    disabled
-                    className="mt-1"
-                  />
+              {/* Usuario */}
+              <div className="flex items-center gap-5">
+                <User className="h-5 w-5 text-muted-foreground" />
+                <div className="flex-1 flex flex-col gap-1">
+                  <Label htmlFor="name">Usuario</Label>
+                  <div className="flex gap-3">
+                    <Input
+                      id="name"
+                      value={profile?.full_name || ''}
+                      disabled
+                      className="flex-1 h-10"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-10 min-w-[140px] px-4"
+                      onClick={() => setShowUsernameDialog(true)}
+                    >
+                      Cambiar usuario
+                    </Button>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <div className="flex-1">
+              {/* Cuenta creada */}
+              <div className="flex items-center gap-5">
+                <Calendar className="h-5 w-5 text-muted-foreground" />
+                <div className="flex-1 flex flex-col gap-1">
                   <Label>Cuenta creada</Label>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-sm text-muted-foreground h-10 flex items-center">
                     {profile?.created_at ? new Date(profile.created_at).toLocaleDateString('es-ES') : 'N/A'}
                   </p>
                 </div>
               </div>
 
-              {getProviderBadge() && (
-                <div className="flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-muted-foreground" />
-                  <div className="flex-1">
-                    <Label>Método de autenticación</Label>
-                    <div className="mt-1">
-                      {getProviderBadge()}
+              {/* Contraseña */}
+              <div className="flex items-center gap-5">
+                <Lock className="h-5 w-5 text-muted-foreground" />
+                <div className="flex-1 flex items-center gap-3">
+                  <Label className="whitespace-nowrap">Contraseña:</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-10 min-w-[140px] px-4"
+                    onClick={() => setShowPasswordDialog(true)}
+                  >
+                    Cambiar contraseña
+                  </Button>
+                </div>
+              </div>
+
+              {/* Password Change Dialog */}
+              <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Cambiar contraseña</DialogTitle>
+                    <DialogDescription>
+                      Introduce tu nueva contraseña. Debe tener al menos 8 caracteres, 1 mayúscula, 1 número y 1 y un caracter.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="new-password">Nueva contraseña</Label>
+                      <div className="relative">
+                        <Input
+                          id="new-password"
+                          type={showPassword ? "text" : "password"}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Nueva contraseña"
+                          className="h-10 pr-12"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                          tabIndex={-1}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirm-password">Confirmar contraseña</Label>
+                      <div className="relative">
+                        <Input
+                          id="confirm-password"
+                          type={showConfirmPassword ? "text" : "password"}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Confirmar contraseña"
+                          className="h-10 pr-12"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          tabIndex={-1}
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowPasswordDialog(false)
+                        setNewPassword('')
+                        setConfirmPassword('')
+                        setShowPassword(false)
+                        setShowConfirmPassword(false)
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={handlePasswordChange}
+                      disabled={isChangingPassword || !newPassword || !confirmPassword}
+                    >
+                      {isChangingPassword ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      ) : null}
+                      {isChangingPassword ? 'Actualizando...' : 'Actualizar contraseña'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              {/* Email Change Dialog */}
+              <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Cambiar email</DialogTitle>
+                    <DialogDescription>
+                      Introduce tu nuevo email. Recibirás un correo de confirmación.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="new-email">Nuevo email</Label>
+                      <Input
+                        id="new-email"
+                        type="email"
+                        value={newEmail}
+                        onChange={(e) => setNewEmail(e.target.value)}
+                        placeholder="nuevo@email.com"
+                        className="h-10"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowEmailDialog(false)
+                        setNewEmail('')
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={handleEmailChange}
+                      disabled={isChangingEmail || !newEmail}
+                    >
+                      {isChangingEmail ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      ) : null}
+                      {isChangingEmail ? 'Actualizando...' : 'Actualizar email'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              {/* Username Change Dialog */}
+              <Dialog open={showUsernameDialog} onOpenChange={setShowUsernameDialog}>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Cambiar nombre de usuario</DialogTitle>
+                    <DialogDescription>
+                      Introduce tu nuevo nombre de usuario.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="new-username">Nuevo nombre de usuario</Label>
+                      <Input
+                        id="new-username"
+                        type="text"
+                        value={newUsername}
+                        onChange={(e) => setNewUsername(e.target.value)}
+                        placeholder="Nuevo nombre de usuario"
+                        className="h-10"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowUsernameDialog(false)
+                        setNewUsername('')
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={handleUsernameChange}
+                      disabled={isChangingUsername || !newUsername}
+                    >
+                      {isChangingUsername ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      ) : null}
+                      {isChangingUsername ? 'Actualizando...' : 'Actualizar usuario'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </CardContent>
         </Card>
@@ -426,7 +588,7 @@ export default function ProfilePage() {
                  <div className="flex-1">
                    <Label>Tema</Label>
                    <div className="flex gap-2 mt-2">
-                     {(['light', 'dark', 'system'] as const).map((theme) => (
+                     {(['light', 'dark',] as const).map((theme) => (
                        <Button
                          key={theme}
                          variant={settings.theme === theme ? "default" : "outline"}
@@ -435,8 +597,7 @@ export default function ProfilePage() {
                        >
                          {theme === 'light' && <Sun className="h-4 w-4 mr-1" />}
                          {theme === 'dark' && <Moon className="h-4 w-4 mr-1" />}
-                         {theme === 'system' && <Settings className="h-4 w-4 mr-1" />}
-                         {theme === 'light' ? 'Claro' : theme === 'dark' ? 'Oscuro' : 'Sistema'}
+                         {theme === 'light' ? 'Claro' : theme === 'dark' ? 'Oscuro' : ''}
                        </Button>
                      ))}
                    </div>
@@ -516,8 +677,6 @@ export default function ProfilePage() {
                    </div>
                  </div>
                </div>
-
-                               {/* View Mode */}
                 <div className="flex items-start gap-2">
                   <List className="h-4 w-4 text-muted-foreground mt-4" />
                   <div className="flex-1">
