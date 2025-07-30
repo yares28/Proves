@@ -74,7 +74,7 @@ export function StatisticsSection() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="mx-auto max-w-2xl text-lg text-muted-foreground"
           >
-            Únete a cientos de estudiantes que usan el Calendario de Exámenes UPV para mantenerse organizados y nunca perderse un examen importante.
+            Únete a cientos de estudiantes que usan el Calendario de Exámenes UPV para mantenerse organizados.
           </motion.p>
         </div>
 

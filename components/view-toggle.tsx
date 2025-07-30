@@ -11,7 +11,7 @@ interface ViewToggleProps {
 export function ViewToggle({ view, onChange }: ViewToggleProps) {
   return (
     <Tabs value={view} onValueChange={(value) => onChange(value as "calendar" | "list")} className="w-full sm:w-auto">
-      <TabsList className="grid w-full grid-cols-2 sm:w-[200px]">
+      <TabsList className="grid w-full grid-cols-2 sm:w-[240px]">
         <TabsTrigger value="calendar" className="flex items-center gap-2">
           <Calendar className="h-4 w-4" />
           <span>Calendario</span>

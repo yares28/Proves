@@ -67,7 +67,7 @@ export function Header() {
       }`}
     >
       <div className="container flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap">
           <Image 
             src="/logo-icon.png" 
             alt="UPV Icon" 

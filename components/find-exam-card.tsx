@@ -31,6 +31,8 @@ export function FindExamCard() {
   const [error, setError] = useState("")
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [acronymOpen, setAcronymOpen] = useState(false)
+  // Add searchLoading state for button loading
+  const [searchLoading, setSearchLoading] = useState(false)
 
   useEffect(() => {
     async function fetchSchools() {
@@ -117,6 +119,7 @@ export function FindExamCard() {
       return
     }
     setError("")
+    setSearchLoading(true) // Set loading when search starts
     const params = new URLSearchParams()
     selectedItems.forEach(item => {
       if (item.type === 'acronym') {
@@ -301,7 +304,7 @@ export function FindExamCard() {
                     variant="outline"
                     role="combobox"
                     aria-expanded={acronymOpen}
-                    className={`w-full h-9 justify-between ${!isAcronymSearchEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`w-full h-9 justify-between pl-3 ${!isAcronymSearchEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                     disabled={!isAcronymSearchEnabled || selectedItems.length === options.length}
                   >
                     {!isAcronymSearchEnabled
@@ -374,12 +377,12 @@ export function FindExamCard() {
             <Button
               type="submit"
               className="w-full h-9 shadow-md transition-all hover:shadow-lg"
-              disabled={loading || selectedItems.length === 0 || !isAcronymSearchEnabled}
+              disabled={searchLoading || loading || selectedItems.length === 0 || !isAcronymSearchEnabled}
             >
-              {loading ? (
+              {searchLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Cargando...
+                  Buscando...
                 </>
               ) : (
                 "Buscar Exámenes"
