@@ -83,8 +83,15 @@ export default function ProfilePage() {
 
   // Redirect if not authenticated
   useEffect(() => {
+    // Only redirect if we're not loading and there's definitely no user
     if (!loading && !user) {
-      router.push('/')
+      console.log('🔄 No authenticated user found, redirecting to home...')
+      // Add a small delay to ensure session restoration has time to complete
+      const redirectTimer = setTimeout(() => {
+        router.push('/')
+      }, 100)
+      
+      return () => clearTimeout(redirectTimer)
     }
   }, [user, loading, router])
 
@@ -103,6 +110,22 @@ export default function ProfilePage() {
       setProfile(userProfile)
     }
   }, [user])
+
+  // Show loading state while auth is initializing
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    )
+  }
+
+  // Don't render anything if user is not authenticated (will redirect)
+  if (!user) {
+    return null
+  }
 
   // Refresh user data after updates
   const refreshUserData = async () => {
@@ -336,20 +359,6 @@ export default function ProfilePage() {
     } finally {
       setIsChangingUsername(false)
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return null
   }
 
   return (

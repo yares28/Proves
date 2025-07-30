@@ -9,7 +9,7 @@ export async function middleware(request: NextRequest) {
   })
 
   // Only process auth for specific routes to improve performance
-  const authRoutes = ['/my-calendars', '/saved-calendars', '/exams', '/auth']
+  const authRoutes = ['/my-calendars', '/saved-calendars', '/exams', '/auth', '/profile']
   const shouldProcessAuth = authRoutes.some(route => 
     request.nextUrl.pathname.startsWith(route)
   )
