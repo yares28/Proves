@@ -21,7 +21,8 @@ export function HeroSection() {
 
   // Determine which logo to use based on theme
   const getHeroLogo = () => {
-    if (!mounted) return "/logo-full2.png" // Default fallback during SSR
+    // Always return the same logo during SSR and initial render to prevent hydration mismatch
+    if (!mounted) return "/logo-full2.png"
     const currentTheme = settings.theme === 'system' ? theme : settings.theme
     return currentTheme === "light" ? "/logo-full-light.png" : "/logo-full2.png"
   }
@@ -164,18 +165,15 @@ export function HeroSection() {
               transition={{ duration: 0.8, delay: 0.2 }}
               className="mb-6 flex justify-center lg:justify-start"
             >
-              <div className="relative">
-                <Image 
-                  src={getHeroLogo()}
-                  alt="UPV Calendario de Exámenes" 
-                  width={260} 
-                  height={110}
-                  className="h-auto w-auto max-w-[260px] drop-shadow-lg"
-                  priority
-                />
-                {/* Subtle glow effect behind logo */}
-                <div className="absolute inset-0 -z-10 scale-110 blur-xl bg-primary/20 rounded-lg"></div>
-              </div>
+              <Image 
+                src={getHeroLogo()}
+                alt="UPV Calendario de Exámenes" 
+                width={260} 
+                height={110}
+                className="h-auto w-auto max-w-[260px]"
+                priority
+                key={mounted ? 'mounted' : 'unmounted'}
+              />
             </motion.div>
 
             <h1 className="mb-5 text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl xl:text-6xl">

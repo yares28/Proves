@@ -42,6 +42,7 @@ import { SaveCalendarDialog } from "@/components/save-calendar-dialog";
 import { ExportCalendarDialog } from "@/components/export-calendar-dialog";
 
 import { useAuth } from "@/context/auth-context";
+import { useSettings } from "@/context/settings-context";
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -74,7 +75,6 @@ export function CalendarDisplay({
   const [visibleMonths, setVisibleMonths] = useState<number[]>([
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
   ]); // Show all 12 months by default
-  const [view, setView] = useState<"calendar" | "list">("calendar");
   const [exams, setExams] = useState<any[]>([]);
   const [months, setMonths] = useState<any[]>([]);
   const [academicYear, setAcademicYear] = useState<{
@@ -85,7 +85,10 @@ export function CalendarDisplay({
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [existingNames, setExistingNames] = useState<string[]>([]);
   const [googleIcalBaseUrl, setGoogleIcalBaseUrl] = useState(DEFAULT_GOOGLE_ICAL_BASE_URL);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const { user, syncToken } = useAuth();
+  const { settings, updateSettings } = useSettings();
   const { toast } = useToast();
 
   // Set the correct URL on client-side to avoid hydration mismatch
@@ -129,6 +132,9 @@ export function CalendarDisplay({
   // Fetch exams when filters change
   useEffect(() => {
     const fetchExams = async () => {
+      setLoading(true);
+      setError(null);
+      
       // Only fetch exams if we have meaningful filters
       if (!hasMeaningfulFilters()) {
         console.log("CalendarDisplay - No meaningful filters selected, clearing exams");
@@ -138,6 +144,7 @@ export function CalendarDisplay({
         const fallbackMonths = generateAcademicYearMonths(currentYear);
         setMonths(fallbackMonths);
         setAcademicYear({ startYear: currentYear, endYear: currentYear + 1 });
+        setLoading(false);
         return;
       }
 
@@ -205,12 +212,15 @@ export function CalendarDisplay({
         setExams(data);
       } catch (error) {
         console.error("CalendarDisplay - Error fetching exams:", error);
+        setError("Error al cargar los exámenes");
         setExams([]);
         // Set fallback months even on error
         const currentYear = getCurrentYear();
         const fallbackMonths = generateAcademicYearMonths(currentYear);
         setMonths(fallbackMonths);
         setAcademicYear({ startYear: currentYear, endYear: currentYear + 1 });
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -485,7 +495,7 @@ export function CalendarDisplay({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ViewToggle view={view} onChange={setView} />
+                          <ViewToggle view={settings.viewMode} onChange={(view) => updateSettings({ viewMode: view })} />
           
           <Button
             variant="outline"
@@ -498,11 +508,35 @@ export function CalendarDisplay({
             <span>Exportar</span>
           </Button>
 
-
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10 px-3 py-1.5 gap-2 rounded-sm text-sm font-medium"
+            disabled={exams.length === 0}
+            onClick={openSaveDialog}
+          >
+            <Save className="h-4 w-4" />
+            <span>Guardar</span>
+          </Button>
         </div>
       </div>
 
-              {/* Add SaveCalendarDialog component */}
+      {/* Error state */}
+      {error && (
+        <div className="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
+          {error}
+        </div>
+      )}
+
+      {/* Loading state */}
+      {loading && (
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Cargando exámenes...</span>
+        </div>
+      )}
+
+      {/* Add SaveCalendarDialog component */}
         <SaveCalendarDialog
           open={saveDialogOpen}
           onOpenChange={setSaveDialogOpen}
@@ -519,7 +553,7 @@ export function CalendarDisplay({
         />
 
       <AnimatePresence mode="wait">
-        {view === "calendar" ? (
+        {settings.viewMode === "calendar" ? (
           <motion.div
             key="calendar-view"
             initial={{ opacity: 0 }}
@@ -653,7 +687,7 @@ export function CalendarDisplay({
                                                 className={styles.examCard}
                                               >
                                                 <div className="mb-1 font-medium">
-                                                  {exam.subject}
+                                                  {exam.name || exam.subject}
                                                 </div>
                                                 <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
                                                   <span className="flex items-center gap-1">
@@ -758,7 +792,7 @@ export function CalendarDisplay({
                       .map((exam) => (
                         <div key={exam.id} className={styles.examCard}>
                           <div className="flex justify-between mb-1">
-                            <span className="font-medium">{exam.subject}</span>
+                            <span className="font-medium">{exam.name || exam.subject}</span>
                             <Badge variant="outline">
                               {new Date(exam.date).toLocaleDateString()}
                             </Badge>
@@ -790,7 +824,7 @@ export function CalendarDisplay({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setView("list")}
+                        onClick={() => updateSettings({ viewMode: "list" })}
                         className="mt-2"
                       >
                         View All {exams.length} Exams

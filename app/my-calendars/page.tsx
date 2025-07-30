@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/auth-context";
+import { useSettings } from "@/context/settings-context";
 import { getUserCalendars, deleteUserCalendar } from "@/actions/user-calendars";
 import { getExams } from "@/actions/exam-actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +31,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+  ExamTooltipContent,
+} from "@/components/ui/tooltip";
 
 interface SavedCalendar {
   id: string;
@@ -40,12 +48,12 @@ interface SavedCalendar {
 
 export default function MyCalendarsPage() {
   const { user } = useAuth();
+  const { settings, updateSettings } = useSettings();
   const [calendars, setCalendars] = useState<SavedCalendar[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCalendar, setSelectedCalendar] = useState<any>(null);
   const [selectedExams, setSelectedExams] = useState<any[]>([]);
   const [examsLoading, setExamsLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
   const { toast } = useToast();
@@ -776,17 +784,17 @@ export default function MyCalendarsPage() {
               <div className="flex items-center gap-2">
                 <div className="flex items-center border rounded-lg p-1">
                   <Button
-                    variant={viewMode === "calendar" ? "default" : "ghost"}
+                    variant={settings.viewMode === "calendar" ? "default" : "ghost"}
                     size="sm"
-                    onClick={() => setViewMode("calendar")}
+                    onClick={() => updateSettings({ viewMode: "calendar" })}
                     className="h-8 px-3"
                   >
                     <CalendarDays className="h-4 w-4" />
                   </Button>
                   <Button
-                    variant={viewMode === "list" ? "default" : "ghost"}
+                    variant={settings.viewMode === "list" ? "default" : "ghost"}
                     size="sm"
-                    onClick={() => setViewMode("list")}
+                    onClick={() => updateSettings({ viewMode: "list" })}
                     className="h-8 px-3"
                   >
                     <List className="h-4 w-4" />
@@ -804,9 +812,10 @@ export default function MyCalendarsPage() {
                 <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
               </div>
             ) : selectedExams.length > 0 ? (
-              viewMode === "calendar" ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {Object.entries(groupExamsByMonth(selectedExams)).map(
+              settings.viewMode === "calendar" ? (
+                <TooltipProvider>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {Object.entries(groupExamsByMonth(selectedExams)).map(
                     ([month, exams]) => {
                       // Extract year and month from the month key
                       const [monthName, yearStr] = month.split(" ");
@@ -884,9 +893,8 @@ export default function MyCalendarsPage() {
                                 );
                                 const hasExams = dayExams.length > 0;
 
-                                return (
+                                const dayContent = (
                                   <div
-                                    key={day}
                                     className={`h-14 border rounded p-0.5 flex flex-col items-center justify-between ${
                                       hasExams
                                         ? "bg-primary/10 border-primary/30"
@@ -904,7 +912,6 @@ export default function MyCalendarsPage() {
                                             <div
                                               key={`${exam.id}-${examIndex}`}
                                               className="text-xs bg-primary/20 text-primary px-1 py-0.5 rounded truncate text-center w-full"
-                                              title={`${exam.subject} - ${exam.time} - ${exam.location}`}
                                             >
                                               {exam.acronym ||
                                                 exam.subject.substring(0, 4)}
@@ -919,6 +926,23 @@ export default function MyCalendarsPage() {
                                     )}
                                   </div>
                                 );
+
+                                if (hasExams) {
+                                  return (
+                                    <Tooltip key={day}>
+                                      <TooltipTrigger asChild>
+                                        {dayContent}
+                                      </TooltipTrigger>
+                                      <ExamTooltipContent 
+                                        side="top" 
+                                        date={new Date(year, monthIndex, day)}
+                                        exams={dayExams}
+                                      />
+                                    </Tooltip>
+                                  );
+                                }
+
+                                return dayContent;
                               })}
                             </div>
                           </CardContent>
@@ -926,7 +950,8 @@ export default function MyCalendarsPage() {
                       );
                     }
                   )}
-                </div>
+                  </div>
+                </TooltipProvider>
               ) : (
                 <div className="space-y-6">
                   {Object.entries(groupExamsByMonth(selectedExams)).map(

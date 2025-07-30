@@ -68,10 +68,6 @@ export function UserButton() {
           <Calendar className="mr-2 h-4 w-4" />
           <span>Mis Calendarios</span>
         </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Configuración</span>
-        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem 
           onClick={async () => {
