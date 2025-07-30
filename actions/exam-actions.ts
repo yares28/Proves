@@ -13,6 +13,8 @@ const cache = {
   semesters: new Map<string, string[]>(),
   years: new Map<string, number[]>(),
   subjects: new Map<string, string[]>(),
+  acronyms: new Map<string, { data: string[], timestamp: number }>(),
+  acronymsAndSubjects: new Map<string, { data: Array<{ value: string; type: 'acronym' | 'subject'; acronym?: string }>, timestamp: number }>(),
   // Add exams cache with 2-minute TTL (shorter than metadata to refresh more often)
   exams: new Map<string, { data: any[], timestamp: number }>(),
   examsTTL: 2 * 60 * 1000, // 2 minutes in milliseconds
@@ -96,22 +98,22 @@ export async function getExams(
 ) {
   // Check cache expiry first
   cache.checkExpiry();
-  
+
   // Validate and normalize filters
   const normalizedFilters: ExamFilters = {};
-  
+
   if (filters && typeof filters === 'object') {
-    Object.keys(filters).forEach(key => {
+    (Object.keys(filters) as (keyof ExamFilters)[]).forEach(key => {
       const value = filters[key];
       if (value !== null && value !== undefined) {
         if (Array.isArray(value)) {
           // Filter out empty strings and null values
           const cleanedArray = value.filter(v => v !== null && v !== undefined && v !== '');
           if (cleanedArray.length > 0) {
-            normalizedFilters[key] = cleanedArray;
+            (normalizedFilters as any)[key] = cleanedArray;
           }
         } else if (typeof value === 'string' && value.trim() !== '') {
-          normalizedFilters[key] = [value.trim()];
+          (normalizedFilters as any)[key] = [value.trim()];
         }
       }
     });
@@ -147,7 +149,7 @@ export async function getExams(
     const startTime = performance.now();
     
     // Only select needed columns for better network performance
-    let query = client
+    let query = (client as any)
       .from('ETSINF')
       .select('exam_instance_id, exam_date, exam_time, duration_minutes, code, subject, acronym, degree, year, semester, place, comment, school')
       .order('exam_date', { ascending: true });
@@ -164,7 +166,7 @@ export async function getExams(
       if (schools.length === 1) {
         query = query.eq('school', schools[0]);
       } else if (schools.length > 1) {
-        query = query.in('school', schools);
+        query = query.in('school', Array.isArray(schools) ? schools : [schools]);
       }
     }
     
@@ -176,7 +178,7 @@ export async function getExams(
       if (degrees.length === 1) {
         query = query.eq('degree', degrees[0]);
       } else if (degrees.length > 1) {
-        query = query.in('degree', degrees);
+        query = query.in('degree', Array.isArray(degrees) ? degrees : [degrees]);
       }
     }
     
@@ -185,12 +187,14 @@ export async function getExams(
       const years = normalizedFilters.year;
       console.log('Filtering by years:', years);
       
-      if (years.length === 1) {
-        query = query.eq('year', parseInt(years[0], 10)); // Ensure numeric comparison
-      } else if (years.length > 1) {
-        // Convert to integers for proper comparison
-        const numericYears = years.map(y => parseInt(y, 10));
-        query = query.in('year', numericYears);
+      if (Array.isArray(years)) {
+        if (years.length === 1) {
+          query = query.eq('year', years[0]);
+        } else if (years.length > 1) {
+          query = query.in('year', years);
+        }
+      } else if (typeof years === 'string') {
+        query = query.eq('year', years);
       }
     }
     
@@ -202,7 +206,7 @@ export async function getExams(
       if (semesters.length === 1) {
         query = query.eq('semester', semesters[0]);
       } else if (semesters.length > 1) {
-        query = query.in('semester', semesters);
+        query = query.in('semester', Array.isArray(semesters) ? semesters : [semesters]);
       }
     }
     
@@ -783,5 +787,166 @@ export async function debugCheckDataExists(
       error: error instanceof Error ? error.message : 'Unknown error', 
       data: null 
     };
+  }
+} 
+
+export async function getAcronyms(
+  client: SupabaseClient<Database> = supabase
+): Promise<string[]> {
+  const cacheKey = 'acronyms';
+  
+  // Check cache first
+  const cached = cache.acronyms.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < cache.TTL) {
+    console.log('📋 [CACHE] Returning cached acronyms');
+    return cached.data;
+  }
+  
+  console.log('🔄 [SUPABASE] Fetching acronyms from database...');
+  const startTime = performance.now();
+  
+  try {
+    // Use the same approach as other functions - query the ETSINF table
+    const { data, error } = await client
+      .from('ETSINF' as any) // Type assertion for now since ETSINF is not in types
+      .select('acronym')
+      .not('acronym', 'is', null)
+      .not('acronym', 'eq', '')
+      .order('acronym', { ascending: true });
+    
+    if (error) {
+      console.error('Supabase error fetching acronyms:', error);
+      throw error;
+    }
+    
+    // Extract unique acronyms and sort them
+    const uniqueAcronyms = [...new Set(data.map((row: any) => row.acronym))].sort();
+    
+    // Cache the results
+    cache.acronyms.set(cacheKey, { 
+      data: uniqueAcronyms, 
+      timestamp: Date.now() 
+    });
+    
+    const duration = performance.now() - startTime;
+    console.log(`✅ [SUPABASE] Found ${uniqueAcronyms.length} unique acronyms in ${duration.toFixed(2)}ms`);
+    
+    return uniqueAcronyms;
+  } catch (error) {
+    console.error('Error fetching acronyms:', error);
+    return [];
+  }
+}
+
+export async function getFilteredAcronyms(
+  school?: string,
+  degree?: string,
+  client: SupabaseClient<Database> = supabase
+): Promise<string[]> {
+  // Generate cache key based on filters
+  const cacheKey = `acronyms_${school || 'all'}_${degree || 'all'}`;
+  
+  // Check cache first
+  const cached = cache.acronyms.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < cache.TTL) {
+    console.log('📋 [CACHE] Returning cached filtered acronyms for:', cacheKey);
+    return cached.data;
+  }
+  
+  console.log('🔄 [SUPABASE] Fetching filtered acronyms for school:', school, 'degree:', degree);
+  const startTime = performance.now();
+  
+  try {
+    let query = client
+      .from('ETSINF' as any)
+      .select('acronym')
+      .not('acronym', 'is', null)
+      .not('acronym', 'eq', '')
+      .order('acronym', { ascending: true });
+    
+    // Apply school filter if provided
+    if (school && school !== 'all') {
+      query = query.eq('school', school);
+    }
+    
+    // Apply degree filter if provided
+    if (degree && degree !== 'all') {
+      query = query.eq('degree', degree);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('Supabase error fetching filtered acronyms:', error);
+      throw error;
+    }
+    
+    // Extract unique acronyms and sort them
+    const uniqueAcronyms = [...new Set(data.map((row: any) => row.acronym))].sort();
+    
+    // Cache the results
+    cache.acronyms.set(cacheKey, { 
+      data: uniqueAcronyms, 
+      timestamp: Date.now() 
+    });
+    
+    const duration = performance.now() - startTime;
+    console.log(`✅ [SUPABASE] Found ${uniqueAcronyms.length} unique filtered acronyms in ${duration.toFixed(2)}ms`);
+    
+    return uniqueAcronyms;
+  } catch (error) {
+    console.error('Error fetching filtered acronyms:', error);
+    return [];
+  }
+} 
+
+/**
+ * Fetches both acronyms and subject names for a given school and degree.
+ * Returns an array of { value, type } where type is 'acronym' or 'subject'.
+ */
+export async function getFilteredAcronymsAndSubjects(
+  school?: string,
+  degree?: string,
+  client: SupabaseClient<Database> = supabase
+): Promise<Array<{ value: string; type: 'acronym' | 'subject'; acronym?: string }>> {
+  const cacheKey = `acronyms_subjects_${school || 'all'}_${degree || 'all'}`;
+  // Check cache first
+  const cached = cache.acronymsAndSubjects?.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < cache.TTL) {
+    return cached.data;
+  }
+  try {
+    let query = (client as any)
+      .from('ETSINF')
+      .select('acronym, subject')
+      .not('acronym', 'is', null)
+      .not('acronym', 'eq', '')
+      .order('acronym', { ascending: true });
+    if (school && school !== 'all') {
+      query = query.eq('school', school);
+    }
+    if (degree && degree !== 'all') {
+      query = query.eq('degree', degree);
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    if (!data) return [];
+    // Collect unique acronyms and subjects with their acronyms
+    const acronymsSet = new Set<string>();
+    const subjectsMap = new Map<string, string>(); // subject -> acronym
+    for (const row of data) {
+      if (row.acronym) acronymsSet.add(row.acronym);
+      if (row.subject) subjectsMap.set(row.subject, row.acronym);
+    }
+    const result: Array<{ value: string; type: 'acronym' | 'subject'; acronym?: string }> = [
+      ...Array.from(acronymsSet).map(a => ({ value: a, type: 'acronym' as const })),
+      ...Array.from(subjectsMap.entries()).map(([subject, acronym]) => ({ value: subject, type: 'subject' as const, acronym })),
+    ].sort((a, b) => a.value.localeCompare(b.value));
+    // Cache the results
+    cache.acronymsAndSubjects?.set(cacheKey, { data: result, timestamp: Date.now() });
+    return result;
+  } catch (error) {
+    console.error('Error fetching acronyms and subjects:', error);
+    return [];
   }
 } 

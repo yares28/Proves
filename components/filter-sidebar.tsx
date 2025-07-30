@@ -560,26 +560,32 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
         {Object.keys(activeFilters).length > 0 && (
           <div className="mt-4">
             <h3 className="text-sm font-medium mb-2">Filtros Activos</h3>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(activeFilters).map(([category, values]) =>
-                values.map((value) => (
-                  <Badge
-                    key={`${category}-${value}`}
-                    variant="secondary"
-                    className="flex items-center gap-1"
-                  >
-                    {category === 'subject' ? getSubjectAcronym(value) : value}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-4 w-4 p-0"
-                      onClick={() => removeFilter(category, value)}
+            <div className="flex flex-wrap items-center gap-2">
+              {Object.entries(activeFilters).map(([category, values], idx, arr) => (
+                <span key={category} className="flex items-center gap-2">
+                  {values.map((value) => (
+                    <Badge
+                      key={`${category}-${value}`}
+                      variant="secondary"
+                      className="flex items-center gap-1"
                     >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </Badge>
-                ))
-              )}
+                      {category === 'subject' ? getSubjectAcronym(value) : value}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-4 w-4 p-0"
+                        onClick={() => removeFilter(category, value)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </Badge>
+                  ))}
+                  {/* Separator between categories, except after the last */}
+                  {idx < arr.length - 1 && (
+                    <span className="mx-1 text-muted-foreground select-none font-bold">|</span>
+                  )}
+                </span>
+              ))}
             </div>
           </div>
         )}
