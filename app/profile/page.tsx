@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
+import { createClient } from "@/utils/supabase/client"
 import { 
   User, 
   Mail, 
@@ -32,6 +33,7 @@ import {
   Eye,
   EyeOff
 } from "lucide-react"
+import React from "react"
 
 
 interface UserProfile {
@@ -61,6 +63,7 @@ export default function ProfilePage() {
   const { settings, updateSettings } = useSettings()
   const router = useRouter()
   const { toast } = useToast()
+  const supabase = createClient()
   
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)
@@ -75,6 +78,8 @@ export default function ProfilePage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [isChangingEmail, setIsChangingEmail] = useState(false)
   const [isChangingUsername, setIsChangingUsername] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -99,16 +104,25 @@ export default function ProfilePage() {
     }
   }, [user])
 
-
-
-
-
-  // Get user initials
-  const getInitials = () => {
-    if (profile?.full_name) {
-      return profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
+  // Refresh user data after updates
+  const refreshUserData = async () => {
+    try {
+      const { data: { user: updatedUser }, error } = await supabase.auth.getUser()
+      if (!error && updatedUser) {
+        const userProfile: UserProfile = {
+          id: updatedUser.id,
+          email: updatedUser.email || '',
+          full_name: updatedUser.user_metadata?.full_name || updatedUser.user_metadata?.name,
+          avatar_url: updatedUser.user_metadata?.avatar_url || updatedUser.user_metadata?.picture,
+          created_at: updatedUser.created_at,
+          last_sign_in_at: updatedUser.last_sign_in_at,
+          provider: updatedUser.app_metadata?.provider
+        }
+        setProfile(userProfile)
+      }
+    } catch (error) {
+      console.error('Error refreshing user data:', error)
     }
-    return profile?.email?.slice(0, 2).toUpperCase() || 'U'
   }
 
   // Get provider badge
@@ -148,11 +162,46 @@ export default function ProfilePage() {
       return
     }
 
+    if (!currentPassword) {
+      toast({
+        title: "Error",
+        description: "Por favor introduce tu contraseña actual.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsChangingPassword(true)
     try {
-      // This is a cosmetic function - in a real app you'd call your auth API
-      // For now, we'll just simulate the process
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // First verify current password
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: profile?.email || '',
+        password: currentPassword
+      })
+
+      if (verifyError) {
+        toast({
+          title: "Error",
+          description: "La contraseña actual es incorrecta.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Update password
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      })
+      
+      if (error) {
+        console.error('Error changing password:', error)
+        toast({
+          title: "Error",
+          description: error.message || "No se pudo actualizar la contraseña. Intenta de nuevo.",
+          variant: "destructive",
+        })
+        return
+      }
       
       toast({
         title: "Contraseña actualizada",
@@ -162,8 +211,10 @@ export default function ProfilePage() {
       setShowPasswordDialog(false)
       setNewPassword('')
       setConfirmPassword('')
+      setCurrentPassword('')
       setShowPassword(false)
       setShowConfirmPassword(false)
+      setShowCurrentPassword(false)
       
     } catch (error) {
       console.error('Error changing password:', error)
@@ -190,16 +241,30 @@ export default function ProfilePage() {
 
     setIsChangingEmail(true)
     try {
-      // This is a cosmetic function - in a real app you'd call your auth API
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const { error } = await supabase.auth.updateUser({
+        email: newEmail
+      })
+      
+      if (error) {
+        console.error('Error changing email:', error)
+        toast({
+          title: "Error",
+          description: error.message || "No se pudo actualizar el email. Intenta de nuevo.",
+          variant: "destructive",
+        })
+        return
+      }
       
       toast({
         title: "Email actualizado",
-        description: "Tu email se ha actualizado correctamente.",
+        description: "Se ha enviado un correo de confirmación a tu nueva dirección de email.",
       })
       
       setShowEmailDialog(false)
       setNewEmail('')
+      
+      // Refresh user data to get updated email
+      await refreshUserData()
       
     } catch (error) {
       console.error('Error changing email:', error)
@@ -226,8 +291,29 @@ export default function ProfilePage() {
 
     setIsChangingUsername(true)
     try {
-      // This is a cosmetic function - in a real app you'd call your auth API
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          full_name: newUsername.trim()
+        }
+      })
+      
+      if (error) {
+        console.error('Error changing username:', error)
+        toast({
+          title: "Error",
+          description: error.message || "No se pudo actualizar el nombre de usuario. Intenta de nuevo.",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      // Update local profile state
+      if (profile) {
+        setProfile({
+          ...profile,
+          full_name: newUsername.trim()
+        })
+      }
       
       toast({
         title: "Usuario actualizado",
@@ -236,6 +322,9 @@ export default function ProfilePage() {
       
       setShowUsernameDialog(false)
       setNewUsername('')
+      
+      // Refresh user data to ensure consistency
+      await refreshUserData()
       
     } catch (error) {
       console.error('Error changing username:', error)
@@ -301,7 +390,7 @@ export default function ProfilePage() {
                   alt="Avatar del usuario"
                 />
                 <AvatarFallback className="text-lg">
-                  {getInitials()}
+                  {profile?.full_name ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase() : profile?.email?.slice(0, 2).toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
             </div>
@@ -391,10 +480,37 @@ export default function ProfilePage() {
                   <DialogHeader>
                     <DialogTitle>Cambiar contraseña</DialogTitle>
                     <DialogDescription>
-                      Introduce tu nueva contraseña. Debe tener al menos 8 caracteres, 1 mayúscula, 1 número y 1 y un caracter.
+                      Introduce tu contraseña actual y la nueva contraseña. La nueva contraseña debe tener al menos 6 caracteres.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="current-password">Contraseña actual</Label>
+                      <div className="relative">
+                        <Input
+                          id="current-password"
+                          type={showCurrentPassword ? "text" : "password"}
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="Contraseña actual"
+                          className="h-10 pr-12"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                          tabIndex={-1}
+                        >
+                          {showCurrentPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="new-password">Nueva contraseña</Label>
                       <div className="relative">
@@ -457,15 +573,17 @@ export default function ProfilePage() {
                         setShowPasswordDialog(false)
                         setNewPassword('')
                         setConfirmPassword('')
+                        setCurrentPassword('')
                         setShowPassword(false)
                         setShowConfirmPassword(false)
+                        setShowCurrentPassword(false)
                       }}
                     >
                       Cancelar
                     </Button>
                     <Button
                       onClick={handlePasswordChange}
-                      disabled={isChangingPassword || !newPassword || !confirmPassword}
+                      disabled={isChangingPassword || !newPassword || !confirmPassword || !currentPassword}
                     >
                       {isChangingPassword ? (
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -480,7 +598,7 @@ export default function ProfilePage() {
               <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
                 <DialogContent className="sm:max-w-md">
                   <DialogHeader>
-                    <DialogTitle>Cambiar email</DialogTitle>
+                    <DialogTitle>Cambiar correo</DialogTitle>
                     <DialogDescription>
                       Introduce tu nuevo email. Recibirás un correo de confirmación.
                     </DialogDescription>
