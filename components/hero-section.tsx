@@ -185,7 +185,7 @@ export function HeroSection() {
             </h1>
             <p className="mx-auto mb-6 max-w-2xl text-base text-emerald-800/80 dark:text-emerald-100/80 md:text-lg lg:mx-0 lg:text-xl">
               Descubre, filtra y organiza tu calendario de exámenes universitarios de la UPV.
-              Nunca más te pierdas una fecha importante de examen.
+              Nunca más te pierdas una fecha de examen importante.
             </p>
 
             
