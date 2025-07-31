@@ -41,6 +41,21 @@ jest.mock('@/utils/auth-helpers', () => ({
   getFreshAuthTokens: jest.fn(),
 }));
 
+// Mock framer-motion
+jest.mock('framer-motion', () => ({
+  motion: {
+    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  },
+}));
+
+// Mock Next.js Image component
+jest.mock('next/image', () => ({
+  __esModule: true,
+  default: ({ src, alt, ...props }: any) => (
+    <img src={src} alt={alt} {...props} />
+  ),
+}));
+
 describe('FilterSidebar', () => {
   const mockOnFiltersChange = jest.fn();
 

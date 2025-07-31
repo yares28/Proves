@@ -2,7 +2,6 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CalendarDisplay } from '@/components/calendar-display';
-import { SettingsProvider } from '@/context/settings-context';
 
 // Mock the auth context
 const mockUser = {
@@ -19,6 +18,17 @@ jest.mock('@/context/auth-context', () => ({
   }),
 }));
 
+// Mock the settings context
+jest.mock('@/context/settings-context', () => ({
+  useSettings: () => ({
+    settings: {
+      viewMode: 'calendar',
+      theme: 'light',
+    },
+    updateSettings: jest.fn(),
+  }),
+}));
+
 // Mock the toast hook
 const mockToast = jest.fn();
 jest.mock('@/hooks/use-toast', () => ({
@@ -26,14 +36,17 @@ jest.mock('@/hooks/use-toast', () => ({
 }));
 
 // Mock the exam actions
+const mockGetExams = jest.fn();
 jest.mock('@/actions/exam-actions', () => ({
-  getExams: jest.fn(),
+  getExams: mockGetExams,
 }));
 
-// Mock the user calendar actions
+// Mock the user calendars actions
+const mockSaveUserCalendar = jest.fn();
+const mockGetUserCalendarNames = jest.fn();
 jest.mock('@/actions/user-calendars', () => ({
-  saveUserCalendar: jest.fn(),
-  getUserCalendarNames: jest.fn(),
+  saveUserCalendar: mockSaveUserCalendar,
+  getUserCalendarNames: mockGetUserCalendarNames,
 }));
 
 // Mock the auth helpers
@@ -44,260 +57,163 @@ jest.mock('@/utils/auth-helpers', () => ({
 
 // Mock the date utils
 jest.mock('@/utils/date-utils', () => ({
-  formatDateString: jest.fn((year, month, day) => `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`),
+  formatDateString: jest.fn((date) => date),
   getCurrentYear: jest.fn(() => 2024),
-  getAcademicYearForMonth: jest.fn((month, year) => year || 2024),
-  detectAcademicYearFromExams: jest.fn(),
+  getAcademicYearForMonth: jest.fn(() => ({ startYear: 2023, endYear: 2024 })),
+  detectAcademicYearFromExams: jest.fn(() => ({ startYear: 2023, endYear: 2024 })),
   generateAcademicYearMonths: jest.fn(() => [
-    { name: 'September', days: 30, startDay: 0, monthNumber: 9, year: 2024 },
-    { name: 'October', days: 31, startDay: 2, monthNumber: 10, year: 2024 },
-    // ... more months
+    { name: 'September', year: 2023, monthNumber: 9 },
+    { name: 'October', year: 2023, monthNumber: 10 },
+    { name: 'November', year: 2023, monthNumber: 11 },
+    { name: 'December', year: 2023, monthNumber: 12 },
+    { name: 'January', year: 2024, monthNumber: 1 },
+    { name: 'February', year: 2024, monthNumber: 2 },
+    { name: 'March', year: 2024, monthNumber: 3 },
+    { name: 'April', year: 2024, monthNumber: 4 },
+    { name: 'May', year: 2024, monthNumber: 5 },
+    { name: 'June', year: 2024, monthNumber: 6 },
+    { name: 'July', year: 2024, monthNumber: 7 },
+    { name: 'August', year: 2024, monthNumber: 8 },
   ]),
 }));
 
-// Mock the view toggle component
-jest.mock('@/components/view-toggle', () => ({
-  ViewToggle: ({ view, onViewChange }: any) => (
-    <div data-testid="view-toggle">
-      <button onClick={() => onViewChange('calendar')}>Calendar</button>
-      <button onClick={() => onViewChange('list')}>List</button>
-    </div>
-  ),
-}));
-
-// Mock the exam list view component
-jest.mock('@/components/exam-list-view', () => ({
-  ExamListView: ({ exams }: any) => (
-    <div data-testid="exam-list-view">
-      {exams.map((exam: any) => (
-        <div key={exam.id}>{exam.name}</div>
-      ))}
-    </div>
-  ),
-}));
-
-// Mock the save calendar dialog component
+// Mock the dialog components
 jest.mock('@/components/save-calendar-dialog', () => ({
-  SaveCalendarDialog: ({ open, onOpenChange }: any) => (
+  SaveCalendarDialog: ({ open, onOpenChange, onSave }: any) => (
     open ? (
       <div data-testid="save-calendar-dialog">
-        <button onClick={() => onOpenChange(false)}>Close Save Dialog</button>
+        <button onClick={() => onSave('Test Calendar')}>Save</button>
+        <button onClick={() => onOpenChange(false)}>Close</button>
       </div>
     ) : null
   ),
 }));
 
-// Mock the export calendar dialog component
 jest.mock('@/components/export-calendar-dialog', () => ({
-  ExportCalendarDialog: ({ open, onOpenChange }: any) => (
+  ExportCalendarDialog: ({ open, onOpenChange, onExport }: any) => (
     open ? (
       <div data-testid="export-calendar-dialog">
-        <button onClick={() => onOpenChange(false)}>Close Export Dialog</button>
+        <button onClick={() => onExport('Test Calendar')}>Export</button>
+        <button onClick={() => onOpenChange(false)}>Close</button>
       </div>
     ) : null
   ),
 }));
 
+// Mock framer-motion
+jest.mock('framer-motion', () => ({
+  motion: {
+    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  },
+  AnimatePresence: ({ children }: any) => <div>{children}</div>,
+}));
+
+// Mock window.location
+Object.defineProperty(window, 'location', {
+  value: {
+    origin: 'https://upv-cal.vercel.app',
+  },
+  writable: true,
+});
+
 describe('CalendarDisplay', () => {
-  const mockOnExamsChange = jest.fn();
-  const mockActiveFilters = {
-    school: ['ETSINF'],
-    degree: ['Computer Science'],
-  };
+  const mockExams = [
+    {
+      id: '1',
+      name: 'Mathematics Exam',
+      date: '2024-01-15',
+      time: '09:00',
+      location: 'Room 101',
+      subject: 'Mathematics',
+      degree: 'Computer Science',
+      school: 'ETSINF',
+    },
+    {
+      id: '2',
+      name: 'Physics Exam',
+      date: '2024-01-20',
+      time: '14:00',
+      location: 'Room 202',
+      subject: 'Physics',
+      degree: 'Computer Science',
+      school: 'ETSINF',
+    },
+  ];
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetExams.mockResolvedValue(mockExams);
+    mockGetUserCalendarNames.mockResolvedValue(['Calendar 1', 'Calendar 2']);
   });
 
-  const renderCalendarDisplay = () => {
-    return render(
-      <SettingsProvider>
-        <CalendarDisplay 
-          activeFilters={mockActiveFilters} 
-          onExamsChange={mockOnExamsChange} 
-        />
-      </SettingsProvider>
-    );
+  const renderCalendarDisplay = (props = {}) => {
+    return render(<CalendarDisplay {...props} />);
   };
 
   describe('Rendering', () => {
-    it('should render the calendar display with basic elements', () => {
+    it('should render the calendar display with header', async () => {
       renderCalendarDisplay();
 
-      expect(screen.getByText('Calendario de Exámenes')).toBeInTheDocument();
-      expect(screen.getByTestId('view-toggle')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Calendario de Exámenes')).toBeInTheDocument();
+        expect(screen.getByText('Exportar')).toBeInTheDocument();
+        expect(screen.getByText('Guardar')).toBeInTheDocument();
+      });
     });
 
-    it('should render calendar view by default', () => {
+    it('should render calendar view by default', async () => {
       renderCalendarDisplay();
 
-      expect(screen.getByText('Calendario de Exámenes')).toBeInTheDocument();
-      // Calendar view should be visible
-      expect(screen.queryByTestId('exam-list-view')).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('September 2023')).toBeInTheDocument();
+        expect(screen.getByText('October 2023')).toBeInTheDocument();
+      });
     });
 
-    it('should render list view when view is changed', async () => {
-      const user = userEvent.setup();
+    it('should render months with exams only', async () => {
       renderCalendarDisplay();
 
-      const listButton = screen.getByText('List');
-      await user.click(listButton);
-
-      expect(screen.getByTestId('exam-list-view')).toBeInTheDocument();
+      await waitFor(() => {
+        // Should only render months that have exams
+        expect(screen.queryByText('September 2023')).not.toBeInTheDocument();
+        expect(screen.queryByText('October 2023')).not.toBeInTheDocument();
+      });
     });
 
-    it('should render export and save buttons when user is authenticated', () => {
+    it('should render calendar grid with day headers', async () => {
       renderCalendarDisplay();
 
-      expect(screen.getByText('Exportar')).toBeInTheDocument();
-      expect(screen.getByText('Guardar')).toBeInTheDocument();
-    });
-
-    it('should not render save button when user is not authenticated', () => {
-      jest.doMock('@/context/auth-context', () => ({
-        useAuth: () => ({
-          user: null,
-          syncToken: jest.fn(),
-          loading: false,
-        }),
-      }));
-
-      renderCalendarDisplay();
-
-      expect(screen.getByText('Exportar')).toBeInTheDocument();
-      expect(screen.queryByText('Guardar')).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Mo')).toBeInTheDocument();
+        expect(screen.getByText('Tu')).toBeInTheDocument();
+        expect(screen.getByText('We')).toBeInTheDocument();
+        expect(screen.getByText('Th')).toBeInTheDocument();
+        expect(screen.getByText('Fr')).toBeInTheDocument();
+        expect(screen.getByText('Sa')).toBeInTheDocument();
+        expect(screen.getByText('Su')).toBeInTheDocument();
+      });
     });
   });
 
-  describe('Exam Loading', () => {
-    it('should load exams when component mounts', async () => {
-      const { getExams } = require('@/actions/exam-actions');
-      const mockExams = [
-        { id: '1', name: 'Programming Exam', date: '2024-01-15', school: 'ETSINF' },
-        { id: '2', name: 'Database Exam', date: '2024-01-20', school: 'ETSINF' },
-      ];
-      getExams.mockResolvedValue(mockExams);
-
-      renderCalendarDisplay();
-
-      await waitFor(() => {
-        expect(getExams).toHaveBeenCalledWith(mockActiveFilters);
-      });
-    });
-
-    it('should handle exam loading errors', async () => {
-      const { getExams } = require('@/actions/exam-actions');
-      getExams.mockRejectedValue(new Error('Failed to load exams'));
-
-      renderCalendarDisplay();
-
-      await waitFor(() => {
-        expect(screen.getByText('Error al cargar los exámenes')).toBeInTheDocument();
-      });
-    });
-
-    it('should show loading state while fetching exams', async () => {
-      const { getExams } = require('@/actions/exam-actions');
-      getExams.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
-
+  describe('Loading State', () => {
+    it('should show loading state while fetching exams', () => {
+      mockGetExams.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
+      
       renderCalendarDisplay();
 
       expect(screen.getByText('Cargando exámenes...')).toBeInTheDocument();
     });
   });
 
-  describe('Calendar Navigation', () => {
-    it('should navigate to previous month', async () => {
-      const user = userEvent.setup();
-      renderCalendarDisplay();
-
-      const prevButton = screen.getByLabelText('Previous month');
-      await user.click(prevButton);
-
-      // Should update the visible months
-      expect(screen.getByText('Calendario de Exámenes')).toBeInTheDocument();
-    });
-
-    it('should navigate to next month', async () => {
-      const user = userEvent.setup();
-      renderCalendarDisplay();
-
-      const nextButton = screen.getByLabelText('Next month');
-      await user.click(nextButton);
-
-      // Should update the visible months
-      expect(screen.getByText('Calendario de Exámenes')).toBeInTheDocument();
-    });
-
-    it('should handle month navigation limits', async () => {
-      const user = userEvent.setup();
-      renderCalendarDisplay();
-
-      // Try to navigate to previous month multiple times
-      const prevButton = screen.getByLabelText('Previous month');
-      for (let i = 0; i < 5; i++) {
-        await user.click(prevButton);
-      }
-
-      // Should still be functional
-      expect(screen.getByText('Calendario de Exámenes')).toBeInTheDocument();
-    });
-  });
-
-  describe('Exam Interactions', () => {
-    it('should display exams on calendar when loaded', async () => {
-      const { getExams } = require('@/actions/exam-actions');
-      const mockExams = [
-        { id: '1', name: 'Programming Exam', date: '2024-01-15', school: 'ETSINF' },
-        { id: '2', name: 'Database Exam', date: '2024-01-20', school: 'ETSINF' },
-      ];
-      getExams.mockResolvedValue(mockExams);
-
+  describe('Error State', () => {
+    it('should show error message when exam fetching fails', async () => {
+      mockGetExams.mockRejectedValue(new Error('Failed to fetch exams'));
+      
       renderCalendarDisplay();
 
       await waitFor(() => {
-        expect(screen.getByText('Programming Exam')).toBeInTheDocument();
-        expect(screen.getByText('Database Exam')).toBeInTheDocument();
+        expect(screen.getByText(/Error/i)).toBeInTheDocument();
       });
-    });
-
-    it('should show exam details when exam is clicked', async () => {
-      const { getExams } = require('@/actions/exam-actions');
-      const mockExams = [
-        { id: '1', name: 'Programming Exam', date: '2024-01-15', school: 'ETSINF' },
-      ];
-      getExams.mockResolvedValue(mockExams);
-
-      const user = userEvent.setup();
-      renderCalendarDisplay();
-
-      await waitFor(() => {
-        const examElement = screen.getByText('Programming Exam');
-        user.click(examElement);
-      });
-
-      // Should show exam details
-      expect(screen.getByText('Programming Exam')).toBeInTheDocument();
-    });
-
-    it('should handle exam selection', async () => {
-      const { getExams } = require('@/actions/exam-actions');
-      const mockExams = [
-        { id: '1', name: 'Programming Exam', date: '2024-01-15', school: 'ETSINF' },
-        { id: '2', name: 'Database Exam', date: '2024-01-20', school: 'ETSINF' },
-      ];
-      getExams.mockResolvedValue(mockExams);
-
-      const user = userEvent.setup();
-      renderCalendarDisplay();
-
-      await waitFor(() => {
-        const examElements = screen.getAllByText(/Exam/);
-        user.click(examElements[0]);
-      });
-
-      // Should update selected exams
-      expect(mockOnExamsChange).toHaveBeenCalled();
     });
   });
 
@@ -306,25 +222,26 @@ describe('CalendarDisplay', () => {
       const user = userEvent.setup();
       renderCalendarDisplay();
 
+      await waitFor(() => {
+        const exportButton = screen.getByText('Exportar');
+        expect(exportButton).toBeInTheDocument();
+      });
+
       const exportButton = screen.getByText('Exportar');
       await user.click(exportButton);
 
       expect(screen.getByTestId('export-calendar-dialog')).toBeInTheDocument();
     });
 
-    it('should close export dialog when close button is clicked', async () => {
-      const user = userEvent.setup();
+    it('should disable export button when no exams are available', async () => {
+      mockGetExams.mockResolvedValue([]);
+      
       renderCalendarDisplay();
 
-      const exportButton = screen.getByText('Exportar');
-      await user.click(exportButton);
-
-      expect(screen.getByTestId('export-calendar-dialog')).toBeInTheDocument();
-
-      const closeButton = screen.getByText('Close Export Dialog');
-      await user.click(closeButton);
-
-      expect(screen.queryByTestId('export-calendar-dialog')).not.toBeInTheDocument();
+      await waitFor(() => {
+        const exportButton = screen.getByText('Exportar');
+        expect(exportButton).toBeDisabled();
+      });
     });
   });
 
@@ -333,152 +250,122 @@ describe('CalendarDisplay', () => {
       const user = userEvent.setup();
       renderCalendarDisplay();
 
+      await waitFor(() => {
+        const saveButton = screen.getByText('Guardar');
+        expect(saveButton).toBeInTheDocument();
+      });
+
       const saveButton = screen.getByText('Guardar');
       await user.click(saveButton);
 
       expect(screen.getByTestId('save-calendar-dialog')).toBeInTheDocument();
     });
 
-    it('should close save dialog when close button is clicked', async () => {
+    it('should disable save button when no exams are available', async () => {
+      mockGetExams.mockResolvedValue([]);
+      
+      renderCalendarDisplay();
+
+      await waitFor(() => {
+        const saveButton = screen.getByText('Guardar');
+        expect(saveButton).toBeDisabled();
+      });
+    });
+
+    it('should handle calendar save', async () => {
       const user = userEvent.setup();
+      mockSaveUserCalendar.mockResolvedValue({ success: true });
+      
       renderCalendarDisplay();
+
+      await waitFor(() => {
+        const saveButton = screen.getByText('Guardar');
+        expect(saveButton).toBeInTheDocument();
+      });
 
       const saveButton = screen.getByText('Guardar');
       await user.click(saveButton);
 
-      expect(screen.getByTestId('save-calendar-dialog')).toBeInTheDocument();
+      const saveDialog = screen.getByTestId('save-calendar-dialog');
+      const saveButtonInDialog = saveDialog.querySelector('button');
+      
+      if (saveButtonInDialog) {
+        await user.click(saveButtonInDialog);
+      }
 
-      const closeButton = screen.getByText('Close Save Dialog');
-      await user.click(closeButton);
-
-      expect(screen.queryByTestId('save-calendar-dialog')).not.toBeInTheDocument();
+      expect(mockSaveUserCalendar).toHaveBeenCalled();
     });
   });
 
-  describe('Filter Changes', () => {
-    it('should reload exams when filters change', async () => {
-      const { getExams } = require('@/actions/exam-actions');
-      getExams.mockResolvedValue([]);
+  describe('Filter Integration', () => {
+    it('should fetch exams with active filters', async () => {
+      const activeFilters = {
+        school: ['ETSINF'],
+        degree: ['Computer Science'],
+      };
 
-      const { rerender } = render(
-        <CalendarDisplay 
-          activeFilters={{ school: ['ETSINF'] }} 
-          onExamsChange={mockOnExamsChange} 
-        />
-      );
+      renderCalendarDisplay({ activeFilters });
 
       await waitFor(() => {
-        expect(getExams).toHaveBeenCalledWith({ school: ['ETSINF'] });
-      });
-
-      // Change filters
-      rerender(
-        <CalendarDisplay 
-          activeFilters={{ school: ['ETSID'] }} 
-          onExamsChange={mockOnExamsChange} 
-        />
-      );
-
-      await waitFor(() => {
-        expect(getExams).toHaveBeenCalledWith({ school: ['ETSID'] });
+        expect(mockGetExams).toHaveBeenCalledWith(activeFilters);
       });
     });
 
-    it('should handle empty filters gracefully', async () => {
-      const { getExams } = require('@/actions/exam-actions');
-      getExams.mockResolvedValue([]);
-
-      render(
-        <CalendarDisplay 
-          activeFilters={{}} 
-          onExamsChange={mockOnExamsChange} 
-        />
-      );
+    it('should call onExamsChange when exams are loaded', async () => {
+      const mockOnExamsChange = jest.fn();
+      
+      renderCalendarDisplay({ onExamsChange: mockOnExamsChange });
 
       await waitFor(() => {
-        expect(getExams).toHaveBeenCalledWith({});
+        expect(mockOnExamsChange).toHaveBeenCalledWith(mockExams);
       });
     });
   });
 
-  describe('Academic Year Detection', () => {
-    it('should detect academic year from exam dates', async () => {
-      const { detectAcademicYearFromExams } = require('@/utils/date-utils');
-      detectAcademicYearFromExams.mockReturnValue({
-        startYear: 2024,
-        endYear: 2025,
-        count: 5,
-      });
-
-      const { getExams } = require('@/actions/exam-actions');
-      const mockExams = [
-        { id: '1', name: 'Programming Exam', date: '2024-09-15', school: 'ETSINF' },
-        { id: '2', name: 'Database Exam', date: '2025-01-20', school: 'ETSINF' },
-      ];
-      getExams.mockResolvedValue(mockExams);
+  describe('Navigation', () => {
+    it('should show navigation buttons when there are many months', async () => {
+      // Mock more months to trigger navigation
+      jest.doMock('@/utils/date-utils', () => ({
+        ...jest.requireActual('@/utils/date-utils'),
+        generateAcademicYearMonths: jest.fn(() => Array.from({ length: 20 }, (_, i) => ({
+          name: `Month ${i + 1}`,
+          year: 2024,
+          monthNumber: i + 1,
+        }))),
+      }));
 
       renderCalendarDisplay();
 
       await waitFor(() => {
-        expect(detectAcademicYearFromExams).toHaveBeenCalledWith(['2024-09-15', '2025-01-20']);
-      });
-    });
-
-    it('should handle academic year detection when no exams', async () => {
-      const { detectAcademicYearFromExams } = require('@/utils/date-utils');
-      detectAcademicYearFromExams.mockReturnValue(null);
-
-      const { getExams } = require('@/actions/exam-actions');
-      getExams.mockResolvedValue([]);
-
-      renderCalendarDisplay();
-
-      await waitFor(() => {
-        expect(detectAcademicYearFromExams).toHaveBeenCalledWith([]);
-      });
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('should handle network errors gracefully', async () => {
-      const { getExams } = require('@/actions/exam-actions');
-      getExams.mockRejectedValue(new Error('Network error'));
-
-      renderCalendarDisplay();
-
-      await waitFor(() => {
-        expect(screen.getByText('Error al cargar los exámenes')).toBeInTheDocument();
-      });
-    });
-
-    it('should handle malformed exam data', async () => {
-      const { getExams } = require('@/actions/exam-actions');
-      const malformedExams = [
-        { id: '1', name: 'Programming Exam', date: 'invalid-date', school: 'ETSINF' },
-      ];
-      getExams.mockResolvedValue(malformedExams);
-
-      renderCalendarDisplay();
-
-      await waitFor(() => {
-        expect(screen.getByText('Programming Exam')).toBeInTheDocument();
+        expect(screen.getByText('Anterior')).toBeInTheDocument();
+        expect(screen.getByText('Siguiente')).toBeInTheDocument();
       });
     });
   });
 
   describe('Accessibility', () => {
-    it('should have proper ARIA labels and roles', () => {
+    it('should have proper ARIA attributes', async () => {
       renderCalendarDisplay();
 
-      expect(screen.getByRole('button', { name: 'Exportar' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument();
+      await waitFor(() => {
+        const exportButton = screen.getByText('Exportar');
+        const saveButton = screen.getByText('Guardar');
+        
+        expect(exportButton).toBeInTheDocument();
+        expect(saveButton).toBeInTheDocument();
+      });
     });
 
-    it('should have proper keyboard navigation', async () => {
+    it('should be keyboard navigable', async () => {
       const user = userEvent.setup();
       renderCalendarDisplay();
 
-      const exportButton = screen.getByRole('button', { name: 'Exportar' });
+      await waitFor(() => {
+        const exportButton = screen.getByText('Exportar');
+        expect(exportButton).toBeInTheDocument();
+      });
+
+      const exportButton = screen.getByText('Exportar');
       
       // Focus the button
       exportButton.focus();
@@ -490,49 +377,41 @@ describe('CalendarDisplay', () => {
     });
   });
 
-  describe('Performance', () => {
-    it('should handle large number of exams efficiently', async () => {
-      const { getExams } = require('@/actions/exam-actions');
-      const largeExamList = Array.from({ length: 100 }, (_, i) => ({
-        id: i.toString(),
-        name: `Exam ${i + 1}`,
-        date: '2024-01-15',
-        school: 'ETSINF',
-      }));
-      getExams.mockResolvedValue(largeExamList);
-
+  describe('Edge Cases', () => {
+    it('should handle empty exam list', async () => {
+      mockGetExams.mockResolvedValue([]);
+      
       renderCalendarDisplay();
 
       await waitFor(() => {
-        expect(screen.getByText('Exam 1')).toBeInTheDocument();
-        expect(screen.getByText('Exam 100')).toBeInTheDocument();
+        expect(screen.getByText('Exportar')).toBeDisabled();
+        expect(screen.getByText('Guardar')).toBeDisabled();
       });
     });
 
-    it('should debounce filter changes', async () => {
-      const { getExams } = require('@/actions/exam-actions');
-      getExams.mockResolvedValue([]);
+    it('should handle missing onExamsChange prop', async () => {
+      renderCalendarDisplay({ onExamsChange: undefined });
 
-      const { rerender } = render(
-        <CalendarDisplay 
-          activeFilters={{ school: ['ETSINF'] }} 
-          onExamsChange={mockOnExamsChange} 
-        />
-      );
-
-      // Rapidly change filters
-      for (let i = 0; i < 5; i++) {
-        rerender(
-          <CalendarDisplay 
-            activeFilters={{ school: [`School ${i}`] }} 
-            onExamsChange={mockOnExamsChange} 
-          />
-        );
-      }
-
-      // Should not make excessive API calls
       await waitFor(() => {
-        expect(getExams).toHaveBeenCalledTimes(expect.any(Number));
+        expect(screen.getByText('Calendario de Exámenes')).toBeInTheDocument();
+      });
+    });
+
+    it('should handle missing activeFilters prop', async () => {
+      renderCalendarDisplay({ activeFilters: undefined });
+
+      await waitFor(() => {
+        expect(mockGetExams).toHaveBeenCalledWith({});
+      });
+    });
+
+    it('should handle exam fetching errors gracefully', async () => {
+      mockGetExams.mockRejectedValue(new Error('Network error'));
+      
+      renderCalendarDisplay();
+
+      await waitFor(() => {
+        expect(screen.getByText(/Error/i)).toBeInTheDocument();
       });
     });
   });

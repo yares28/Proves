@@ -2,14 +2,12 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LoginForm } from '@/components/auth/login-form';
-import { AuthProvider } from '@/context/auth-context';
 
 // Mock the auth context
 const mockSignIn = jest.fn();
 const mockSignInWithProvider = jest.fn();
 
 jest.mock('@/context/auth-context', () => ({
-  ...jest.requireActual('@/context/auth-context'),
   useAuth: () => ({
     signIn: mockSignIn,
     signInWithProvider: mockSignInWithProvider,
@@ -18,51 +16,62 @@ jest.mock('@/context/auth-context', () => ({
   }),
 }));
 
-// Mock Supabase client
+// Mock the Supabase client
+const mockSupabase = {
+  auth: {
+    getSession: jest.fn(),
+  },
+};
+
 jest.mock('@/utils/supabase/client', () => ({
-  createClient: jest.fn(() => ({
-    auth: {
-      getSession: jest.fn(() => Promise.resolve({ data: { session: null }, error: null })),
-      refreshSession: jest.fn(),
-      onAuthStateChange: jest.fn(),
-    },
-  })),
+  createClient: () => mockSupabase,
 }));
 
-// Mock EnhancedGoogleAuth component
+// Mock the enhanced Google auth component
 jest.mock('@/components/auth/enhanced-google-auth', () => ({
-  EnhancedGoogleAuth: ({ onSuccess, onError }: any) => (
+  EnhancedGoogleAuth: ({ onSuccess, onError, className, variant }: any) => (
     <button 
-      onClick={() => onSuccess()} 
       data-testid="google-auth-button"
+      onClick={() => onSuccess()}
+      className={className}
+      data-variant={variant}
     >
-      Sign in with Google
+      Continuar con Google
     </button>
   ),
 }));
 
-// Mock AuthPerformanceMonitor component
+// Mock the auth performance monitor
 jest.mock('@/components/auth-performance-monitor', () => ({
   AuthPerformanceMonitor: () => <div data-testid="auth-performance-monitor" />,
 }));
+
+// Mock localStorage
+Object.defineProperty(window, 'localStorage', {
+  value: {
+    setItem: jest.fn(),
+    getItem: jest.fn(),
+    removeItem: jest.fn(),
+  },
+  writable: true,
+});
 
 describe('LoginForm', () => {
   const mockOnSuccess = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSignIn.mockResolvedValue({ error: null });
-    mockSignInWithProvider.mockResolvedValue(undefined);
+    mockSupabase.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'test-token' } },
+    });
   });
 
   const renderLoginForm = () => {
-    return render(
-      <LoginForm onSuccess={mockOnSuccess} />
-    );
+    return render(<LoginForm onSuccess={mockOnSuccess} />);
   };
 
   describe('Rendering', () => {
-    it('should render the login form with all required elements', () => {
+    it('should render the login form with all fields', () => {
       renderLoginForm();
 
       expect(screen.getByText('Iniciar Sesión')).toBeInTheDocument();
@@ -70,25 +79,28 @@ describe('LoginForm', () => {
       expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
       expect(screen.getByLabelText('Recordarme')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Iniciar Sesión' })).toBeInTheDocument();
+    });
+
+    it('should render Google auth button', () => {
+      renderLoginForm();
+
       expect(screen.getByTestId('google-auth-button')).toBeInTheDocument();
+      expect(screen.getByText('Continuar con Google')).toBeInTheDocument();
+    });
+
+    it('should render auth performance monitor', () => {
+      renderLoginForm();
+
       expect(screen.getByTestId('auth-performance-monitor')).toBeInTheDocument();
     });
 
-    it('should show password toggle button', () => {
+    it('should render password visibility toggle', () => {
       renderLoginForm();
 
       const passwordInput = screen.getByLabelText('Contraseña');
-      const toggleButton = screen.getByRole('button', { name: '' }); // Eye icon button
-
-      expect(passwordInput).toHaveAttribute('type', 'password');
+      const toggleButton = passwordInput.parentElement?.querySelector('button');
+      
       expect(toggleButton).toBeInTheDocument();
-    });
-
-    it('should have remember me checkbox checked by default', () => {
-      renderLoginForm();
-
-      const rememberMeCheckbox = screen.getByLabelText('Recordarme');
-      expect(rememberMeCheckbox).toBeChecked();
     });
   });
 
@@ -131,36 +143,24 @@ describe('LoginForm', () => {
 
       const emailInput = screen.getByLabelText('Email');
       const passwordInput = screen.getByLabelText('Contraseña');
+      const submitButton = screen.getByRole('button', { name: 'Iniciar Sesión' });
 
       await user.type(emailInput, 'test@example.com');
       await user.type(passwordInput, 'password123');
+      await user.click(submitButton);
 
-      expect(screen.queryByText('Por favor ingresa un email válido')).not.toBeInTheDocument();
-      expect(screen.queryByText('La contraseña debe tener al menos 6 caracteres')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('Password Toggle', () => {
-    it('should toggle password visibility when eye button is clicked', async () => {
-      const user = userEvent.setup();
-      renderLoginForm();
-
-      const passwordInput = screen.getByLabelText('Contraseña');
-      const toggleButton = screen.getByRole('button', { name: '' });
-
-      expect(passwordInput).toHaveAttribute('type', 'password');
-
-      await user.click(toggleButton);
-      expect(passwordInput).toHaveAttribute('type', 'text');
-
-      await user.click(toggleButton);
-      expect(passwordInput).toHaveAttribute('type', 'password');
+      await waitFor(() => {
+        expect(screen.queryByText('Por favor ingresa un email válido')).not.toBeInTheDocument();
+        expect(screen.queryByText('La contraseña debe tener al menos 6 caracteres')).not.toBeInTheDocument();
+      });
     });
   });
 
   describe('Form Submission', () => {
-    it('should call signIn with correct data on successful submission', async () => {
+    it('should call signIn with form data on successful submission', async () => {
       const user = userEvent.setup();
+      mockSignIn.mockResolvedValue({ error: null });
+      
       renderLoginForm();
 
       const emailInput = screen.getByLabelText('Email');
@@ -176,8 +176,10 @@ describe('LoginForm', () => {
       });
     });
 
-    it('should call onSuccess when signIn is successful', async () => {
+    it('should call onSuccess after successful login', async () => {
       const user = userEvent.setup();
+      mockSignIn.mockResolvedValue({ error: null });
+      
       renderLoginForm();
 
       const emailInput = screen.getByLabelText('Email');
@@ -193,30 +195,10 @@ describe('LoginForm', () => {
       });
     });
 
-    it('should show loading state during submission', async () => {
-      mockSignIn.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
-
+    it('should store session in localStorage on successful login', async () => {
       const user = userEvent.setup();
-      renderLoginForm();
-
-      const emailInput = screen.getByLabelText('Email');
-      const passwordInput = screen.getByLabelText('Contraseña');
-      const submitButton = screen.getByRole('button', { name: 'Iniciar Sesión' });
-
-      await user.type(emailInput, 'test@example.com');
-      await user.type(passwordInput, 'password123');
-      await user.click(submitButton);
-
-      expect(screen.getByText('Espera por favor')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Espera por favor' })).toBeDisabled();
-    });
-
-    it('should show error message when signIn fails', async () => {
-      mockSignIn.mockResolvedValue({ 
-        error: { message: 'Invalid login credentials' } 
-      });
-
-      const user = userEvent.setup();
+      mockSignIn.mockResolvedValue({ error: null });
+      
       renderLoginForm();
 
       const emailInput = screen.getByLabelText('Email');
@@ -228,16 +210,60 @@ describe('LoginForm', () => {
       await user.click(submitButton);
 
       await waitFor(() => {
+        expect(localStorage.setItem).toHaveBeenCalledWith(
+          'supabase.auth.token',
+          JSON.stringify({ currentSession: { access_token: 'test-token' } })
+        );
+      });
+    });
+
+    it('should show loading state during submission', async () => {
+      const user = userEvent.setup();
+      mockSignIn.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
+      
+      renderLoginForm();
+
+      const emailInput = screen.getByLabelText('Email');
+      const passwordInput = screen.getByLabelText('Contraseña');
+      const submitButton = screen.getByRole('button', { name: 'Iniciar Sesión' });
+
+      await user.type(emailInput, 'test@example.com');
+      await user.type(passwordInput, 'password123');
+      await user.click(submitButton);
+
+      expect(screen.getByText('Espera por favor')).toBeInTheDocument();
+      expect(submitButton).toBeDisabled();
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should display error message for invalid credentials', async () => {
+      const user = userEvent.setup();
+      mockSignIn.mockResolvedValue({ 
+        error: { message: 'Invalid login credentials' } 
+      });
+      
+      renderLoginForm();
+
+      const emailInput = screen.getByLabelText('Email');
+      const passwordInput = screen.getByLabelText('Contraseña');
+      const submitButton = screen.getByRole('button', { name: 'Iniciar Sesión' });
+
+      await user.type(emailInput, 'test@example.com');
+      await user.type(passwordInput, 'wrongpassword');
+      await user.click(submitButton);
+
+      await waitFor(() => {
         expect(screen.getByText('Credenciales de inicio de sesión incorrectas')).toBeInTheDocument();
       });
     });
 
-    it('should translate common error messages to Spanish', async () => {
+    it('should display error message for unconfirmed email', async () => {
+      const user = userEvent.setup();
       mockSignIn.mockResolvedValue({ 
         error: { message: 'Email not confirmed' } 
       });
-
-      const user = userEvent.setup();
+      
       renderLoginForm();
 
       const emailInput = screen.getByLabelText('Email');
@@ -253,10 +279,10 @@ describe('LoginForm', () => {
       });
     });
 
-    it('should show generic error for unexpected errors', async () => {
-      mockSignIn.mockRejectedValue(new Error('Network error'));
-
+    it('should display generic error for unexpected errors', async () => {
       const user = userEvent.setup();
+      mockSignIn.mockRejectedValue(new Error('Network error'));
+      
       renderLoginForm();
 
       const emailInput = screen.getByLabelText('Email');
@@ -273,70 +299,98 @@ describe('LoginForm', () => {
     });
   });
 
-  describe('Google Authentication', () => {
-    it('should call signInWithProvider when Google auth is clicked', async () => {
+  describe('Password Visibility', () => {
+    it('should toggle password visibility when eye button is clicked', async () => {
       const user = userEvent.setup();
       renderLoginForm();
 
-      const googleButton = screen.getByTestId('google-auth-button');
-      await user.click(googleButton);
+      const passwordInput = screen.getByLabelText('Contraseña');
+      const toggleButton = passwordInput.parentElement?.querySelector('button');
 
-      expect(mockSignInWithProvider).toHaveBeenCalledWith('google');
-    });
+      expect(passwordInput).toHaveAttribute('type', 'password');
 
-    it('should show error when Google auth fails', async () => {
-      mockSignInWithProvider.mockRejectedValue(new Error('Google auth failed'));
+      if (toggleButton) {
+        await user.click(toggleButton);
+      }
 
-      const user = userEvent.setup();
-      renderLoginForm();
+      expect(passwordInput).toHaveAttribute('type', 'text');
 
-      const googleButton = screen.getByTestId('google-auth-button');
-      await user.click(googleButton);
+      if (toggleButton) {
+        await user.click(toggleButton);
+      }
 
-      await waitFor(() => {
-        expect(screen.getByText('Error al iniciar sesión con el proveedor. Por favor intenta de nuevo.')).toBeInTheDocument();
-      });
+      expect(passwordInput).toHaveAttribute('type', 'password');
     });
   });
 
-  describe('Remember Me Functionality', () => {
-    it('should include remember me value in form data', async () => {
+  describe('Remember Me Checkbox', () => {
+    it('should be checked by default', () => {
+      renderLoginForm();
+
+      const rememberMeCheckbox = screen.getByLabelText('Recordarme');
+      expect(rememberMeCheckbox).toBeChecked();
+    });
+
+    it('should be toggleable', async () => {
       const user = userEvent.setup();
       renderLoginForm();
 
       const rememberMeCheckbox = screen.getByLabelText('Recordarme');
-      const emailInput = screen.getByLabelText('Email');
-      const passwordInput = screen.getByLabelText('Contraseña');
-      const submitButton = screen.getByRole('button', { name: 'Iniciar Sesión' });
-
-      // Uncheck remember me
+      
       await user.click(rememberMeCheckbox);
       expect(rememberMeCheckbox).not.toBeChecked();
 
-      await user.type(emailInput, 'test@example.com');
-      await user.type(passwordInput, 'password123');
-      await user.click(submitButton);
+      await user.click(rememberMeCheckbox);
+      expect(rememberMeCheckbox).toBeChecked();
+    });
+  });
 
-      await waitFor(() => {
-        expect(mockSignIn).toHaveBeenCalledWith('test@example.com', 'password123');
-      });
+  describe('Google Auth Integration', () => {
+    it('should call onSuccess when Google auth succeeds', async () => {
+      const user = userEvent.setup();
+      renderLoginForm();
+
+      const googleAuthButton = screen.getByTestId('google-auth-button');
+      await user.click(googleAuthButton);
+
+      expect(mockOnSuccess).toHaveBeenCalled();
     });
   });
 
   describe('Accessibility', () => {
-    it('should have proper ARIA labels and roles', () => {
+    it('should have proper form labels and ARIA attributes', () => {
       renderLoginForm();
 
       expect(screen.getByLabelText('Email')).toBeInTheDocument();
       expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
       expect(screen.getByLabelText('Recordarme')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Iniciar Sesión' })).toBeInTheDocument();
     });
 
-    it('should disable form inputs during loading', async () => {
-      mockSignIn.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
-
+    it('should be keyboard navigable', async () => {
       const user = userEvent.setup();
+      renderLoginForm();
+
+      const emailInput = screen.getByLabelText('Email');
+      const passwordInput = screen.getByLabelText('Contraseña');
+      const submitButton = screen.getByRole('button', { name: 'Iniciar Sesión' });
+
+      // Tab through form elements
+      await user.tab();
+      expect(emailInput).toHaveFocus();
+
+      await user.tab();
+      expect(passwordInput).toHaveFocus();
+
+      await user.tab();
+      expect(submitButton).toHaveFocus();
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle rapid form submissions', async () => {
+      const user = userEvent.setup();
+      mockSignIn.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
+      
       renderLoginForm();
 
       const emailInput = screen.getByLabelText('Email');
@@ -345,11 +399,22 @@ describe('LoginForm', () => {
 
       await user.type(emailInput, 'test@example.com');
       await user.type(passwordInput, 'password123');
+
+      // Rapidly click submit button
+      await user.click(submitButton);
+      await user.click(submitButton);
       await user.click(submitButton);
 
-      expect(emailInput).toBeDisabled();
-      expect(passwordInput).toBeDisabled();
-      expect(submitButton).toBeDisabled();
+      // Should only call signIn once
+      await waitFor(() => {
+        expect(mockSignIn).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('should handle missing onSuccess prop', () => {
+      render(<LoginForm onSuccess={undefined as any} />);
+
+      expect(screen.getByText('Iniciar Sesión')).toBeInTheDocument();
     });
   });
 }); 

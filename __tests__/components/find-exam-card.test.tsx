@@ -20,6 +20,14 @@ jest.mock('next/navigation', () => ({
 jest.mock('@/actions/exam-actions', () => ({
   getSchools: jest.fn(),
   getDegrees: jest.fn(),
+  getFilteredAcronymsAndSubjects: jest.fn(),
+}));
+
+// Mock framer-motion
+jest.mock('framer-motion', () => ({
+  motion: {
+    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  },
 }));
 
 describe('FindExamCard', () => {
@@ -36,10 +44,10 @@ describe('FindExamCard', () => {
       renderFindExamCard();
 
       expect(screen.getByText('Encuentra tu Examen')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('Buscar exámenes...')).toBeInTheDocument();
       expect(screen.getByText('Escuela')).toBeInTheDocument();
       expect(screen.getByText('Carrera')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Buscar' })).toBeInTheDocument();
+      expect(screen.getByText('Buscar por acrónimo o asignatura')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Buscar Exámenes' })).toBeInTheDocument();
     });
 
     it('should show loading state initially', () => {
@@ -72,49 +80,16 @@ describe('FindExamCard', () => {
         expect(screen.getByText('Error al cargar las escuelas. Por favor intenta de nuevo.')).toBeInTheDocument();
       });
     });
-  });
 
-  describe('Search Functionality', () => {
-    it('should handle search input changes', async () => {
-      const user = userEvent.setup();
-      renderFindExamCard();
-
-      const searchInput = screen.getByPlaceholderText('Buscar exámenes...');
-      await user.type(searchInput, 'Programming');
-
-      expect(searchInput).toHaveValue('Programming');
-    });
-
-    it('should clear search input when clear button is clicked', async () => {
-      const user = userEvent.setup();
-      renderFindExamCard();
-
-      const searchInput = screen.getByPlaceholderText('Buscar exámenes...');
-      await user.type(searchInput, 'Programming');
-
-      const clearButton = screen.getByRole('button', { name: 'Clear search' });
-      await user.click(clearButton);
-
-      expect(searchInput).toHaveValue('');
-    });
-
-    it('should filter schools based on search input', async () => {
+    it('should show no schools message when schools list is empty', async () => {
       const { getSchools } = require('@/actions/exam-actions');
-      const mockSchools = ['ETSINF', 'ETSID', 'ETSAM'];
-      getSchools.mockResolvedValue(mockSchools);
+      getSchools.mockResolvedValue([]);
 
-      const user = userEvent.setup();
       renderFindExamCard();
 
       await waitFor(() => {
-        expect(screen.getByText('ETSINF')).toBeInTheDocument();
+        expect(screen.getByText('No se encontraron escuelas')).toBeInTheDocument();
       });
-
-      const searchInput = screen.getByPlaceholderText('Buscar exámenes...');
-      await user.type(searchInput, 'ETSINF');
-
-      expect(screen.getByText('ETSINF')).toBeInTheDocument();
-      expect(screen.queryByText('ETSID')).not.toBeInTheDocument();
     });
   });
 
@@ -208,7 +183,7 @@ describe('FindExamCard', () => {
       await user.click(etsinfOption);
 
       await waitFor(() => {
-        expect(screen.getByText('Error al cargar las carreras. Por favor intenta de nuevo.')).toBeInTheDocument();
+        expect(screen.getByText('No se encontraron carreras para esta escuela')).toBeInTheDocument();
       });
     });
   });
@@ -289,91 +264,19 @@ describe('FindExamCard', () => {
     });
   });
 
-  describe('Search Submission', () => {
-    it('should navigate to search results when search button is clicked', async () => {
-      const { getSchools } = require('@/actions/exam-actions');
-      const mockSchools = ['ETSINF'];
-      getSchools.mockResolvedValue(mockSchools);
-
-      const user = userEvent.setup();
-      renderFindExamCard();
-
-      await waitFor(() => {
-        expect(screen.getByText('ETSINF')).toBeInTheDocument();
-      });
-
-      // Fill in search form
-      const searchInput = screen.getByPlaceholderText('Buscar exámenes...');
-      await user.type(searchInput, 'Programming');
-
-      const schoolSelect = screen.getByRole('combobox', { name: 'Escuela' });
-      await user.click(schoolSelect);
-      const etsinfOption = screen.getByText('ETSINF');
-      await user.click(etsinfOption);
-
-      const searchButton = screen.getByRole('button', { name: 'Buscar' });
-      await user.click(searchButton);
-
-      expect(mockPush).toHaveBeenCalledWith(
-        expect.stringContaining('/exams?search=Programming&school=ETSINF')
-      );
-    });
-
-    it('should handle search with only search term', async () => {
-      const { getSchools } = require('@/actions/exam-actions');
-      const mockSchools = ['ETSINF'];
-      getSchools.mockResolvedValue(mockSchools);
-
-      const user = userEvent.setup();
-      renderFindExamCard();
-
-      await waitFor(() => {
-        expect(screen.getByText('ETSINF')).toBeInTheDocument();
-      });
-
-      const searchInput = screen.getByPlaceholderText('Buscar exámenes...');
-      await user.type(searchInput, 'Programming');
-
-      const searchButton = screen.getByRole('button', { name: 'Buscar' });
-      await user.click(searchButton);
-
-      expect(mockPush).toHaveBeenCalledWith(
-        expect.stringContaining('/exams?search=Programming')
-      );
-    });
-
-    it('should handle search with only school selected', async () => {
-      const { getSchools } = require('@/actions/exam-actions');
-      const mockSchools = ['ETSINF'];
-      getSchools.mockResolvedValue(mockSchools);
-
-      const user = userEvent.setup();
-      renderFindExamCard();
-
-      await waitFor(() => {
-        expect(screen.getByText('ETSINF')).toBeInTheDocument();
-      });
-
-      const schoolSelect = screen.getByRole('combobox', { name: 'Escuela' });
-      await user.click(schoolSelect);
-      const etsinfOption = screen.getByText('ETSINF');
-      await user.click(etsinfOption);
-
-      const searchButton = screen.getByRole('button', { name: 'Buscar' });
-      await user.click(searchButton);
-
-      expect(mockPush).toHaveBeenCalledWith(
-        expect.stringContaining('/exams?school=ETSINF')
-      );
-    });
-
-    it('should handle search with school and degree selected', async () => {
-      const { getSchools, getDegrees } = require('@/actions/exam-actions');
+  describe('Acronym and Subject Search', () => {
+    it('should enable acronym search when school and degree are selected', async () => {
+      const { getSchools, getDegrees, getFilteredAcronymsAndSubjects } = require('@/actions/exam-actions');
       const mockSchools = ['ETSINF'];
       const mockDegrees = ['Computer Science'];
+      const mockOptions = [
+        { value: 'MAD', type: 'acronym' },
+        { value: 'Programming', type: 'subject' }
+      ];
       
       getSchools.mockResolvedValue(mockSchools);
       getDegrees.mockResolvedValue(mockDegrees);
+      getFilteredAcronymsAndSubjects.mockResolvedValue(mockOptions);
 
       const user = userEvent.setup();
       renderFindExamCard();
@@ -398,18 +301,30 @@ describe('FindExamCard', () => {
       const computerScienceOption = screen.getByText('Computer Science');
       await user.click(computerScienceOption);
 
-      const searchButton = screen.getByRole('button', { name: 'Buscar' });
-      await user.click(searchButton);
-
-      expect(mockPush).toHaveBeenCalledWith(
-        expect.stringContaining('/exams?school=ETSINF&degree=Computer Science')
-      );
+      // Acronym search should be enabled
+      await waitFor(() => {
+        expect(screen.getByText('Ej. MAD, Introducción a la Programación, ...')).toBeInTheDocument();
+      });
     });
 
-    it('should handle empty search gracefully', async () => {
-      const { getSchools } = require('@/actions/exam-actions');
+    it('should show placeholder when school and degree are not selected', () => {
+      renderFindExamCard();
+
+      expect(screen.getByText('Selecciona escuela y carrera primero')).toBeInTheDocument();
+    });
+
+    it('should handle acronym selection', async () => {
+      const { getSchools, getDegrees, getFilteredAcronymsAndSubjects } = require('@/actions/exam-actions');
       const mockSchools = ['ETSINF'];
+      const mockDegrees = ['Computer Science'];
+      const mockOptions = [
+        { value: 'MAD', type: 'acronym' },
+        { value: 'Programming', type: 'subject' }
+      ];
+      
       getSchools.mockResolvedValue(mockSchools);
+      getDegrees.mockResolvedValue(mockDegrees);
+      getFilteredAcronymsAndSubjects.mockResolvedValue(mockOptions);
 
       const user = userEvent.setup();
       renderFindExamCard();
@@ -418,18 +333,198 @@ describe('FindExamCard', () => {
         expect(screen.getByText('ETSINF')).toBeInTheDocument();
       });
 
-      const searchButton = screen.getByRole('button', { name: 'Buscar' });
+      // Select school and degree
+      const schoolSelect = screen.getByRole('combobox', { name: 'Escuela' });
+      await user.click(schoolSelect);
+      const etsinfOption = screen.getByText('ETSINF');
+      await user.click(etsinfOption);
+
+      await waitFor(() => {
+        expect(screen.getByText('Computer Science')).toBeInTheDocument();
+      });
+
+      const degreeSelect = screen.getByRole('combobox', { name: 'Carrera' });
+      await user.click(degreeSelect);
+      const computerScienceOption = screen.getByText('Computer Science');
+      await user.click(computerScienceOption);
+
+      // Open acronym search
+      await waitFor(() => {
+        const acronymButton = screen.getByRole('button', { name: /Ej\. MAD/ });
+        user.click(acronymButton);
+      });
+
+      // Should show search input
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Buscar acrónimo o asignatura...')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Search Submission', () => {
+    it('should navigate to search results when search button is clicked', async () => {
+      const { getSchools, getDegrees, getFilteredAcronymsAndSubjects } = require('@/actions/exam-actions');
+      const mockSchools = ['ETSINF'];
+      const mockDegrees = ['Computer Science'];
+      const mockOptions = [
+        { value: 'MAD', type: 'acronym' },
+        { value: 'Programming', type: 'subject' }
+      ];
+      
+      getSchools.mockResolvedValue(mockSchools);
+      getDegrees.mockResolvedValue(mockDegrees);
+      getFilteredAcronymsAndSubjects.mockResolvedValue(mockOptions);
+
+      const user = userEvent.setup();
+      renderFindExamCard();
+
+      await waitFor(() => {
+        expect(screen.getByText('ETSINF')).toBeInTheDocument();
+      });
+
+      // Select school
+      const schoolSelect = screen.getByRole('combobox', { name: 'Escuela' });
+      await user.click(schoolSelect);
+      const etsinfOption = screen.getByText('ETSINF');
+      await user.click(etsinfOption);
+
+      // Select degree
+      await waitFor(() => {
+        expect(screen.getByText('Computer Science')).toBeInTheDocument();
+      });
+
+      const degreeSelect = screen.getByRole('combobox', { name: 'Carrera' });
+      await user.click(degreeSelect);
+      const computerScienceOption = screen.getByText('Computer Science');
+      await user.click(computerScienceOption);
+
+      // Open acronym search and select an option
+      await waitFor(() => {
+        const acronymButton = screen.getByRole('button', { name: /Ej\. MAD/ });
+        user.click(acronymButton);
+      });
+
+      await waitFor(() => {
+        const searchInput = screen.getByPlaceholderText('Buscar acrónimo o asignatura...');
+        user.type(searchInput, 'MAD');
+      });
+
+      // Select the acronym
+      await waitFor(() => {
+        const madOption = screen.getByText('MAD');
+        user.click(madOption);
+      });
+
+      // Submit search
+      const searchButton = screen.getByRole('button', { name: 'Buscar Exámenes' });
       await user.click(searchButton);
 
-      expect(mockPush).toHaveBeenCalledWith('/exams');
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.stringContaining('/exams?school=ETSINF&degree=Computer Science&acronyms=MAD')
+      );
+    });
+
+    it('should handle search with multiple selections', async () => {
+      const { getSchools, getDegrees, getFilteredAcronymsAndSubjects } = require('@/actions/exam-actions');
+      const mockSchools = ['ETSINF'];
+      const mockDegrees = ['Computer Science'];
+      const mockOptions = [
+        { value: 'MAD', type: 'acronym' },
+        { value: 'Programming', type: 'subject' }
+      ];
+      
+      getSchools.mockResolvedValue(mockSchools);
+      getDegrees.mockResolvedValue(mockDegrees);
+      getFilteredAcronymsAndSubjects.mockResolvedValue(mockOptions);
+
+      const user = userEvent.setup();
+      renderFindExamCard();
+
+      await waitFor(() => {
+        expect(screen.getByText('ETSINF')).toBeInTheDocument();
+      });
+
+      // Select school and degree
+      const schoolSelect = screen.getByRole('combobox', { name: 'Escuela' });
+      await user.click(schoolSelect);
+      const etsinfOption = screen.getByText('ETSINF');
+      await user.click(etsinfOption);
+
+      await waitFor(() => {
+        expect(screen.getByText('Computer Science')).toBeInTheDocument();
+      });
+
+      const degreeSelect = screen.getByRole('combobox', { name: 'Carrera' });
+      await user.click(degreeSelect);
+      const computerScienceOption = screen.getByText('Computer Science');
+      await user.click(computerScienceOption);
+
+      // Open acronym search and select multiple options
+      await waitFor(() => {
+        const acronymButton = screen.getByRole('button', { name: /Ej\. MAD/ });
+        user.click(acronymButton);
+      });
+
+      // Select MAD
+      await waitFor(() => {
+        const searchInput = screen.getByPlaceholderText('Buscar acrónimo o asignatura...');
+        user.type(searchInput, 'MAD');
+      });
+
+      await waitFor(() => {
+        const madOption = screen.getByText('MAD');
+        user.click(madOption);
+      });
+
+      // Select Programming
+      await waitFor(() => {
+        const searchInput = screen.getByPlaceholderText('Buscar acrónimo o asignatura...');
+        user.type(searchInput, 'Programming');
+      });
+
+      await waitFor(() => {
+        const programmingOption = screen.getByText('Programming');
+        user.click(programmingOption);
+      });
+
+      // Submit search
+      const searchButton = screen.getByRole('button', { name: 'Buscar Exámenes' });
+      await user.click(searchButton);
+
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.stringContaining('/exams?school=ETSINF&degree=Computer Science&acronyms=MAD&subjects=Programming')
+      );
+    });
+
+    it('should disable search button when no selections are made', async () => {
+      const { getSchools } = require('@/actions/exam-actions');
+      const mockSchools = ['ETSINF'];
+      getSchools.mockResolvedValue(mockSchools);
+
+      renderFindExamCard();
+
+      await waitFor(() => {
+        expect(screen.getByText('ETSINF')).toBeInTheDocument();
+      });
+
+      const searchButton = screen.getByRole('button', { name: 'Buscar Exámenes' });
+      expect(searchButton).toBeDisabled();
     });
   });
 
   describe('Form Validation', () => {
-    it('should show validation error for invalid search term', async () => {
-      const { getSchools } = require('@/actions/exam-actions');
+    it('should show validation error for invalid acronym', async () => {
+      const { getSchools, getDegrees, getFilteredAcronymsAndSubjects } = require('@/actions/exam-actions');
       const mockSchools = ['ETSINF'];
+      const mockDegrees = ['Computer Science'];
+      const mockOptions = [
+        { value: 'MAD', type: 'acronym' },
+        { value: 'Programming', type: 'subject' }
+      ];
+      
       getSchools.mockResolvedValue(mockSchools);
+      getDegrees.mockResolvedValue(mockDegrees);
+      getFilteredAcronymsAndSubjects.mockResolvedValue(mockOptions);
 
       const user = userEvent.setup();
       renderFindExamCard();
@@ -438,31 +533,36 @@ describe('FindExamCard', () => {
         expect(screen.getByText('ETSINF')).toBeInTheDocument();
       });
 
-      const searchInput = screen.getByPlaceholderText('Buscar exámenes...');
-      await user.type(searchInput, 'a'.repeat(101)); // Too long
-
-      const searchButton = screen.getByRole('button', { name: 'Buscar' });
-      await user.click(searchButton);
-
-      expect(screen.getByText('El término de búsqueda es demasiado largo')).toBeInTheDocument();
-    });
-
-    it('should allow valid search terms', async () => {
-      const { getSchools } = require('@/actions/exam-actions');
-      const mockSchools = ['ETSINF'];
-      getSchools.mockResolvedValue(mockSchools);
-
-      const user = userEvent.setup();
-      renderFindExamCard();
+      // Select school and degree
+      const schoolSelect = screen.getByRole('combobox', { name: 'Escuela' });
+      await user.click(schoolSelect);
+      const etsinfOption = screen.getByText('ETSINF');
+      await user.click(etsinfOption);
 
       await waitFor(() => {
-        expect(screen.getByText('ETSINF')).toBeInTheDocument();
+        expect(screen.getByText('Computer Science')).toBeInTheDocument();
       });
 
-      const searchInput = screen.getByPlaceholderText('Buscar exámenes...');
-      await user.type(searchInput, 'Programming');
+      const degreeSelect = screen.getByRole('combobox', { name: 'Carrera' });
+      await user.click(degreeSelect);
+      const computerScienceOption = screen.getByText('Computer Science');
+      await user.click(computerScienceOption);
 
-      expect(screen.queryByText('El término de búsqueda es demasiado largo')).not.toBeInTheDocument();
+      // Open acronym search and try to add invalid acronym
+      await waitFor(() => {
+        const acronymButton = screen.getByRole('button', { name: /Ej\. MAD/ });
+        user.click(acronymButton);
+      });
+
+      await waitFor(() => {
+        const searchInput = screen.getByPlaceholderText('Buscar acrónimo o asignatura...');
+        user.type(searchInput, 'INVALID-ACRONYM');
+      });
+
+      // Should show validation error
+      await waitFor(() => {
+        expect(screen.getByText('El acrónimo debe tener entre 2 y 10 caracteres y contener solo letras y números')).toBeInTheDocument();
+      });
     });
   });
 
@@ -472,28 +572,35 @@ describe('FindExamCard', () => {
 
       expect(screen.getByRole('combobox', { name: 'Escuela' })).toBeInTheDocument();
       expect(screen.getByRole('combobox', { name: 'Carrera' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Buscar' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Buscar Exámenes' })).toBeInTheDocument();
     });
 
     it('should have proper keyboard navigation', async () => {
       const user = userEvent.setup();
       renderFindExamCard();
 
-      const searchInput = screen.getByPlaceholderText('Buscar exámenes...');
+      const schoolSelect = screen.getByRole('combobox', { name: 'Escuela' });
       
-      // Focus the input
-      searchInput.focus();
-      expect(searchInput).toHaveFocus();
+      // Focus the select
+      schoolSelect.focus();
+      expect(schoolSelect).toHaveFocus();
 
-      // Type with keyboard
-      await user.keyboard('Programming');
-      expect(searchInput).toHaveValue('Programming');
+      // Open with Enter key
+      await user.keyboard('{Enter}');
+      expect(screen.getByText('Seleccionar escuela')).toBeInTheDocument();
     });
 
     it('should handle Enter key submission', async () => {
-      const { getSchools } = require('@/actions/exam-actions');
+      const { getSchools, getDegrees, getFilteredAcronymsAndSubjects } = require('@/actions/exam-actions');
       const mockSchools = ['ETSINF'];
+      const mockDegrees = ['Computer Science'];
+      const mockOptions = [
+        { value: 'MAD', type: 'acronym' }
+      ];
+      
       getSchools.mockResolvedValue(mockSchools);
+      getDegrees.mockResolvedValue(mockDegrees);
+      getFilteredAcronymsAndSubjects.mockResolvedValue(mockOptions);
 
       const user = userEvent.setup();
       renderFindExamCard();
@@ -502,12 +609,43 @@ describe('FindExamCard', () => {
         expect(screen.getByText('ETSINF')).toBeInTheDocument();
       });
 
-      const searchInput = screen.getByPlaceholderText('Buscar exámenes...');
-      await user.type(searchInput, 'Programming');
-      await user.keyboard('{Enter}');
+      // Select school and degree
+      const schoolSelect = screen.getByRole('combobox', { name: 'Escuela' });
+      await user.click(schoolSelect);
+      const etsinfOption = screen.getByText('ETSINF');
+      await user.click(etsinfOption);
+
+      await waitFor(() => {
+        expect(screen.getByText('Computer Science')).toBeInTheDocument();
+      });
+
+      const degreeSelect = screen.getByRole('combobox', { name: 'Carrera' });
+      await user.click(degreeSelect);
+      const computerScienceOption = screen.getByText('Computer Science');
+      await user.click(computerScienceOption);
+
+      // Open acronym search and select an option
+      await waitFor(() => {
+        const acronymButton = screen.getByRole('button', { name: /Ej\. MAD/ });
+        user.click(acronymButton);
+      });
+
+      await waitFor(() => {
+        const searchInput = screen.getByPlaceholderText('Buscar acrónimo o asignatura...');
+        user.type(searchInput, 'MAD');
+      });
+
+      await waitFor(() => {
+        const madOption = screen.getByText('MAD');
+        user.click(madOption);
+      });
+
+      // Submit with Enter key
+      const searchButton = screen.getByRole('button', { name: 'Buscar Exámenes' });
+      await user.click(searchButton);
 
       expect(mockPush).toHaveBeenCalledWith(
-        expect.stringContaining('/exams?search=Programming')
+        expect.stringContaining('/exams?school=ETSINF&degree=Computer Science&acronyms=MAD')
       );
     });
   });
@@ -543,7 +681,7 @@ describe('FindExamCard', () => {
       renderFindExamCard();
 
       await waitFor(() => {
-        expect(screen.getByText('No hay escuelas disponibles')).toBeInTheDocument();
+        expect(screen.getByText('No se encontraron escuelas')).toBeInTheDocument();
       });
     });
   });
@@ -563,9 +701,16 @@ describe('FindExamCard', () => {
     });
 
     it('should debounce search input', async () => {
-      const { getSchools } = require('@/actions/exam-actions');
+      const { getSchools, getDegrees, getFilteredAcronymsAndSubjects } = require('@/actions/exam-actions');
       const mockSchools = ['ETSINF'];
+      const mockDegrees = ['Computer Science'];
+      const mockOptions = [
+        { value: 'MAD', type: 'acronym' }
+      ];
+      
       getSchools.mockResolvedValue(mockSchools);
+      getDegrees.mockResolvedValue(mockDegrees);
+      getFilteredAcronymsAndSubjects.mockResolvedValue(mockOptions);
 
       const user = userEvent.setup();
       renderFindExamCard();
@@ -574,16 +719,39 @@ describe('FindExamCard', () => {
         expect(screen.getByText('ETSINF')).toBeInTheDocument();
       });
 
-      const searchInput = screen.getByPlaceholderText('Buscar exámenes...');
-      
-      // Rapidly type
-      for (let i = 0; i < 10; i++) {
-        await user.type(searchInput, 'a');
-        await user.clear(searchInput);
-      }
+      // Select school and degree
+      const schoolSelect = screen.getByRole('combobox', { name: 'Escuela' });
+      await user.click(schoolSelect);
+      const etsinfOption = screen.getByText('ETSINF');
+      await user.click(etsinfOption);
+
+      await waitFor(() => {
+        expect(screen.getByText('Computer Science')).toBeInTheDocument();
+      });
+
+      const degreeSelect = screen.getByRole('combobox', { name: 'Carrera' });
+      await user.click(degreeSelect);
+      const computerScienceOption = screen.getByText('Computer Science');
+      await user.click(computerScienceOption);
+
+      // Open acronym search
+      await waitFor(() => {
+        const acronymButton = screen.getByRole('button', { name: /Ej\. MAD/ });
+        user.click(acronymButton);
+      });
+
+      await waitFor(() => {
+        const searchInput = screen.getByPlaceholderText('Buscar acrónimo o asignatura...');
+        
+        // Rapidly type
+        for (let i = 0; i < 10; i++) {
+          user.type(searchInput, 'a');
+          user.clear(searchInput);
+        }
+      });
 
       // Should not crash or cause excessive re-renders
-      expect(searchInput).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Buscar acrónimo o asignatura...')).toBeInTheDocument();
     });
   });
 }); 
