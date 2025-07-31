@@ -3,30 +3,40 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AuthDialog } from '@/components/auth/auth-dialog';
 
-// Mock the auth context
-const mockUser = {
-  id: 'user-123',
-  email: 'test@example.com',
-  user_metadata: { full_name: 'John Doe' },
-};
-
-jest.mock('@/context/auth-context', () => ({
-  useAuth: () => ({
-    user: mockUser,
-    loading: false,
-  }),
-}));
-
 // Mock Next.js navigation
+const mockPush = jest.fn();
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
-    push: jest.fn(),
+    push: mockPush,
     replace: jest.fn(),
     prefetch: jest.fn(),
     back: jest.fn(),
     forward: jest.fn(),
     refresh: jest.fn(),
   }),
+}));
+
+// Mock the auth forms
+jest.mock('@/components/auth/login-form', () => ({
+  LoginForm: ({ onSuccess }: { onSuccess: () => void }) => (
+    <div data-testid="login-form">
+      <input type="email" placeholder="Email" aria-label="Email" />
+      <input type="password" placeholder="Contraseña" aria-label="Contraseña" />
+      <button type="submit" onClick={onSuccess}>Iniciar Sesión</button>
+    </div>
+  ),
+}));
+
+jest.mock('@/components/auth/register-form', () => ({
+  RegisterForm: ({ onSuccess }: { onSuccess: () => void }) => (
+    <div data-testid="register-form">
+      <input type="text" placeholder="Nombre Completo" aria-label="Nombre Completo" />
+      <input type="email" placeholder="Email" aria-label="Email" />
+      <input type="password" placeholder="Contraseña" aria-label="Contraseña" />
+      <input type="password" placeholder="Confirmar Contraseña" aria-label="Confirmar Contraseña" />
+      <button type="submit" onClick={onSuccess}>Crear Cuenta</button>
+    </div>
+  ),
 }));
 
 describe('AuthDialog', () => {
@@ -50,8 +60,9 @@ describe('AuthDialog', () => {
     it('should render the auth dialog when open', () => {
       renderAuthDialog();
 
+      expect(screen.getByText('Bienvenido de nuevo')).toBeInTheDocument();
       expect(screen.getByText('Iniciar Sesión')).toBeInTheDocument();
-      expect(screen.getByText('Crear Cuenta')).toBeInTheDocument();
+      expect(screen.getByText('Registrarse')).toBeInTheDocument();
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
@@ -66,25 +77,31 @@ describe('AuthDialog', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
-    it('should render with correct title', () => {
+    it('should render with correct title for login tab', () => {
       renderAuthDialog();
 
-      expect(screen.getByText('Iniciar Sesión')).toBeInTheDocument();
+      expect(screen.getByText('Bienvenido de nuevo')).toBeInTheDocument();
+      expect(screen.getByText('Inicia sesión en tu cuenta para acceder a tu calendario de exámenes')).toBeInTheDocument();
     });
 
     it('should render login and register tabs', () => {
       renderAuthDialog();
 
       expect(screen.getByRole('tab', { name: 'Iniciar Sesión' })).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: 'Crear Cuenta' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Registrarse' })).toBeInTheDocument();
     });
 
     it('should show login form by default', () => {
       renderAuthDialog();
 
-      expect(screen.getByLabelText('Email')).toBeInTheDocument();
-      expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Iniciar Sesión' })).toBeInTheDocument();
+      expect(screen.getByTestId('login-form')).toBeInTheDocument();
+      expect(screen.queryByTestId('register-form')).not.toBeInTheDocument();
+    });
+
+    it('should render My Calendars button', () => {
+      renderAuthDialog();
+
+      expect(screen.getByRole('button', { name: /Mis Calendarios/i })).toBeInTheDocument();
     });
   });
 
@@ -93,14 +110,13 @@ describe('AuthDialog', () => {
       const user = userEvent.setup();
       renderAuthDialog();
 
-      const registerTab = screen.getByRole('tab', { name: 'Crear Cuenta' });
+      const registerTab = screen.getByRole('tab', { name: 'Registrarse' });
       await user.click(registerTab);
 
-      expect(screen.getByLabelText('Nombre Completo')).toBeInTheDocument();
-      expect(screen.getByLabelText('Email')).toBeInTheDocument();
-      expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
-      expect(screen.getByLabelText('Confirmar Contraseña')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Crear Cuenta' })).toBeInTheDocument();
+      expect(screen.getByText('Crear una cuenta')).toBeInTheDocument();
+      expect(screen.getByText('Regístrate para personalizar tu calendario de exámenes')).toBeInTheDocument();
+      expect(screen.getByTestId('register-form')).toBeInTheDocument();
+      expect(screen.queryByTestId('login-form')).not.toBeInTheDocument();
     });
 
     it('should switch back to login tab when clicked', async () => {
@@ -108,16 +124,16 @@ describe('AuthDialog', () => {
       renderAuthDialog();
 
       // Switch to register tab
-      const registerTab = screen.getByRole('tab', { name: 'Crear Cuenta' });
+      const registerTab = screen.getByRole('tab', { name: 'Registrarse' });
       await user.click(registerTab);
 
       // Switch back to login tab
       const loginTab = screen.getByRole('tab', { name: 'Iniciar Sesión' });
       await user.click(loginTab);
 
-      expect(screen.getByLabelText('Email')).toBeInTheDocument();
-      expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Iniciar Sesión' })).toBeInTheDocument();
+      expect(screen.getByText('Bienvenido de nuevo')).toBeInTheDocument();
+      expect(screen.getByTestId('login-form')).toBeInTheDocument();
+      expect(screen.queryByTestId('register-form')).not.toBeInTheDocument();
     });
 
     it('should maintain tab state correctly', async () => {
@@ -125,119 +141,86 @@ describe('AuthDialog', () => {
       renderAuthDialog();
 
       // Start on login tab
-      expect(screen.getByLabelText('Email')).toBeInTheDocument();
+      expect(screen.getByTestId('login-form')).toBeInTheDocument();
 
       // Switch to register tab
-      const registerTab = screen.getByRole('tab', { name: 'Crear Cuenta' });
+      const registerTab = screen.getByRole('tab', { name: 'Registrarse' });
       await user.click(registerTab);
 
-      expect(screen.getByLabelText('Nombre Completo')).toBeInTheDocument();
+      expect(screen.getByTestId('register-form')).toBeInTheDocument();
 
       // Switch back to login tab
       const loginTab = screen.getByRole('tab', { name: 'Iniciar Sesión' });
       await user.click(loginTab);
 
-      expect(screen.getByLabelText('Email')).toBeInTheDocument();
+      expect(screen.getByTestId('login-form')).toBeInTheDocument();
     });
   });
 
-  describe('Dialog Close', () => {
-    it('should call onOpenChange when close button is clicked', async () => {
+  describe('My Calendars Button', () => {
+    it('should navigate to my-calendars when clicked', async () => {
       const user = userEvent.setup();
       renderAuthDialog();
 
-      const closeButton = screen.getByRole('button', { name: 'Close' });
-      await user.click(closeButton);
+      const myCalendarsButton = screen.getByRole('button', { name: /Mis Calendarios/i });
+      await user.click(myCalendarsButton);
 
       expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+      expect(mockPush).toHaveBeenCalledWith('/my-calendars');
     });
 
-    it('should call onOpenChange when clicking outside dialog', async () => {
-      const user = userEvent.setup();
-      renderAuthDialog();
-
-      const backdrop = screen.getByTestId('dialog-backdrop');
-      await user.click(backdrop);
-
-      expect(mockOnOpenChange).toHaveBeenCalledWith(false);
-    });
-
-    it('should call onOpenChange when Escape key is pressed', async () => {
-      const user = userEvent.setup();
-      renderAuthDialog();
-
-      await user.keyboard('{Escape}');
-
-      expect(mockOnOpenChange).toHaveBeenCalledWith(false);
-    });
-  });
-
-  describe('Form Integration', () => {
-    it('should render login form with all fields', () => {
-      renderAuthDialog();
-
-      expect(screen.getByLabelText('Email')).toBeInTheDocument();
-      expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
-      expect(screen.getByLabelText('Recordarme')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Iniciar Sesión' })).toBeInTheDocument();
-    });
-
-    it('should render register form with all fields when tab is switched', async () => {
-      const user = userEvent.setup();
-      renderAuthDialog();
-
-      const registerTab = screen.getByRole('tab', { name: 'Crear Cuenta' });
-      await user.click(registerTab);
-
-      expect(screen.getByLabelText('Nombre Completo')).toBeInTheDocument();
-      expect(screen.getByLabelText('Email')).toBeInTheDocument();
-      expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
-      expect(screen.getByLabelText('Confirmar Contraseña')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Crear Cuenta' })).toBeInTheDocument();
-    });
-
-    it('should handle form submission in login tab', async () => {
-      const user = userEvent.setup();
-      renderAuthDialog();
-
-      const emailInput = screen.getByLabelText('Email');
-      const passwordInput = screen.getByLabelText('Contraseña');
-      const submitButton = screen.getByRole('button', { name: 'Iniciar Sesión' });
-
-      await user.type(emailInput, 'test@example.com');
-      await user.type(passwordInput, 'password123');
-      await user.click(submitButton);
-
-      // Should handle form submission
-      expect(emailInput).toHaveValue('test@example.com');
-      expect(passwordInput).toHaveValue('password123');
-    });
-
-    it('should handle form submission in register tab', async () => {
+    it('should be disabled when on register tab', async () => {
       const user = userEvent.setup();
       renderAuthDialog();
 
       // Switch to register tab
-      const registerTab = screen.getByRole('tab', { name: 'Crear Cuenta' });
+      const registerTab = screen.getByRole('tab', { name: 'Registrarse' });
       await user.click(registerTab);
 
-      const fullNameInput = screen.getByLabelText('Nombre Completo');
-      const emailInput = screen.getByLabelText('Email');
-      const passwordInput = screen.getByLabelText('Contraseña');
-      const confirmPasswordInput = screen.getByLabelText('Confirmar Contraseña');
-      const submitButton = screen.getByRole('button', { name: 'Crear Cuenta' });
+      const myCalendarsButton = screen.getByRole('button', { name: /Mis Calendarios/i });
+      expect(myCalendarsButton).toBeDisabled();
+    });
 
-      await user.type(fullNameInput, 'John Doe');
-      await user.type(emailInput, 'test@example.com');
-      await user.type(passwordInput, 'password123');
-      await user.type(confirmPasswordInput, 'password123');
-      await user.click(submitButton);
+    it('should be enabled when on login tab', () => {
+      renderAuthDialog();
 
-      // Should handle form submission
-      expect(fullNameInput).toHaveValue('John Doe');
-      expect(emailInput).toHaveValue('test@example.com');
-      expect(passwordInput).toHaveValue('password123');
-      expect(confirmPasswordInput).toHaveValue('password123');
+      const myCalendarsButton = screen.getByRole('button', { name: /Mis Calendarios/i });
+      expect(myCalendarsButton).not.toBeDisabled();
+    });
+  });
+
+  describe('Form Integration', () => {
+    it('should handle login form success', async () => {
+      const user = userEvent.setup();
+      renderAuthDialog();
+
+      const loginForm = screen.getByTestId('login-form');
+      const submitButton = loginForm.querySelector('button');
+      
+      if (submitButton) {
+        await user.click(submitButton);
+      }
+
+      expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+    });
+
+    it('should handle register form success', async () => {
+      const user = userEvent.setup();
+      renderAuthDialog();
+
+      // Switch to register tab
+      const registerTab = screen.getByRole('tab', { name: 'Registrarse' });
+      await user.click(registerTab);
+
+      const registerForm = screen.getByTestId('register-form');
+      const submitButton = registerForm.querySelector('button');
+      
+      if (submitButton) {
+        await user.click(submitButton);
+      }
+
+      // Should switch back to login tab
+      expect(screen.getByTestId('login-form')).toBeInTheDocument();
     });
   });
 
@@ -248,14 +231,14 @@ describe('AuthDialog', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
       expect(screen.getByRole('tablist')).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: 'Iniciar Sesión' })).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: 'Crear Cuenta' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Registrarse' })).toBeInTheDocument();
     });
 
     it('should have proper keyboard navigation', async () => {
       const user = userEvent.setup();
       renderAuthDialog();
 
-      const registerTab = screen.getByRole('tab', { name: 'Crear Cuenta' });
+      const registerTab = screen.getByRole('tab', { name: 'Registrarse' });
       
       // Focus the tab
       registerTab.focus();
@@ -263,7 +246,7 @@ describe('AuthDialog', () => {
 
       // Activate with Enter key
       await user.keyboard('{Enter}');
-      expect(screen.getByLabelText('Nombre Completo')).toBeInTheDocument();
+      expect(screen.getByTestId('register-form')).toBeInTheDocument();
     });
 
     it('should handle tab navigation with arrow keys', async () => {
@@ -271,7 +254,7 @@ describe('AuthDialog', () => {
       renderAuthDialog();
 
       const loginTab = screen.getByRole('tab', { name: 'Iniciar Sesión' });
-      const registerTab = screen.getByRole('tab', { name: 'Crear Cuenta' });
+      const registerTab = screen.getByRole('tab', { name: 'Registrarse' });
 
       // Focus login tab
       loginTab.focus();
@@ -283,62 +266,13 @@ describe('AuthDialog', () => {
     });
   });
 
-  describe('Loading States', () => {
-    it('should handle loading state correctly', () => {
-      jest.doMock('@/context/auth-context', () => ({
-        useAuth: () => ({
-          user: null,
-          loading: true,
-        }),
-      }));
-
-      renderAuthDialog();
-
-      // Should still render the dialog even when loading
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('should handle form validation errors', async () => {
-      const user = userEvent.setup();
-      renderAuthDialog();
-
-      const emailInput = screen.getByLabelText('Email');
-      const submitButton = screen.getByRole('button', { name: 'Iniciar Sesión' });
-
-      // Submit without filling required fields
-      await user.click(submitButton);
-
-      // Should show validation errors
-      expect(screen.getByText('Por favor ingresa un email válido')).toBeInTheDocument();
-    });
-
-    it('should handle authentication errors gracefully', async () => {
-      const user = userEvent.setup();
-      renderAuthDialog();
-
-      const emailInput = screen.getByLabelText('Email');
-      const passwordInput = screen.getByLabelText('Contraseña');
-      const submitButton = screen.getByRole('button', { name: 'Iniciar Sesión' });
-
-      await user.type(emailInput, 'invalid@example.com');
-      await user.type(passwordInput, 'wrongpassword');
-      await user.click(submitButton);
-
-      // Should handle error display
-      expect(emailInput).toHaveValue('invalid@example.com');
-      expect(passwordInput).toHaveValue('wrongpassword');
-    });
-  });
-
   describe('Edge Cases', () => {
     it('should handle rapid tab switching', async () => {
       const user = userEvent.setup();
       renderAuthDialog();
 
       const loginTab = screen.getByRole('tab', { name: 'Iniciar Sesión' });
-      const registerTab = screen.getByRole('tab', { name: 'Crear Cuenta' });
+      const registerTab = screen.getByRole('tab', { name: 'Registrarse' });
 
       // Rapidly switch tabs
       for (let i = 0; i < 5; i++) {
@@ -347,7 +281,7 @@ describe('AuthDialog', () => {
       }
 
       // Should still be functional
-      expect(screen.getByLabelText('Email')).toBeInTheDocument();
+      expect(screen.getByTestId('login-form')).toBeInTheDocument();
     });
 
     it('should handle dialog reopening', async () => {

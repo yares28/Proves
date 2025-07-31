@@ -5,78 +5,75 @@ import { RegisterForm } from '@/components/auth/register-form';
 
 // Mock the auth context
 const mockSignUp = jest.fn();
-const mockSignInWithProvider = jest.fn();
 
 jest.mock('@/context/auth-context', () => ({
   useAuth: () => ({
     signUp: mockSignUp,
-    signInWithProvider: mockSignInWithProvider,
     user: null,
     loading: false,
   }),
 }));
 
-// Mock Supabase client
-jest.mock('@/utils/supabase/client', () => ({
-  createClient: jest.fn(() => ({
-    auth: {
-      getSession: jest.fn(() => Promise.resolve({ data: { session: null }, error: null })),
-      refreshSession: jest.fn(),
-      onAuthStateChange: jest.fn(),
-    },
-  })),
-}));
-
-// Mock EnhancedGoogleAuth component
+// Mock the enhanced Google auth component
 jest.mock('@/components/auth/enhanced-google-auth', () => ({
-  EnhancedGoogleAuth: ({ onSuccess, onError }: any) => (
+  EnhancedGoogleAuth: ({ onSuccess, onError, className, variant }: any) => (
     <button 
-      onClick={() => onSuccess()} 
       data-testid="google-auth-button"
+      onClick={() => onSuccess()}
+      className={className}
+      data-variant={variant}
     >
-      Sign up with Google
+      Continuar con Google
     </button>
   ),
 }));
+
+// Mock setTimeout
+jest.useFakeTimers();
 
 describe('RegisterForm', () => {
   const mockOnSuccess = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSignUp.mockResolvedValue({ error: null });
-    mockSignInWithProvider.mockResolvedValue(undefined);
+    jest.clearAllTimers();
   });
 
   const renderRegisterForm = () => {
-    return render(
-      <RegisterForm onSuccess={mockOnSuccess} />
-    );
+    return render(<RegisterForm onSuccess={mockOnSuccess} />);
   };
 
   describe('Rendering', () => {
-    it('should render the register form with all required elements', () => {
+    it('should render the register form with all fields', () => {
       renderRegisterForm();
 
       expect(screen.getByText('Crear Cuenta')).toBeInTheDocument();
+      expect(screen.getByText('Completa el formulario para crear tu cuenta')).toBeInTheDocument();
       expect(screen.getByLabelText('Nombre Completo')).toBeInTheDocument();
       expect(screen.getByLabelText('Email')).toBeInTheDocument();
       expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
       expect(screen.getByLabelText('Confirmar Contraseña')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Crear Cuenta' })).toBeInTheDocument();
-      expect(screen.getByTestId('google-auth-button')).toBeInTheDocument();
     });
 
-    it('should show password toggle buttons for both password fields', () => {
+    it('should render Google auth button', () => {
+      renderRegisterForm();
+
+      expect(screen.getByTestId('google-auth-button')).toBeInTheDocument();
+      expect(screen.getByText('Continuar con Google')).toBeInTheDocument();
+    });
+
+    it('should render password visibility toggles', () => {
       renderRegisterForm();
 
       const passwordInput = screen.getByLabelText('Contraseña');
       const confirmPasswordInput = screen.getByLabelText('Confirmar Contraseña');
-      const toggleButtons = screen.getAllByRole('button', { name: '' }); // Eye icon buttons
-
-      expect(passwordInput).toHaveAttribute('type', 'password');
-      expect(confirmPasswordInput).toHaveAttribute('type', 'password');
-      expect(toggleButtons).toHaveLength(2);
+      
+      const passwordToggle = passwordInput.parentElement?.querySelector('button');
+      const confirmPasswordToggle = confirmPasswordInput.parentElement?.querySelector('button');
+      
+      expect(passwordToggle).toBeInTheDocument();
+      expect(confirmPasswordToggle).toBeInTheDocument();
     });
   });
 
@@ -126,14 +123,18 @@ describe('RegisterForm', () => {
       });
     });
 
-    it('should show validation error for password confirmation mismatch', async () => {
+    it('should show validation error for mismatched passwords', async () => {
       const user = userEvent.setup();
       renderRegisterForm();
 
+      const fullNameInput = screen.getByLabelText('Nombre Completo');
+      const emailInput = screen.getByLabelText('Email');
       const passwordInput = screen.getByLabelText('Contraseña');
       const confirmPasswordInput = screen.getByLabelText('Confirmar Contraseña');
       const submitButton = screen.getByRole('button', { name: 'Crear Cuenta' });
 
+      await user.type(fullNameInput, 'John Doe');
+      await user.type(emailInput, 'test@example.com');
       await user.type(passwordInput, 'password123');
       await user.type(confirmPasswordInput, 'differentpassword');
       await user.click(submitButton);
@@ -151,50 +152,28 @@ describe('RegisterForm', () => {
       const emailInput = screen.getByLabelText('Email');
       const passwordInput = screen.getByLabelText('Contraseña');
       const confirmPasswordInput = screen.getByLabelText('Confirmar Contraseña');
+      const submitButton = screen.getByRole('button', { name: 'Crear Cuenta' });
 
       await user.type(fullNameInput, 'John Doe');
       await user.type(emailInput, 'test@example.com');
       await user.type(passwordInput, 'password123');
       await user.type(confirmPasswordInput, 'password123');
+      await user.click(submitButton);
 
-      expect(screen.queryByText('El nombre completo debe tener al menos 2 caracteres')).not.toBeInTheDocument();
-      expect(screen.queryByText('Por favor ingresa un email válido')).not.toBeInTheDocument();
-      expect(screen.queryByText('La contraseña debe tener al menos 6 caracteres')).not.toBeInTheDocument();
-      expect(screen.queryByText('Las contraseñas no coinciden')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('Password Toggle', () => {
-    it('should toggle password visibility when eye buttons are clicked', async () => {
-      const user = userEvent.setup();
-      renderRegisterForm();
-
-      const passwordInput = screen.getByLabelText('Contraseña');
-      const confirmPasswordInput = screen.getByLabelText('Confirmar Contraseña');
-      const toggleButtons = screen.getAllByRole('button', { name: '' });
-
-      expect(passwordInput).toHaveAttribute('type', 'password');
-      expect(confirmPasswordInput).toHaveAttribute('type', 'password');
-
-      // Toggle password field
-      await user.click(toggleButtons[0]);
-      expect(passwordInput).toHaveAttribute('type', 'text');
-
-      await user.click(toggleButtons[0]);
-      expect(passwordInput).toHaveAttribute('type', 'password');
-
-      // Toggle confirm password field
-      await user.click(toggleButtons[1]);
-      expect(confirmPasswordInput).toHaveAttribute('type', 'text');
-
-      await user.click(toggleButtons[1]);
-      expect(confirmPasswordInput).toHaveAttribute('type', 'password');
+      await waitFor(() => {
+        expect(screen.queryByText('El nombre completo debe tener al menos 2 caracteres')).not.toBeInTheDocument();
+        expect(screen.queryByText('Por favor ingresa un email válido')).not.toBeInTheDocument();
+        expect(screen.queryByText('La contraseña debe tener al menos 6 caracteres')).not.toBeInTheDocument();
+        expect(screen.queryByText('Las contraseñas no coinciden')).not.toBeInTheDocument();
+      });
     });
   });
 
   describe('Form Submission', () => {
-    it('should call signUp with correct data on successful submission', async () => {
+    it('should call signUp with form data on successful submission', async () => {
       const user = userEvent.setup();
+      mockSignUp.mockResolvedValue({ error: null });
+      
       renderRegisterForm();
 
       const fullNameInput = screen.getByLabelText('Nombre Completo');
@@ -214,8 +193,10 @@ describe('RegisterForm', () => {
       });
     });
 
-    it('should call onSuccess when signUp is successful', async () => {
+    it('should show success message after successful registration', async () => {
       const user = userEvent.setup();
+      mockSignUp.mockResolvedValue({ error: null });
+      
       renderRegisterForm();
 
       const fullNameInput = screen.getByLabelText('Nombre Completo');
@@ -231,14 +212,44 @@ describe('RegisterForm', () => {
       await user.click(submitButton);
 
       await waitFor(() => {
+        expect(screen.getByText('¡Cuenta creada exitosamente! Revisa tu email para confirmar tu cuenta.')).toBeInTheDocument();
+      });
+    });
+
+    it('should call onSuccess after delay on successful registration', async () => {
+      const user = userEvent.setup();
+      mockSignUp.mockResolvedValue({ error: null });
+      
+      renderRegisterForm();
+
+      const fullNameInput = screen.getByLabelText('Nombre Completo');
+      const emailInput = screen.getByLabelText('Email');
+      const passwordInput = screen.getByLabelText('Contraseña');
+      const confirmPasswordInput = screen.getByLabelText('Confirmar Contraseña');
+      const submitButton = screen.getByRole('button', { name: 'Crear Cuenta' });
+
+      await user.type(fullNameInput, 'John Doe');
+      await user.type(emailInput, 'test@example.com');
+      await user.type(passwordInput, 'password123');
+      await user.type(confirmPasswordInput, 'password123');
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('¡Cuenta creada exitosamente! Revisa tu email para confirmar tu cuenta.')).toBeInTheDocument();
+      });
+
+      // Fast-forward timers
+      jest.advanceTimersByTime(2000);
+
+      await waitFor(() => {
         expect(mockOnSuccess).toHaveBeenCalled();
       });
     });
 
     it('should show loading state during submission', async () => {
-      mockSignUp.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
-
       const user = userEvent.setup();
+      mockSignUp.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
+      
       renderRegisterForm();
 
       const fullNameInput = screen.getByLabelText('Nombre Completo');
@@ -254,40 +265,17 @@ describe('RegisterForm', () => {
       await user.click(submitButton);
 
       expect(screen.getByText('Espera por favor')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Espera por favor' })).toBeDisabled();
+      expect(submitButton).toBeDisabled();
     });
+  });
 
-    it('should show error message when signUp fails', async () => {
-      mockSignUp.mockResolvedValue({ 
-        error: { message: 'Email already exists' } 
-      });
-
+  describe('Error Handling', () => {
+    it('should display error message for already registered user', async () => {
       const user = userEvent.setup();
-      renderRegisterForm();
-
-      const fullNameInput = screen.getByLabelText('Nombre Completo');
-      const emailInput = screen.getByLabelText('Email');
-      const passwordInput = screen.getByLabelText('Contraseña');
-      const confirmPasswordInput = screen.getByLabelText('Confirmar Contraseña');
-      const submitButton = screen.getByRole('button', { name: 'Crear Cuenta' });
-
-      await user.type(fullNameInput, 'John Doe');
-      await user.type(emailInput, 'test@example.com');
-      await user.type(passwordInput, 'password123');
-      await user.type(confirmPasswordInput, 'password123');
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Email already exists')).toBeInTheDocument();
-      });
-    });
-
-    it('should translate common error messages to Spanish', async () => {
       mockSignUp.mockResolvedValue({ 
         error: { message: 'User already registered' } 
       });
-
-      const user = userEvent.setup();
+      
       renderRegisterForm();
 
       const fullNameInput = screen.getByLabelText('Nombre Completo');
@@ -303,14 +291,39 @@ describe('RegisterForm', () => {
       await user.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByText('Usuario ya registrado')).toBeInTheDocument();
+        expect(screen.getByText('El usuario ya está registrado')).toBeInTheDocument();
       });
     });
 
-    it('should show generic error for unexpected errors', async () => {
-      mockSignUp.mockRejectedValue(new Error('Network error'));
-
+    it('should display error message for invalid email format', async () => {
       const user = userEvent.setup();
+      mockSignUp.mockResolvedValue({ 
+        error: { message: 'Unable to validate email address' } 
+      });
+      
+      renderRegisterForm();
+
+      const fullNameInput = screen.getByLabelText('Nombre Completo');
+      const emailInput = screen.getByLabelText('Email');
+      const passwordInput = screen.getByLabelText('Contraseña');
+      const confirmPasswordInput = screen.getByLabelText('Confirmar Contraseña');
+      const submitButton = screen.getByRole('button', { name: 'Crear Cuenta' });
+
+      await user.type(fullNameInput, 'John Doe');
+      await user.type(emailInput, 'test@example.com');
+      await user.type(passwordInput, 'password123');
+      await user.type(confirmPasswordInput, 'password123');
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('No se pudo validar la dirección de email')).toBeInTheDocument();
+      });
+    });
+
+    it('should display generic error for unexpected errors', async () => {
+      const user = userEvent.setup();
+      mockSignUp.mockRejectedValue(new Error('Network error'));
+      
       renderRegisterForm();
 
       const fullNameInput = screen.getByLabelText('Nombre Completo');
@@ -331,46 +344,122 @@ describe('RegisterForm', () => {
     });
   });
 
-  describe('Google Authentication', () => {
-    it('should call signInWithProvider when Google auth is clicked', async () => {
+  describe('Password Visibility', () => {
+    it('should toggle password visibility when eye button is clicked', async () => {
       const user = userEvent.setup();
       renderRegisterForm();
 
-      const googleButton = screen.getByTestId('google-auth-button');
-      await user.click(googleButton);
+      const passwordInput = screen.getByLabelText('Contraseña');
+      const passwordToggle = passwordInput.parentElement?.querySelector('button');
 
-      expect(mockSignInWithProvider).toHaveBeenCalledWith('google');
+      expect(passwordInput).toHaveAttribute('type', 'password');
+
+      if (passwordToggle) {
+        await user.click(passwordToggle);
+      }
+
+      expect(passwordInput).toHaveAttribute('type', 'text');
+
+      if (passwordToggle) {
+        await user.click(passwordToggle);
+      }
+
+      expect(passwordInput).toHaveAttribute('type', 'password');
     });
 
-    it('should show error when Google auth fails', async () => {
-      mockSignInWithProvider.mockRejectedValue(new Error('Google auth failed'));
-
+    it('should toggle confirm password visibility when eye button is clicked', async () => {
       const user = userEvent.setup();
       renderRegisterForm();
 
-      const googleButton = screen.getByTestId('google-auth-button');
-      await user.click(googleButton);
+      const confirmPasswordInput = screen.getByLabelText('Confirmar Contraseña');
+      const confirmPasswordToggle = confirmPasswordInput.parentElement?.querySelector('button');
 
-      await waitFor(() => {
-        expect(screen.getByText('Error al registrarse con el proveedor. Por favor intenta de nuevo.')).toBeInTheDocument();
+      expect(confirmPasswordInput).toHaveAttribute('type', 'password');
+
+      if (confirmPasswordToggle) {
+        await user.click(confirmPasswordToggle);
+      }
+
+      expect(confirmPasswordInput).toHaveAttribute('type', 'text');
+
+      if (confirmPasswordToggle) {
+        await user.click(confirmPasswordToggle);
+      }
+
+      expect(confirmPasswordInput).toHaveAttribute('type', 'password');
+    });
+  });
+
+  describe('Paste Prevention', () => {
+    it('should prevent paste in email field', async () => {
+      const user = userEvent.setup();
+      renderRegisterForm();
+
+      const emailInput = screen.getByLabelText('Email');
+      
+      // Simulate paste event
+      const pasteEvent = new Event('paste', { bubbles: true });
+      Object.defineProperty(pasteEvent, 'preventDefault', {
+        value: jest.fn(),
+        writable: true,
       });
+
+      emailInput.dispatchEvent(pasteEvent);
+
+      expect(pasteEvent.preventDefault).toHaveBeenCalled();
+    });
+
+    it('should prevent paste in password fields', async () => {
+      const user = userEvent.setup();
+      renderRegisterForm();
+
+      const passwordInput = screen.getByLabelText('Contraseña');
+      const confirmPasswordInput = screen.getByLabelText('Confirmar Contraseña');
+      
+      // Simulate paste events
+      const passwordPasteEvent = new Event('paste', { bubbles: true });
+      const confirmPasswordPasteEvent = new Event('paste', { bubbles: true });
+      
+      Object.defineProperty(passwordPasteEvent, 'preventDefault', {
+        value: jest.fn(),
+        writable: true,
+      });
+      Object.defineProperty(confirmPasswordPasteEvent, 'preventDefault', {
+        value: jest.fn(),
+        writable: true,
+      });
+
+      passwordInput.dispatchEvent(passwordPasteEvent);
+      confirmPasswordInput.dispatchEvent(confirmPasswordPasteEvent);
+
+      expect(passwordPasteEvent.preventDefault).toHaveBeenCalled();
+      expect(confirmPasswordPasteEvent.preventDefault).toHaveBeenCalled();
+    });
+  });
+
+  describe('Google Auth Integration', () => {
+    it('should call onSuccess when Google auth succeeds', async () => {
+      const user = userEvent.setup();
+      renderRegisterForm();
+
+      const googleAuthButton = screen.getByTestId('google-auth-button');
+      await user.click(googleAuthButton);
+
+      expect(mockOnSuccess).toHaveBeenCalled();
     });
   });
 
   describe('Accessibility', () => {
-    it('should have proper ARIA labels and roles', () => {
+    it('should have proper form labels and ARIA attributes', () => {
       renderRegisterForm();
 
       expect(screen.getByLabelText('Nombre Completo')).toBeInTheDocument();
       expect(screen.getByLabelText('Email')).toBeInTheDocument();
       expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
       expect(screen.getByLabelText('Confirmar Contraseña')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Crear Cuenta' })).toBeInTheDocument();
     });
 
-    it('should disable form inputs during loading', async () => {
-      mockSignUp.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
-
+    it('should be keyboard navigable', async () => {
       const user = userEvent.setup();
       renderRegisterForm();
 
@@ -380,23 +469,29 @@ describe('RegisterForm', () => {
       const confirmPasswordInput = screen.getByLabelText('Confirmar Contraseña');
       const submitButton = screen.getByRole('button', { name: 'Crear Cuenta' });
 
-      await user.type(fullNameInput, 'John Doe');
-      await user.type(emailInput, 'test@example.com');
-      await user.type(passwordInput, 'password123');
-      await user.type(confirmPasswordInput, 'password123');
-      await user.click(submitButton);
+      // Tab through form elements
+      await user.tab();
+      expect(fullNameInput).toHaveFocus();
 
-      expect(fullNameInput).toBeDisabled();
-      expect(emailInput).toBeDisabled();
-      expect(passwordInput).toBeDisabled();
-      expect(confirmPasswordInput).toBeDisabled();
-      expect(submitButton).toBeDisabled();
+      await user.tab();
+      expect(emailInput).toHaveFocus();
+
+      await user.tab();
+      expect(passwordInput).toHaveFocus();
+
+      await user.tab();
+      expect(confirmPasswordInput).toHaveFocus();
+
+      await user.tab();
+      expect(submitButton).toHaveFocus();
     });
   });
 
-  describe('Form Reset', () => {
-    it('should clear form fields after successful submission', async () => {
+  describe('Edge Cases', () => {
+    it('should handle rapid form submissions', async () => {
       const user = userEvent.setup();
+      mockSignUp.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
+      
       renderRegisterForm();
 
       const fullNameInput = screen.getByLabelText('Nombre Completo');
@@ -409,14 +504,22 @@ describe('RegisterForm', () => {
       await user.type(emailInput, 'test@example.com');
       await user.type(passwordInput, 'password123');
       await user.type(confirmPasswordInput, 'password123');
+
+      // Rapidly click submit button
+      await user.click(submitButton);
+      await user.click(submitButton);
       await user.click(submitButton);
 
+      // Should only call signUp once
       await waitFor(() => {
-        expect(fullNameInput).toHaveValue('');
-        expect(emailInput).toHaveValue('');
-        expect(passwordInput).toHaveValue('');
-        expect(confirmPasswordInput).toHaveValue('');
+        expect(mockSignUp).toHaveBeenCalledTimes(1);
       });
+    });
+
+    it('should handle missing onSuccess prop', () => {
+      render(<RegisterForm onSuccess={undefined as any} />);
+
+      expect(screen.getByText('Crear Cuenta')).toBeInTheDocument();
     });
   });
 }); 

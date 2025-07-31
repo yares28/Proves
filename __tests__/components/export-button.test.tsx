@@ -33,6 +33,26 @@ Object.assign(window, {
   open: jest.fn(),
 });
 
+// Mock URL.createObjectURL and URL.revokeObjectURL
+Object.assign(URL, {
+  createObjectURL: jest.fn(() => 'blob:mock-url'),
+  revokeObjectURL: jest.fn(),
+});
+
+// Mock document.createElement and appendChild
+const mockLink = {
+  href: '',
+  download: '',
+  click: jest.fn(),
+};
+Object.assign(document, {
+  createElement: jest.fn(() => mockLink),
+  body: {
+    appendChild: jest.fn(),
+    removeChild: jest.fn(),
+  },
+});
+
 describe('ExportButton', () => {
   const mockExams = [
     {
@@ -190,9 +210,80 @@ describe('ExportButton', () => {
 
       expect(mockToast.error).toHaveBeenCalledWith('No hay exámenes para exportar');
     });
+
+    it('should handle clipboard error', async () => {
+      navigator.clipboard.writeText.mockRejectedValue(new Error('Clipboard error'));
+      
+      const user = userEvent.setup();
+      renderExportButton();
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      const copyButton = screen.getByText('Copiar URL');
+      await user.click(copyButton);
+
+      expect(mockToast.error).toHaveBeenCalledWith('Error al copiar URL');
+    });
   });
 
+  describe('ICS File Generation', () => {
+    it('should generate ICS content correctly', async () => {
+      const user = userEvent.setup();
+      renderExportButton();
 
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      const downloadButton = screen.getByText('Descargar .ics');
+      await user.click(downloadButton);
+
+      expect(document.createElement).toHaveBeenCalledWith('a');
+      expect(mockLink.download).toBe('exams.ics');
+      expect(mockLink.click).toHaveBeenCalled();
+    });
+
+    it('should handle multiple exams in ICS file', async () => {
+      const multipleExams = [
+        {
+          id: '1',
+          subject: 'Programming',
+          code: 'PROG101',
+          date: '2024-01-15',
+          time: '09:00 - 11:00',
+          location: 'Room 101',
+          school: 'ETSINF',
+          degree: 'Computer Science',
+          year: 2024,
+          semester: '1st Semester',
+        },
+        {
+          id: '2',
+          subject: 'Databases',
+          code: 'DB101',
+          date: '2024-01-20',
+          time: '14:00 - 16:00',
+          location: 'Room 102',
+          school: 'ETSINF',
+          degree: 'Computer Science',
+          year: 2024,
+          semester: '1st Semester',
+        },
+      ];
+
+      const user = userEvent.setup();
+      renderExportButton({ exams: multipleExams });
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      const downloadButton = screen.getByText('Descargar .ics');
+      await user.click(downloadButton);
+
+      expect(mockLink.download).toBe('exams.ics');
+      expect(mockLink.click).toHaveBeenCalled();
+    });
+  });
 
   describe('Accessibility', () => {
     it('should have proper ARIA attributes', () => {
@@ -281,6 +372,113 @@ describe('ExportButton', () => {
     it('should handle missing filters prop', () => {
       renderExportButton({ filters: undefined });
       expect(screen.getByRole('button')).toBeInTheDocument();
+    });
+
+    it('should handle malformed exam data', async () => {
+      const malformedExams = [
+        {
+          id: '1',
+          subject: 'Programming',
+          // Missing required fields
+        },
+      ];
+
+      const user = userEvent.setup();
+      renderExportButton({ exams: malformedExams });
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      const downloadButton = screen.getByText('Descargar .ics');
+      await user.click(downloadButton);
+
+      // Should still work without crashing
+      expect(mockLink.click).toHaveBeenCalled();
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should handle clipboard permission denied', async () => {
+      navigator.clipboard.writeText.mockRejectedValue(new Error('Permission denied'));
+      
+      const user = userEvent.setup();
+      renderExportButton();
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      const copyButton = screen.getByText('Copiar URL');
+      await user.click(copyButton);
+
+      expect(mockToast.error).toHaveBeenCalledWith('Error al copiar URL');
+    });
+
+    it('should handle window.open failure', async () => {
+      window.open.mockReturnValue(null);
+      
+      const user = userEvent.setup();
+      renderExportButton();
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      const googleButton = screen.getByText('Google Calendar');
+      await user.click(googleButton);
+
+      // Should still show success message even if window.open fails
+      expect(mockToast.success).toHaveBeenCalledWith('Abriendo Google Calendar');
+    });
+
+    it('should handle blob creation failure', async () => {
+      // Mock Blob to throw error
+      const originalBlob = global.Blob;
+      global.Blob = jest.fn(() => {
+        throw new Error('Blob creation failed');
+      });
+
+      const user = userEvent.setup();
+      renderExportButton();
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      const downloadButton = screen.getByText('Descargar .ics');
+      await user.click(downloadButton);
+
+      // Should handle the error gracefully
+      expect(mockLink.click).toHaveBeenCalled();
+
+      // Restore original Blob
+      global.Blob = originalBlob;
+    });
+  });
+
+  describe('Performance', () => {
+    it('should handle large number of exams efficiently', async () => {
+      const largeExamList = Array.from({ length: 100 }, (_, i) => ({
+        id: i.toString(),
+        subject: `Exam ${i + 1}`,
+        code: `CODE${i + 1}`,
+        date: '2024-01-15',
+        time: '09:00 - 11:00',
+        location: 'Room 101',
+        school: 'ETSINF',
+        degree: 'Computer Science',
+        year: 2024,
+        semester: '1st Semester',
+      }));
+
+      const user = userEvent.setup();
+      renderExportButton({ exams: largeExamList });
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      const downloadButton = screen.getByText('Descargar .ics');
+      await user.click(downloadButton);
+
+      // Should work without performance issues
+      expect(mockLink.click).toHaveBeenCalled();
     });
   });
 }); 

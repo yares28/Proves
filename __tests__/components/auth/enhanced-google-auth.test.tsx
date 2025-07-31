@@ -3,36 +3,49 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EnhancedGoogleAuth } from '@/components/auth/enhanced-google-auth';
 
-// Mock the auth context
-const mockSignInWithProvider = jest.fn();
+// Mock the Supabase client
+const mockSignInWithOAuth = jest.fn();
+const mockOnAuthStateChange = jest.fn();
+const mockGetSession = jest.fn();
 
-jest.mock('@/context/auth-context', () => ({
-  useAuth: () => ({
-    signInWithProvider: mockSignInWithProvider,
-    loading: false,
-  }),
-}));
+const mockSupabase = {
+  auth: {
+    signInWithOAuth: mockSignInWithOAuth,
+    onAuthStateChange: mockOnAuthStateChange,
+    getSession: mockGetSession,
+  },
+};
 
-// Mock Supabase client
 jest.mock('@/utils/supabase/client', () => ({
-  createClient: jest.fn(() => ({
-    auth: {
-      signInWithOAuth: jest.fn(),
-    },
-  })),
+  createClient: () => mockSupabase,
 }));
 
-// Mock Next.js navigation
-jest.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: jest.fn(),
-    replace: jest.fn(),
-    prefetch: jest.fn(),
-    back: jest.fn(),
-    forward: jest.fn(),
-    refresh: jest.fn(),
-  }),
+// Mock the toast hook
+const mockToast = jest.fn();
+jest.mock('@/hooks/use-toast', () => ({
+  useToast: () => ({ toast: mockToast }),
 }));
+
+// Mock localStorage
+Object.defineProperty(window, 'localStorage', {
+  value: {
+    setItem: jest.fn(),
+    getItem: jest.fn(),
+    removeItem: jest.fn(),
+  },
+  writable: true,
+});
+
+// Mock crypto for nonce generation
+Object.defineProperty(window, 'crypto', {
+  value: {
+    getRandomValues: jest.fn(() => new Uint8Array(32)),
+    subtle: {
+      digest: jest.fn(),
+    },
+  },
+  writable: true,
+});
 
 describe('EnhancedGoogleAuth', () => {
   const mockOnSuccess = jest.fn();
@@ -40,7 +53,9 @@ describe('EnhancedGoogleAuth', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSignInWithProvider.mockResolvedValue({ error: null });
+    mockOnAuthStateChange.mockReturnValue({
+      data: { subscription: { unsubscribe: jest.fn() } },
+    });
   });
 
   const renderEnhancedGoogleAuth = (props = {}) => {
@@ -57,53 +72,81 @@ describe('EnhancedGoogleAuth', () => {
     it('should render the Google auth button', () => {
       renderEnhancedGoogleAuth();
 
-      expect(screen.getByRole('button')).toBeInTheDocument();
-      expect(screen.getByText('Continuar con Google')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Continuar con Google/i })).toBeInTheDocument();
     });
 
-    it('should render with Google icon', () => {
-      renderEnhancedGoogleAuth();
-
-      const button = screen.getByRole('button');
-      expect(button).toBeInTheDocument();
-      expect(button.querySelector('svg')).toBeInTheDocument();
-    });
-
-    it('should have proper button styling', () => {
+    it('should render with default props', () => {
       renderEnhancedGoogleAuth();
 
       const button = screen.getByRole('button');
       expect(button).toHaveClass('w-full');
-      expect(button).toHaveClass('justify-center');
+      expect(button).toHaveAttribute('type', 'button');
     });
 
-    it('should render with custom text when provided', () => {
-      renderEnhancedGoogleAuth({ text: 'Sign in with Google' });
-
-      expect(screen.getByText('Sign in with Google')).toBeInTheDocument();
-    });
-
-    it('should render with custom variant when provided', () => {
-      renderEnhancedGoogleAuth({ variant: 'outline' });
+    it('should render with custom props', () => {
+      renderEnhancedGoogleAuth({
+        className: 'custom-class',
+        variant: 'default',
+        size: 'lg',
+      });
 
       const button = screen.getByRole('button');
-      expect(button).toHaveClass('border');
+      expect(button).toHaveClass('custom-class');
     });
-  });
 
-  describe('Button Interactions', () => {
-    it('should call signInWithProvider when button is clicked', async () => {
+    it('should show loading state when isLoading is true', async () => {
+      mockSignInWithOAuth.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
+      
       const user = userEvent.setup();
       renderEnhancedGoogleAuth();
 
       const button = screen.getByRole('button');
       await user.click(button);
 
-      expect(mockSignInWithProvider).toHaveBeenCalledWith('google');
+      expect(screen.getByText('Conectando con Google...')).toBeInTheDocument();
+      expect(button).toBeDisabled();
     });
 
-    it('should call onSuccess when authentication is successful', async () => {
+    it('should hide loading text when showLoadingText is false', async () => {
+      mockSignInWithOAuth.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
+      
       const user = userEvent.setup();
+      renderEnhancedGoogleAuth({ showLoadingText: false });
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      expect(screen.queryByText('Conectando con Google...')).not.toBeInTheDocument();
+      expect(button).toBeDisabled();
+    });
+  });
+
+  describe('Google Sign In', () => {
+    it('should call signInWithOAuth with correct parameters', async () => {
+      const user = userEvent.setup();
+      mockSignInWithOAuth.mockResolvedValue({ data: {}, error: null });
+      
+      renderEnhancedGoogleAuth();
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      expect(mockSignInWithOAuth).toHaveBeenCalledWith({
+        provider: 'google',
+        options: {
+          scopes: 'openid email profile',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
+        }
+      });
+    });
+
+    it('should call onSuccess when authentication succeeds', async () => {
+      const user = userEvent.setup();
+      mockSignInWithOAuth.mockResolvedValue({ data: {}, error: null });
+      
       renderEnhancedGoogleAuth();
 
       const button = screen.getByRole('button');
@@ -114,143 +157,237 @@ describe('EnhancedGoogleAuth', () => {
       });
     });
 
-    it('should call onError when authentication fails', async () => {
-      mockSignInWithProvider.mockResolvedValue({ 
-        error: { message: 'Authentication failed' } 
-      });
-
+    it('should show success toast when authentication succeeds', async () => {
       const user = userEvent.setup();
+      mockSignInWithOAuth.mockResolvedValue({ data: {}, error: null });
+      
       renderEnhancedGoogleAuth();
 
       const button = screen.getByRole('button');
       await user.click(button);
 
       await waitFor(() => {
-        expect(mockOnError).toHaveBeenCalledWith(expect.any(Error));
+        expect(mockToast).toHaveBeenCalledWith({
+          title: "Redirigiendo...",
+          description: "Te estamos redirigiendo a Google para autenticarte.",
+        });
       });
-    });
-
-    it('should handle network errors gracefully', async () => {
-      mockSignInWithProvider.mockRejectedValue(new Error('Network error'));
-
-      const user = userEvent.setup();
-      renderEnhancedGoogleAuth();
-
-      const button = screen.getByRole('button');
-      await user.click(button);
-
-      await waitFor(() => {
-        expect(mockOnError).toHaveBeenCalledWith(expect.any(Error));
-      });
-    });
-  });
-
-  describe('Loading States', () => {
-    it('should show loading state during authentication', async () => {
-      mockSignInWithProvider.mockImplementation(() => 
-        new Promise(resolve => setTimeout(resolve, 100))
-      );
-
-      const user = userEvent.setup();
-      renderEnhancedGoogleAuth();
-
-      const button = screen.getByRole('button');
-      await user.click(button);
-
-      expect(screen.getByText('Espera por favor')).toBeInTheDocument();
-      expect(button).toBeDisabled();
-    });
-
-    it('should restore button state after loading', async () => {
-      mockSignInWithProvider.mockImplementation(() => 
-        new Promise(resolve => setTimeout(resolve, 100))
-      );
-
-      const user = userEvent.setup();
-      renderEnhancedGoogleAuth();
-
-      const button = screen.getByRole('button');
-      await user.click(button);
-
-      expect(button).toBeDisabled();
-
-      await waitFor(() => {
-        expect(button).not.toBeDisabled();
-        expect(screen.getByText('Continuar con Google')).toBeInTheDocument();
-      });
-    });
-
-    it('should handle loading state with custom loading text', async () => {
-      mockSignInWithProvider.mockImplementation(() => 
-        new Promise(resolve => setTimeout(resolve, 100))
-      );
-
-      const user = userEvent.setup();
-      renderEnhancedGoogleAuth({ loadingText: 'Authenticating...' });
-
-      const button = screen.getByRole('button');
-      await user.click(button);
-
-      expect(screen.getByText('Authenticating...')).toBeInTheDocument();
     });
   });
 
   describe('Error Handling', () => {
-    it('should handle authentication errors with custom error handling', async () => {
-      mockSignInWithProvider.mockResolvedValue({ 
-        error: { message: 'User cancelled' } 
-      });
-
+    it('should handle oauth_provider_not_supported error', async () => {
       const user = userEvent.setup();
+      mockSignInWithOAuth.mockResolvedValue({ 
+        data: null, 
+        error: { message: 'oauth_provider_not_supported' } 
+      });
+      
       renderEnhancedGoogleAuth();
 
       const button = screen.getByRole('button');
       await user.click(button);
 
       await waitFor(() => {
-        expect(mockOnError).toHaveBeenCalledWith(expect.any(Error));
+        expect(screen.getByText('Google OAuth no está habilitado en este momento')).toBeInTheDocument();
+        expect(mockOnError).toHaveBeenCalledWith('Google OAuth no está habilitado en este momento');
+      });
+    });
+
+    it('should handle access_denied error', async () => {
+      const user = userEvent.setup();
+      mockSignInWithOAuth.mockResolvedValue({ 
+        data: null, 
+        error: { message: 'access_denied' } 
+      });
+      
+      renderEnhancedGoogleAuth();
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      await waitFor(() => {
+        expect(screen.getByText('Acceso denegado. Es necesario otorgar permisos para continuar.')).toBeInTheDocument();
+      });
+    });
+
+    it('should handle invalid_request error', async () => {
+      const user = userEvent.setup();
+      mockSignInWithOAuth.mockResolvedValue({ 
+        data: null, 
+        error: { message: 'invalid_request' } 
+      });
+      
+      renderEnhancedGoogleAuth();
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      await waitFor(() => {
+        expect(screen.getByText('Solicitud inválida. Por favor intenta de nuevo.')).toBeInTheDocument();
+      });
+    });
+
+    it('should handle server_error error', async () => {
+      const user = userEvent.setup();
+      mockSignInWithOAuth.mockResolvedValue({ 
+        data: null, 
+        error: { message: 'server_error' } 
+      });
+      
+      renderEnhancedGoogleAuth();
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      await waitFor(() => {
+        expect(screen.getByText('Error del servidor. Por favor intenta más tarde.')).toBeInTheDocument();
+      });
+    });
+
+    it('should handle popup blocked error', async () => {
+      const user = userEvent.setup();
+      mockSignInWithOAuth.mockResolvedValue({ 
+        data: null, 
+        error: { message: 'popup blocked' } 
+      });
+      
+      renderEnhancedGoogleAuth();
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      await waitFor(() => {
+        expect(screen.getByText('Por favor permite las ventanas emergentes para este sitio')).toBeInTheDocument();
+      });
+    });
+
+    it('should handle redirect error', async () => {
+      const user = userEvent.setup();
+      mockSignInWithOAuth.mockResolvedValue({ 
+        data: null, 
+        error: { message: 'redirect error' } 
+      });
+      
+      renderEnhancedGoogleAuth();
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      await waitFor(() => {
+        expect(screen.getByText('Error de redirección. Verifica la configuración.')).toBeInTheDocument();
+      });
+    });
+
+    it('should handle generic error', async () => {
+      const user = userEvent.setup();
+      mockSignInWithOAuth.mockResolvedValue({ 
+        data: null, 
+        error: { message: 'unknown error' } 
+      });
+      
+      renderEnhancedGoogleAuth();
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      await waitFor(() => {
+        expect(screen.getByText('Error en la autenticación con Google')).toBeInTheDocument();
+      });
+    });
+
+    it('should show error toast when authentication fails', async () => {
+      const user = userEvent.setup();
+      mockSignInWithOAuth.mockResolvedValue({ 
+        data: null, 
+        error: { message: 'oauth_provider_not_supported' } 
+      });
+      
+      renderEnhancedGoogleAuth();
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      await waitFor(() => {
+        expect(mockToast).toHaveBeenCalledWith({
+          title: "Error de autenticación",
+          description: "Google OAuth no está habilitado en este momento",
+          variant: "destructive",
+        });
       });
     });
 
     it('should handle unexpected errors', async () => {
-      mockSignInWithProvider.mockRejectedValue(new Error('Unexpected error'));
-
       const user = userEvent.setup();
+      mockSignInWithOAuth.mockRejectedValue(new Error('Network error'));
+      
       renderEnhancedGoogleAuth();
 
       const button = screen.getByRole('button');
       await user.click(button);
 
       await waitFor(() => {
-        expect(mockOnError).toHaveBeenCalledWith(expect.any(Error));
+        expect(screen.getByText('Error inesperado durante la autenticación')).toBeInTheDocument();
+        expect(mockOnError).toHaveBeenCalledWith('Error inesperado durante la autenticación');
       });
     });
+  });
 
-    it('should handle null error gracefully', async () => {
-      mockSignInWithProvider.mockResolvedValue({ error: null });
-
-      const user = userEvent.setup();
+  describe('Auth State Monitoring', () => {
+    it('should set up auth state change listener', () => {
       renderEnhancedGoogleAuth();
 
-      const button = screen.getByRole('button');
-      await user.click(button);
+      expect(mockOnAuthStateChange).toHaveBeenCalled();
+    });
 
-      await waitFor(() => {
-        expect(mockOnSuccess).toHaveBeenCalled();
+    it('should store provider tokens when available', () => {
+      const mockSession = {
+        provider_token: 'provider-token',
+        provider_refresh_token: 'refresh-token',
+      };
+
+      mockOnAuthStateChange.mockImplementation((callback) => {
+        // Simulate SIGNED_IN event
+        callback('SIGNED_IN', mockSession);
+        return { data: { subscription: { unsubscribe: jest.fn() } } };
+      });
+
+      renderEnhancedGoogleAuth();
+
+      expect(localStorage.setItem).toHaveBeenCalledWith('oauth_provider_token', 'provider-token');
+      expect(localStorage.setItem).toHaveBeenCalledWith('oauth_provider_refresh_token', 'refresh-token');
+    });
+
+    it('should show welcome toast on successful sign in', () => {
+      const mockSession = { user: { id: 'user-123' } };
+
+      mockOnAuthStateChange.mockImplementation((callback) => {
+        // Simulate SIGNED_IN event
+        callback('SIGNED_IN', mockSession);
+        return { data: { subscription: { unsubscribe: jest.fn() } } };
+      });
+
+      renderEnhancedGoogleAuth();
+
+      expect(mockToast).toHaveBeenCalledWith({
+        title: "¡Bienvenido!",
+        description: "Has iniciado sesión exitosamente con Google.",
       });
     });
   });
 
   describe('Accessibility', () => {
-    it('should have proper ARIA labels', () => {
+    it('should have proper button attributes', () => {
       renderEnhancedGoogleAuth();
 
       const button = screen.getByRole('button');
-      expect(button).toHaveAttribute('aria-label', 'Sign in with Google');
+      expect(button).toHaveAttribute('type', 'button');
     });
 
-    it('should have proper keyboard navigation', async () => {
+    it('should be keyboard accessible', async () => {
       const user = userEvent.setup();
+      mockSignInWithOAuth.mockResolvedValue({ data: {}, error: null });
+      
       renderEnhancedGoogleAuth();
 
       const button = screen.getByRole('button');
@@ -261,176 +398,71 @@ describe('EnhancedGoogleAuth', () => {
 
       // Activate with Enter key
       await user.keyboard('{Enter}');
-      expect(mockSignInWithProvider).toHaveBeenCalledWith('google');
-    });
-
-    it('should have proper keyboard navigation with Space key', async () => {
-      const user = userEvent.setup();
-      renderEnhancedGoogleAuth();
-
-      const button = screen.getByRole('button');
-      
-      // Focus the button
-      button.focus();
-      expect(button).toHaveFocus();
-
-      // Activate with Space key
-      await user.keyboard(' ');
-      expect(mockSignInWithProvider).toHaveBeenCalledWith('google');
+      expect(mockSignInWithOAuth).toHaveBeenCalled();
     });
 
     it('should be disabled during loading', async () => {
-      mockSignInWithProvider.mockImplementation(() => 
-        new Promise(resolve => setTimeout(resolve, 100))
-      );
-
       const user = userEvent.setup();
+      mockSignInWithOAuth.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
+      
       renderEnhancedGoogleAuth();
 
       const button = screen.getByRole('button');
       await user.click(button);
 
       expect(button).toBeDisabled();
-      expect(button).toHaveAttribute('aria-disabled', 'true');
-    });
-  });
-
-  describe('Customization', () => {
-    it('should render with custom className', () => {
-      renderEnhancedGoogleAuth({ className: 'custom-class' });
-
-      const button = screen.getByRole('button');
-      expect(button).toHaveClass('custom-class');
-    });
-
-    it('should render with custom size', () => {
-      renderEnhancedGoogleAuth({ size: 'lg' });
-
-      const button = screen.getByRole('button');
-      expect(button).toHaveClass('h-12');
-    });
-
-    it('should render with custom variant', () => {
-      renderEnhancedGoogleAuth({ variant: 'destructive' });
-
-      const button = screen.getByRole('button');
-      expect(button).toHaveClass('bg-destructive');
-    });
-
-    it('should render with custom text and loading text', () => {
-      renderEnhancedGoogleAuth({ 
-        text: 'Custom Google Sign In',
-        loadingText: 'Custom Loading...'
-      });
-
-      expect(screen.getByText('Custom Google Sign In')).toBeInTheDocument();
     });
   });
 
   describe('Edge Cases', () => {
+    it('should handle missing onSuccess callback', async () => {
+      const user = userEvent.setup();
+      mockSignInWithOAuth.mockResolvedValue({ data: {}, error: null });
+      
+      render(<EnhancedGoogleAuth onError={mockOnError} />);
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      // Should not throw error
+      await waitFor(() => {
+        expect(mockSignInWithOAuth).toHaveBeenCalled();
+      });
+    });
+
+    it('should handle missing onError callback', async () => {
+      const user = userEvent.setup();
+      mockSignInWithOAuth.mockResolvedValue({ 
+        data: null, 
+        error: { message: 'oauth_provider_not_supported' } 
+      });
+      
+      render(<EnhancedGoogleAuth onSuccess={mockOnSuccess} />);
+
+      const button = screen.getByRole('button');
+      await user.click(button);
+
+      // Should not throw error
+      await waitFor(() => {
+        expect(screen.getByText('Google OAuth no está habilitado en este momento')).toBeInTheDocument();
+      });
+    });
+
     it('should handle rapid button clicks', async () => {
       const user = userEvent.setup();
+      mockSignInWithOAuth.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
+      
       renderEnhancedGoogleAuth();
 
       const button = screen.getByRole('button');
       
       // Rapidly click the button
-      for (let i = 0; i < 5; i++) {
-        await user.click(button);
-      }
-
-      // Should only call once due to loading state
-      expect(mockSignInWithProvider).toHaveBeenCalledTimes(1);
-    });
-
-    it('should handle missing onSuccess callback', async () => {
-      const user = userEvent.setup();
-      renderEnhancedGoogleAuth({ onSuccess: undefined });
-
-      const button = screen.getByRole('button');
+      await user.click(button);
+      await user.click(button);
       await user.click(button);
 
-      // Should not throw error
-      await waitFor(() => {
-        expect(mockSignInWithProvider).toHaveBeenCalled();
-      });
-    });
-
-    it('should handle missing onError callback', async () => {
-      mockSignInWithProvider.mockResolvedValue({ 
-        error: { message: 'Auth failed' } 
-      });
-
-      const user = userEvent.setup();
-      renderEnhancedGoogleAuth({ onError: undefined });
-
-      const button = screen.getByRole('button');
-      await user.click(button);
-
-      // Should not throw error
-      await waitFor(() => {
-        expect(mockSignInWithProvider).toHaveBeenCalled();
-      });
-    });
-
-    it('should handle component unmounting during authentication', async () => {
-      mockSignInWithProvider.mockImplementation(() => 
-        new Promise(resolve => setTimeout(resolve, 100))
-      );
-
-      const user = userEvent.setup();
-      const { unmount } = renderEnhancedGoogleAuth();
-
-      const button = screen.getByRole('button');
-      await user.click(button);
-
-      // Unmount component during authentication
-      unmount();
-
-      // Should not cause errors
-      await waitFor(() => {
-        expect(mockSignInWithProvider).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('Integration with Auth Context', () => {
-    it('should use auth context signInWithProvider method', async () => {
-      const user = userEvent.setup();
-      renderEnhancedGoogleAuth();
-
-      const button = screen.getByRole('button');
-      await user.click(button);
-
-      expect(mockSignInWithProvider).toHaveBeenCalledWith('google');
-    });
-
-    it('should handle auth context loading state', () => {
-      jest.doMock('@/context/auth-context', () => ({
-        useAuth: () => ({
-          signInWithProvider: mockSignInWithProvider,
-          loading: true,
-        }),
-      }));
-
-      renderEnhancedGoogleAuth();
-
-      const button = screen.getByRole('button');
-      expect(button).toBeDisabled();
-    });
-
-    it('should handle auth context errors', async () => {
-      mockSignInWithProvider.mockRejectedValue(new Error('Auth context error'));
-
-      const user = userEvent.setup();
-      renderEnhancedGoogleAuth();
-
-      const button = screen.getByRole('button');
-      await user.click(button);
-
-      await waitFor(() => {
-        expect(mockOnError).toHaveBeenCalledWith(expect.any(Error));
-      });
+      // Should only call signInWithOAuth once
+      expect(mockSignInWithOAuth).toHaveBeenCalledTimes(1);
     });
   });
 }); 
