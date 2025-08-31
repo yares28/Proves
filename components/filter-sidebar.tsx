@@ -560,20 +560,22 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
         {Object.keys(activeFilters).length > 0 && (
           <div className="mt-4">
             <h3 className="text-sm font-medium mb-2">Filtros Activos</h3>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 overflow-hidden">
               {Object.entries(activeFilters).map(([category, values], idx, arr) => (
-                <span key={category} className="flex items-center gap-2">
+                <span key={category} className="flex flex-wrap items-center gap-2">
                   {values.map((value) => (
                     <Badge
                       key={`${category}-${value}`}
                       variant="secondary"
-                      className="flex items-center gap-1"
+                      className="flex items-center gap-1 max-w-full text-xs break-all"
                     >
-                      {category === 'subject' ? getSubjectAcronym(value) : value}
+                      <span className="truncate max-w-[120px]">
+                        {category === 'subject' ? getSubjectAcronym(value) : value}
+                      </span>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-4 w-4 p-0"
+                        className="h-4 w-4 p-0 flex-shrink-0"
                         onClick={() => removeFilter(category, value)}
                       >
                         <X className="h-3 w-3" />
@@ -582,7 +584,7 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
                   ))}
                   {/* Separator between categories, except after the last */}
                   {idx < arr.length - 1 && (
-                    <span className="mx-1 text-muted-foreground select-none font-bold">|</span>
+                    <span className="mx-1 text-muted-foreground select-none font-bold flex-shrink-0">|</span>
                   )}
                 </span>
               ))}
