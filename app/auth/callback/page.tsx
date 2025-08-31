@@ -35,10 +35,10 @@ function AuthCallbackContent() {
   // Determine which logo to use based on theme - with proper hydration handling
   const getLogo = () => {
     // Always return the same logo during SSR to prevent hydration mismatch
-    if (!mounted) return "/logo-full2.png"
+    if (!mounted) return "/icon2.png"
     
     const currentTheme = settings.theme === 'system' ? theme : settings.theme
-    return currentTheme === "light" ? "/logo-full-light.png" : "/logo-full2.png"
+    return currentTheme === "light" ? "/icon2.png" : "/icon2.png"
   }
 
   useEffect(() => {
@@ -363,9 +363,9 @@ function AuthCallbackContent() {
                 <Image 
                   src={getLogo()}
                   alt="UPV Calendario de Exámenes" 
-                  width={200} 
-                  height={80}
-                  className="h-auto w-auto mx-auto drop-shadow-lg"
+                  width={320} 
+                  height={135}
+                  className="h-auto w-auto mx-auto drop-shadow-lg max-w-[320px]"
                   priority
                 />
               </motion.div>

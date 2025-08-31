@@ -18,6 +18,8 @@ import { useAuth } from "@/context/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { saveUserCalendar, getUserCalendarNames } from "@/actions/user-calendars"
 import { getFreshAuthTokens } from "@/utils/auth-helpers"
+import { useTheme } from "next-themes"
+import { useSettings } from "@/context/settings-context"
 import Image from "next/image"
 
 type FilterCategory = {
@@ -36,10 +38,13 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
   const [expandedItems, setExpandedItems] = useState<string[]>([]) // Start with nothing expanded
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [existingNames, setExistingNames] = useState<string[]>([])
+  const [mounted, setMounted] = useState(false)
   const prevSchoolsRef = useRef<string[]>([]);
 
   const { user, syncToken } = useAuth()
   const { toast } = useToast()
+  const { theme } = useTheme()
+  const { settings } = useSettings()
 
   // Get the selected filters
   const selectedSchools = activeFilters.school || []
@@ -63,6 +68,18 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
   useEffect(() => {
     prevSchoolsRef.current = selectedSchools;
   }, [selectedSchools]);
+
+  // Handle mounted state for theme detection
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Determine which logoY icon to use based on theme (same logic as header)
+  const getLogoYIcon = () => {
+    if (!mounted) return "/logoYdark.png" // Default fallback during SSR
+    const currentTheme = settings.theme === 'system' ? theme : settings.theme
+    return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
+  }
 
   const { schools, degrees, semesters, years, subjects, isLoading, error } = useFilterData(
     selectedSchoolsForData,
@@ -528,11 +545,12 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
         <div className="relative">
           <div className="bg-white dark:bg-card rounded-full p-3 shadow-lg border border-border/50">
             <Image 
-              src="/logo-icon.png" 
+              src={getLogoYIcon()} 
               alt="UPV Logo" 
-              width={32} 
-              height={32}
-              className="h-8 w-8"
+              width={56} 
+              height={56}
+              className="h-14 w-14"
+              key={mounted ? 'mounted' : 'unmounted'}
             />
           </div>
           {/* Subtle glow effect */}

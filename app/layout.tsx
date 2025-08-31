@@ -11,9 +11,9 @@ export const metadata: Metadata = {
   title: 'Calendario de Exámenes UPV',
   description: 'Gestiona y organiza tus exámenes universitarios',
   icons: {
-    icon: '/logo-icon.png',
-    shortcut: '/logo-icon.png',
-    apple: '/logo-icon.png',
+    icon: '/logoYdark.png',
+    shortcut: '/logoYdark.png',
+    apple: '/logoYdark.png',
   },
 }
 
@@ -25,8 +25,8 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
-        <link rel="icon" href="/logo-icon.png" sizes="any" />
-        <link rel="apple-touch-icon" href="/logo-icon.png" />
+            <link rel="icon" href="/logoYdark.png" sizes="any" />
+    <link rel="apple-touch-icon" href="/logoYdark.png" />
       </head>
       <body suppressHydrationWarning>
         <ErrorBoundary>

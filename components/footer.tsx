@@ -22,9 +22,9 @@ export function Footer() {
 
   // Determine which logo to use based on theme
   const getFooterLogo = () => {
-    if (!mounted) return "/logo-full.png" // Default fallback during SSR
+    if (!mounted) return "/icon2.png" // Default fallback during SSR
     const currentTheme = settings.theme === 'system' ? theme : settings.theme
-    return currentTheme === "light" ? "/logo-full2-light.png" : "/logo-full.png"
+    return currentTheme === "light" ? "/icon2.png" : "/icon2.png"
   }
 
   return (
@@ -34,7 +34,7 @@ export function Footer() {
           <div>
             <div className="mb-6 flex items-center space-x+2">
               <Image 
-                src="/logo-icon.png" 
+                src="/logoYdark.png" 
                 alt="UPV Icon" 
                 width={32} 
                 height={32}
