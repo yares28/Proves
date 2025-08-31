@@ -163,8 +163,8 @@ export function CalendarDisplay({
         // For debugging - log all unique dates in the exam data
         if (data.length > 0) {
           const uniqueDates = [
-            ...new Set(data.map((exam) => exam.date)),
-          ].sort();
+            ...new Set(data.map((exam: any) => exam.date)),
+          ].sort() as string[];
           console.log("CalendarDisplay - Unique exam dates:", uniqueDates);
 
           // Detect academic year from exam dates
@@ -597,12 +597,12 @@ export function CalendarDisplay({
                             )
                           )}
                         </div>
-                        <div className="grid grid-cols-7 gap-1.5 text-center text-sm">
+                        <div className="grid grid-cols-7 gap-1.5 text-center text-sm justify-items-center">
                           {Array.from({ length: month.startDay }).map(
                             (_, i) => (
                               <div
                                 key={`empty-start-${i}`}
-                                className="rounded-md bg-muted/30 p-2"
+                                className="rounded-md bg-muted/30 w-8 h-8 flex-shrink-0"
                               ></div>
                             )
                           )}
@@ -620,7 +620,7 @@ export function CalendarDisplay({
                                   <motion.div
                                     whileHover={{ scale: 1.02 }}
                                     transition={{ duration: 0.1 }}
-                                    className={`relative rounded-md p-2 transition-all cursor-pointer ${
+                                    className={`relative rounded-md w-8 h-8 flex items-center justify-center transition-all cursor-pointer flex-shrink-0 ${
                                       isSelected
                                         ? "bg-primary text-primary-foreground shadow-md"
                                         : dayHasExam
@@ -636,7 +636,7 @@ export function CalendarDisplay({
                                   >
                                     {day}
                                     {dayHasExam && (
-                                      <span className="absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-primary"></span>
+                                      <span className="absolute bottom-0.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-primary"></span>
                                     )}
                                   </motion.div>
                                 </TooltipTrigger>
@@ -768,7 +768,7 @@ export function CalendarDisplay({
                           }).map((_, i) => (
                             <div
                               key={`empty-end-${i}`}
-                              className="rounded-md bg-muted/30 p-2"
+                              className="rounded-md bg-muted/30 w-8 h-8"
                             ></div>
                           ))}
                         </div>

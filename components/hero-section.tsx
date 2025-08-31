@@ -20,12 +20,12 @@ export function HeroSection() {
   }, [])
 
   // Determine which logo to use based on theme
-  const getHeroLogo = () => {
-    // Always return the same logo during SSR and initial render to prevent hydration mismatch
-    if (!mounted) return "/logo-full2.png"
-    const currentTheme = settings.theme === 'system' ? theme : settings.theme
-    return currentTheme === "light" ? "/logo-full-light.png" : "/logo-full2.png"
-  }
+      const getHeroLogo = () => {
+      // Always return the same logo during SSR and initial render to prevent hydration mismatch
+      if (!mounted) return "/icon2.png"
+      const currentTheme = settings.theme === 'system' ? theme : settings.theme
+      return currentTheme === "light" ? "/icon2.png" : "/icon2.png"
+    }
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-emerald-100 px-4 py-20 dark:from-emerald-950 dark:to-emerald-900 md:py-28 lg:py-36">
@@ -78,7 +78,7 @@ export function HeroSection() {
           }}
         >
           <Image 
-            src="/logo-icon.png" 
+            src="/logoYdark.png" 
             alt="UPV Logo" 
             width={32} 
             height={32}
@@ -99,7 +99,7 @@ export function HeroSection() {
           }}
         >
           <Image 
-            src="/logo-icon.png" 
+            src="/logoYdark.png" 
             alt="UPV Logo" 
             width={28} 
             height={28}
@@ -120,7 +120,7 @@ export function HeroSection() {
           }}
         >
           <Image 
-            src="/logo-icon.png" 
+            src="/logoYdark.png" 
             alt="UPV Logo" 
             width={24} 
             height={24}
@@ -141,7 +141,7 @@ export function HeroSection() {
           }}
         >
           <Image 
-            src="/logo-icon.png" 
+            src="/logoYdark.png" 
             alt="UPV Logo" 
             width={36} 
             height={36}
@@ -158,24 +158,7 @@ export function HeroSection() {
             transition={{ duration: 0.7 }}
             className="text-center lg:col-span-7 lg:text-left"
           >
-            {/* Logo Section */}
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="mb-6 flex justify-center lg:justify-start"
-            >
-              <Image 
-                src={getHeroLogo()}
-                alt="UPV Calendario de Exámenes" 
-                width={260} 
-                height={110}
-                className="h-auto w-auto max-w-[260px]"
-                priority
-                key={mounted ? 'mounted' : 'unmounted'}
-              />
-            </motion.div>
-
+            
             <h1 className="mb-5 text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl xl:text-6xl">
               Encuentra tu{" "}
               <span className="relative inline-block">

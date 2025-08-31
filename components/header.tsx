@@ -53,11 +53,11 @@ export function Header() {
     updateSettings({ language: newLanguage })
   }
 
-  // Determine which logo to use based on theme
-  const getHeaderLogo = () => {
-    if (!mounted) return "/logo-full.png" // Default fallback during SSR
+  // Determine which logoY icon to use based on theme
+  const getLogoYIcon = () => {
+    if (!mounted) return "/logoYdark.png" // Default fallback during SSR
     const currentTheme = settings.theme === 'system' ? theme : settings.theme
-    return currentTheme === "light" ? "/logo-full2-light.png" : "/logo-full.png"
+    return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
   }
 
   return (
@@ -69,21 +69,15 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap">
           <Image 
-            src="/logo-icon.png" 
+            src={getLogoYIcon()} 
             alt="UPV Icon" 
-            width={50} 
-            height={50}
-            className="h-10 w-10"
+            width={56} 
+            height={56}
+            className="h-14 w-14"
             priority
+            key={mounted ? 'mounted' : 'unmounted'}
           />
-          <Image 
-            src={getHeaderLogo()} 
-            alt="UPV Calendario de Exámenes" 
-            width={140} 
-            height={40}
-            className="h-10 w-auto"
-            priority
-          />
+
         </Link>
 
         <div className="flex items-center space-x-4">
