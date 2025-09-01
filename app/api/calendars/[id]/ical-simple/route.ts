@@ -16,11 +16,18 @@ export async function GET(
     console.log('📅 [Simple iCal] Starting for calendar:', params.id)
     
     // Get token from URL parameters
-    const token = request.nextUrl.searchParams.get('token')
+    const rawToken = request.nextUrl.searchParams.get('token')
     
-    if (!token) {
+    if (!rawToken) {
       return new NextResponse('Token required', { status: 401, headers: corsHeaders })
     }
+    
+    // URL decode the token (in case it was double-encoded)
+    const token = decodeURIComponent(rawToken)
+    
+    console.log('🔍 [Token Debug] Raw token from URL:', rawToken)
+    console.log('🔍 [Token Debug] Decoded token:', token)
+    console.log('🔍 [Token Debug] Tokens are same:', rawToken === token)
     
     // Decode and validate token
     let calendarId, userId, timestamp;
@@ -36,7 +43,10 @@ export async function GET(
       console.log('🔍 [Token Decode] Parts count:', parts.length)
       
       if (parts.length !== 3) throw new Error(`Invalid token format: expected 3 parts, got ${parts.length}`)
-      [calendarId, userId, timestamp] = parts
+      
+      calendarId = parts[0]
+      userId = parts[1] 
+      timestamp = parts[2]
       
       console.log('🔍 [Token Decode] Extracted values:', {
         calendarId,
