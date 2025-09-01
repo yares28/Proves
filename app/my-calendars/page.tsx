@@ -393,8 +393,8 @@ export default function MyCalendarsPage() {
           process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
       }
 
-      // Construct iCal calendar feed URL with secure token
-      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical?token=${encodeURIComponent(accessToken)}`;
+      // Construct iCal calendar feed URL with secure token (using working endpoint)
+      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical-working?token=${encodeURIComponent(accessToken)}`;
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
 
       // Use smart URL generation for mobile-aware calendar opening
@@ -438,7 +438,8 @@ export default function MyCalendarsPage() {
       });
       
       const baseUrl = window.location.origin;
-      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical?token=${encodeURIComponent(accessToken)}`;
+      // Temporarily use the working endpoint
+      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical-working?token=${encodeURIComponent(accessToken)}`;
       
       console.log("🍎 [Apple Export] Starting Apple Calendar export for:", calendar.name);
       console.log("🍎 [Apple Export] iCal URL:", icalUrl.replace(/token=[^&]+/, 'token=***'));
