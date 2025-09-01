@@ -220,10 +220,11 @@ export async function getExams(
         
         // Check if subject has an acronym in parentheses
         if (subject.includes('(') && subject.includes(')')) {
-          // Extract the acronym from the parentheses
-          const match = subject.match(/\(([^)]+)\)/);
-          if (match && match[1]) {
-            const acronym = match[1];
+          // Extract the acronym from the LAST parentheses group (e.g., "(B1) (IN1)" -> "IN1")
+          const matches = subject.match(/\(([^)]+)\)/g);
+          if (matches && matches.length > 0) {
+            const lastGroup = matches[matches.length - 1];
+            const acronym = lastGroup.replace(/[()]/g, '');
             // Use exact acronym matching for better precision
             query = query.eq('acronym', acronym);
             console.log(`Using exact acronym match for: "${acronym}"`);
@@ -245,10 +246,11 @@ export async function getExams(
         
         for (const subject of subjects) {
           if (subject.includes('(') && subject.includes(')')) {
-            // Extract acronym and use exact matching
-            const match = subject.match(/\(([^)]+)\)/);
-            if (match && match[1]) {
-              const acronym = match[1];
+            // Extract acronym from the LAST parentheses group
+            const matches = subject.match(/\(([^)]+)\)/g);
+            if (matches && matches.length > 0) {
+              const lastGroup = matches[matches.length - 1];
+              const acronym = lastGroup.replace(/[()]/g, '');
               acronyms.push(acronym);
             } else {
               // Fallback to subject name

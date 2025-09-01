@@ -3,16 +3,16 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { Menu, Globe, Moon, Sun } from "lucide-react"
+import { Globe, Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { UserButton } from "@/components/auth/user-button"
 import { useSettings } from "@/context/settings-context"
 
 export function Header() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+
   const [isScrolled, setIsScrolled] = useState(false)
   const [mounted, setMounted] = useState(false)
   const { theme, setTheme } = useTheme()
@@ -114,20 +114,6 @@ export function Header() {
           </Button>
 
           <UserButton />
-
-          <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="md:hidden">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Alternar menú</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-              <nav className="flex flex-col gap-4">
-                {/* Navigation items removed */}
-              </nav>
-            </SheetContent>
-          </Sheet>
         </div>
       </div>
     </header>

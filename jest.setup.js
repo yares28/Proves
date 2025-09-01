@@ -4,16 +4,31 @@
 // Learn more: https://github.com/testing-library/jest-dom
 import '@testing-library/jest-dom';
 
-// Mock Supabase
-jest.mock('@supabase/supabase-js', () => ({
-  createClient: jest.fn(() => ({
-    auth: {
-      getSession: jest.fn(),
-      refreshSession: jest.fn(),
-      onAuthStateChange: jest.fn(),
-    },
-  })),
-}));
+// Load environment variables for tests
+require('dotenv').config({ path: '.env.local' });
+
+// Only mock Supabase auth methods, not the entire client (so database calls work)
+jest.mock('@supabase/supabase-js', () => {
+  const actual = jest.requireActual('@supabase/supabase-js');
+  return {
+    ...actual,
+    createClient: jest.fn((url, key, options) => {
+      // Create the real client first
+      const client = actual.createClient(url, key, options);
+      // Override only auth methods while preserving the instance/prototype (so .from() etc. still work)
+      const originalAuth = client.auth;
+      client.auth = {
+        ...originalAuth,
+        getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+        refreshSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+        onAuthStateChange: jest.fn().mockReturnValue({ data: { subscription: { unsubscribe: jest.fn() } } }),
+        getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
+        signOut: jest.fn().mockResolvedValue({ error: null }),
+      };
+      return client;
+    }),
+  };
+});
 
 // Mock Next.js router
 jest.mock('next/router', () => ({
@@ -59,9 +74,14 @@ jest.mock('next/navigation', () => ({
   },
 }));
 
-// Mock environment variables
-process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
-process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
+// Environment variables are now loaded from .env.local via dotenv above
+// If .env.local doesn't exist, provide fallback test values
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
+}
+if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
+}
 
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
