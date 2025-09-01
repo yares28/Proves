@@ -412,22 +412,34 @@ export default function MyCalendarsPage() {
 
   const handleAppleCalendarExport = async (calendar: SavedCalendar) => {
     try {
-      const baseUrl = window.location.origin;
-      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
+      console.log("🍎 Starting Apple Calendar export for calendar:", calendar.name);
       
-      // Import mobile utilities
-      const { getSmartCalendarUrl } = await import("@/lib/utils");
-      
-      // Use smart URL generation for mobile-aware calendar opening
-      const smartCalendarUrl = getSmartCalendarUrl(icalUrl, 'apple', calendar.name);
+      // Use production domain to ensure HTTPS for Apple Calendar
+      let baseUrl = window.location.origin;
 
-      // For Apple Calendar, we use window.location.href to trigger the calendar app
-      window.location.href = smartCalendarUrl;
+      // If we're in development, use production URL for Apple Calendar compatibility
+      if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")) {
+        baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
+      }
+
+      // Generate the iCal URL for this specific calendar
+      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
+      console.log("🍎 Generated iCal URL:", icalUrl);
+      
+      // Convert to webcal protocol for Apple Calendar subscription
+      const webcalUrl = icalUrl.replace(/^https?:/, "webcal:");
+      console.log("🍎 Apple Calendar subscription URL:", webcalUrl);
+
+      // For Apple Calendar, create a subscription link
+      const subscriptionUrl = `webcal://${new URL(icalUrl).host}${new URL(icalUrl).pathname}${new URL(icalUrl).search}`;
+      console.log("🍎 Final subscription URL:", subscriptionUrl);
+
+      // Try to open Apple Calendar with the subscription
+      window.open(subscriptionUrl, "_blank", "noopener,noreferrer");
 
       toast({
-        title: "Abriendo Apple Calendar",
-        description:
-          "Se intentará abrir Apple Calendar con el enlace de suscripción.",
+        title: "Suscripción a Apple Calendar",
+        description: "Se abrirá Apple Calendar para suscribirse al calendario. Acepta la suscripción en el diálogo que aparece.",
       });
     } catch (error) {
       console.error("❌ Error opening Apple Calendar:", error);

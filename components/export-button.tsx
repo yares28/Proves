@@ -84,87 +84,84 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
     }
   }
 
-  const exportToAppleCalendar = () => {
+  const exportToAppleCalendar = async () => {
     if (exams.length === 0) {
       toast.error("No hay exámenes para exportar")
       return
     }
 
-
-    
     try {
-      // Generate iCal content using the proper utility
-      const icsContent = generateICalContent(exams, {
-        calendarName: "Mis Exámenes UPV",
-        useUPVFormat: true
-      })
+      console.log("🍎 Starting Apple Calendar export with filters:", filters);
       
-      const blob = new Blob([icsContent], { type: 'text/calendar' })
-      const url = URL.createObjectURL(blob)
+      // Import the Apple Calendar utility functions
+      const { generateAppleCalendarSubscriptionUrlWithFilters } = await import("@/lib/utils");
+      
+      // Generate Apple Calendar subscription URL with current filters
+      const subscriptionUrl = await generateAppleCalendarSubscriptionUrlWithFilters(
+        filters, 
+        "Mis Exámenes UPV"
+      );
+      
+      console.log("🍎 Generated Apple Calendar subscription URL:", subscriptionUrl);
       
       // Check if we're on mobile
-      const isMobile = isMobileDevice()
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       
-      if (isMobile) {
-        // On mobile, try to open with calendar app using webcal protocol
-        const webcalUrl = url.replace(/^blob:/, 'webcal://')
-        const smartUrl = getSmartCalendarUrl(url, 'apple', 'Mis Exámenes UPV')
+      if (isMobile && (navigator.userAgent.toLowerCase().includes('iphone') || 
+          navigator.userAgent.toLowerCase().includes('ipad') || 
+          navigator.userAgent.toLowerCase().includes('mac'))) {
+        // iOS/macOS devices: open the subscription URL directly
+        window.location.href = subscriptionUrl;
+        toast.success("Abriendo Apple Calendar para suscripción");
+      } else if (isMobile) {
+        // Android or other mobile: fallback to file download
+        const icsContent = generateICalContent(exams, {
+          calendarName: "Mis Exámenes UPV",
+          useUPVFormat: true
+        });
         
-        // For mobile devices, try to trigger the calendar app
-        if (navigator.userAgent.toLowerCase().includes('iphone') || 
-            navigator.userAgent.toLowerCase().includes('ipad') || 
-            navigator.userAgent.toLowerCase().includes('mac')) {
-          // iOS/macOS devices: create a temporary link with webcal protocol
-          const tempLink = document.createElement('a')
-          tempLink.href = `data:text/calendar;charset=utf8,${encodeURIComponent(icsContent)}`
-          tempLink.download = 'exams.ics'
-          document.body.appendChild(tempLink)
-          tempLink.click()
-          document.body.removeChild(tempLink)
-          
-          toast.success("Abriendo Apple Calendar")
-        } else {
-          // Android or other mobile: fallback to download
-          const link = document.createElement('a')
-          link.href = url
-          link.download = 'exams.ics'
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-          
-          toast.success("Archivo .ics descargado")
-        }
+        const blob = new Blob([icsContent], { type: 'text/calendar' });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'mis-examenes-upv.ics';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        toast.success("Archivo .ics descargado");
       } else {
-        // Desktop: download the file
-        const link = document.createElement('a')
-        link.href = url
-        link.download = 'exams.ics'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        
-        toast.success("Archivo .ics descargado para Apple Calendar")
+        // Desktop: open subscription URL in new tab
+        window.open(subscriptionUrl, "_blank", "noopener,noreferrer");
+        toast.success("Abriendo Apple Calendar para suscripción. Acepta la suscripción en el diálogo que aparece.");
       }
       
-      // Clean up
-      setTimeout(() => URL.revokeObjectURL(url), 1000)
-      
     } catch (error) {
-      console.error('Error exporting to Apple Calendar:', error)
-      // Fallback to original method
-      const icsContent = generateICSContent(exams)
-      const blob = new Blob([icsContent], { type: 'text/calendar' })
-      const url = URL.createObjectURL(blob)
-      
-      const link = document.createElement('a')
-      link.href = url
-      link.download = 'exams.ics'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-      
-      toast.success("Archivo .ics descargado para Apple Calendar")
+      console.error('❌ Error exporting to Apple Calendar:', error);
+      // Fallback to download method
+      try {
+        const icsContent = generateICalContent(exams, {
+          calendarName: "Mis Exámenes UPV",
+          useUPVFormat: true
+        });
+        const blob = new Blob([icsContent], { type: 'text/calendar' });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'mis-examenes-upv.ics';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        toast.success("Archivo .ics descargado para Apple Calendar");
+      } catch (fallbackError) {
+        console.error('❌ Fallback also failed:', fallbackError);
+        toast.error("Error al exportar a Apple Calendar");
+      }
     }
   }
 
