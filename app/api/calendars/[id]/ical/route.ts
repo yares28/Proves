@@ -10,6 +10,8 @@ export async function GET(
 ) {
   try {
     console.log('📅 [iCal API] Starting iCal generation for calendar:', params.id)
+    console.log('📅 [iCal API] Request URL:', request.url)
+    console.log('📅 [iCal API] Request headers:', Object.fromEntries(request.headers.entries()))
     
     // Create Supabase client
     const supabase = createRouteHandlerClient({ cookies })
@@ -17,10 +19,16 @@ export async function GET(
     // Get current user session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     
+    console.log('📅 [iCal API] Session check result:', {
+      hasSession: !!session,
+      sessionError: sessionError?.message,
+      userId: session?.user?.id
+    })
+    
     if (sessionError || !session) {
       console.error('❌ [iCal API] Authentication error:', sessionError)
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: 'Unauthorized', details: sessionError?.message || 'No session found' },
         { status: 401 }
       )
     }
@@ -50,7 +58,17 @@ export async function GET(
     })
     
     // Get the exams based on the calendar's filters
-    const exams = await getExams(calendar.filters as Record<string, string[]>)
+    console.log('🔍 [iCal API] Calling getExams with filters:', calendar.filters)
+    let exams;
+    try {
+      exams = await getExams(calendar.filters as Record<string, string[]>)
+    } catch (examError) {
+      console.error('❌ [iCal API] Error fetching exams:', examError)
+      return NextResponse.json(
+        { error: 'Error fetching exam data', details: examError instanceof Error ? examError.message : 'Unknown error' },
+        { status: 500 }
+      )
+    }
     
     console.log('📊 [iCal API] Exams fetched:', {
       count: exams.length,
@@ -58,13 +76,22 @@ export async function GET(
     })
     
     // Generate iCal content
-    const icalContent = generateICalContent(exams, {
-      calendarName: calendar.name,
-      useUPVFormat: true,
-      timeZone: 'Europe/Madrid'
-    })
+    let icalContent;
+    try {
+      icalContent = generateICalContent(exams, {
+        calendarName: calendar.name,
+        useUPVFormat: true,
+        timeZone: 'Europe/Madrid'
+      })
+    } catch (icalError) {
+      console.error('❌ [iCal API] Error generating iCal content:', icalError)
+      return NextResponse.json(
+        { error: 'Error generating calendar content', details: icalError instanceof Error ? icalError.message : 'Unknown error' },
+        { status: 500 }
+      )
+    }
     
-    console.log('📄 [iCal API] iCal content generated successfully')
+    console.log('📄 [iCal API] iCal content generated successfully, length:', icalContent.length)
     
     // Return iCal file with proper headers
     return new NextResponse(icalContent, {
