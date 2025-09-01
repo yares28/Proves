@@ -444,10 +444,33 @@ export default function MyCalendarsPage() {
             description: "Se está abriendo Apple Calendar con el calendario.",
           });
         } catch (webcalError) {
-          console.warn("🍎 [Apple Export] Webcal failed, falling back to download");
+          console.warn("🍎 [Apple Export] Webcal failed, falling back to download:", webcalError);
           // Fallback to direct download
-          const response = await fetch(icalUrl);
+          const response = await fetch(icalUrl, {
+            method: 'GET',
+            headers: {
+              'Accept': 'text/calendar,text/plain,*/*',
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include', // Include cookies for authentication
+          });
+          
+          if (!response.ok) {
+            let errorMessage;
+            try {
+              const errorData = await response.json();
+              errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+            } catch {
+              errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+            }
+            throw new Error(errorMessage);
+          }
+          
           const icsContent = await response.text();
+          
+          if (!icsContent || icsContent.length === 0) {
+            throw new Error("El contenido del calendario está vacío");
+          }
           
           const blob = new Blob([icsContent], { type: 'text/calendar' });
           const downloadUrl = URL.createObjectURL(blob);
@@ -469,12 +492,38 @@ export default function MyCalendarsPage() {
         // Desktop or other devices: download the file
         console.log("🍎 [Apple Export] Desktop/other device, downloading file");
         
-        const response = await fetch(icalUrl);
+        const response = await fetch(icalUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'text/calendar,text/plain,*/*',
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include', // Include cookies for authentication
+        });
+        
+        console.log("🍎 [Apple Export] Response status:", response.status);
+        console.log("🍎 [Apple Export] Response headers:", Object.fromEntries(response.headers.entries()));
+        
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          // Try to get error details from response
+          let errorMessage;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+          } catch {
+            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          }
+          console.error("🍎 [Apple Export] API Error:", errorMessage);
+          throw new Error(errorMessage);
         }
         
         const icsContent = await response.text();
+        console.log("🍎 [Apple Export] iCal content length:", icsContent.length);
+        
+        if (!icsContent || icsContent.length === 0) {
+          throw new Error("El contenido del calendario está vacío");
+        }
+        
         const blob = new Blob([icsContent], { type: 'text/calendar' });
         const downloadUrl = URL.createObjectURL(blob);
         
@@ -493,9 +542,24 @@ export default function MyCalendarsPage() {
       }
     } catch (error) {
       console.error("❌ [Apple Export] Error opening Apple Calendar:", error);
+      
+      // Provide more specific error message
+      let errorDescription = "No se pudo exportar el calendario. Inténtalo de nuevo.";
+      if (error instanceof Error) {
+        if (error.message.includes('401')) {
+          errorDescription = "Error de autenticación. Por favor, inicia sesión de nuevo.";
+        } else if (error.message.includes('404')) {
+          errorDescription = "Calendario no encontrado. Verifica que el calendario existe.";
+        } else if (error.message.includes('empty') || error.message.includes('vacío')) {
+          errorDescription = "El calendario no tiene exámenes para exportar.";
+        } else if (error.message !== "No se pudo exportar el calendario. Inténtalo de nuevo.") {
+          errorDescription = `Error: ${error.message}`;
+        }
+      }
+      
       toast({
         title: "Error",
-        description: "No se pudo exportar el calendario. Inténtalo de nuevo.",
+        description: errorDescription,
         variant: "destructive",
       });
     }
