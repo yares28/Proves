@@ -7,18 +7,32 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // Set CORS headers for all responses
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  }
+
   try {
     console.log('📅 [iCal API] Starting iCal generation for calendar:', params.id)
     console.log('📅 [iCal API] Request URL:', request.url)
+    console.log('📅 [iCal API] Request headers:', Object.fromEntries(request.headers.entries()))
     
     // Get token from URL parameters (required for webcal protocol compatibility)
     const token = request.nextUrl.searchParams.get('token')
     
+    console.log('📅 [iCal API] Token present:', !!token)
+    console.log('📅 [iCal API] Token length:', token?.length || 0)
+    
     if (!token) {
       console.error('❌ [iCal API] No token provided')
-      return NextResponse.json(
-        { error: 'Token required for calendar access' },
-        { status: 401 }
+      return new NextResponse(
+        'Unauthorized: Token required for calendar access',
+        { 
+          status: 401,
+          headers: corsHeaders
+        }
       )
     }
     
@@ -28,9 +42,12 @@ export async function GET(
     
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error('❌ [iCal API] Missing Supabase environment variables')
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
+      return new NextResponse(
+        'Server configuration error',
+        { 
+          status: 500,
+          headers: corsHeaders
+        }
       )
     }
     
@@ -83,9 +100,12 @@ export async function GET(
       
     } catch (tokenError) {
       console.error('❌ [iCal API] Token validation failed:', tokenError)
-      return NextResponse.json(
-        { error: 'Invalid or expired access token', details: tokenError.message },
-        { status: 401 }
+      return new NextResponse(
+        `Unauthorized: ${tokenError.message}`,
+        { 
+          status: 401,
+          headers: corsHeaders
+        }
       )
     }
     
@@ -99,9 +119,12 @@ export async function GET(
     
     if (calendarError || !calendar) {
       console.error('❌ [iCal API] Calendar not found:', calendarError)
-      return NextResponse.json(
-        { error: 'Calendar not found or access denied' },
-        { status: 404 }
+      return new NextResponse(
+        'Calendar not found or access denied',
+        { 
+          status: 404,
+          headers: corsHeaders
+        }
       )
     }
     
@@ -119,9 +142,12 @@ export async function GET(
       exams = await getExams(calendar.filters as Record<string, string[]>)
     } catch (examError) {
       console.error('❌ [iCal API] Error fetching exams:', examError)
-      return NextResponse.json(
-        { error: 'Error fetching exam data', details: examError instanceof Error ? examError.message : 'Unknown error' },
-        { status: 500 }
+      return new NextResponse(
+        `Error fetching exam data: ${examError instanceof Error ? examError.message : 'Unknown error'}`,
+        { 
+          status: 500,
+          headers: corsHeaders
+        }
       )
     }
     
@@ -140,9 +166,12 @@ export async function GET(
       })
     } catch (icalError) {
       console.error('❌ [iCal API] Error generating iCal content:', icalError)
-      return NextResponse.json(
-        { error: 'Error generating calendar content', details: icalError instanceof Error ? icalError.message : 'Unknown error' },
-        { status: 500 }
+      return new NextResponse(
+        `Error generating calendar content: ${icalError instanceof Error ? icalError.message : 'Unknown error'}`,
+        { 
+          status: 500,
+          headers: corsHeaders
+        }
       )
     }
     
@@ -152,12 +181,10 @@ export async function GET(
     return new NextResponse(icalContent, {
       status: 200,
       headers: {
+        ...corsHeaders,
         'Content-Type': 'text/calendar; charset=utf-8',
         'Content-Disposition': `inline; filename="${calendar.name.replace(/[^a-zA-Z0-9]/g, '_')}.ics"`,
         'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET',
-        'Access-Control-Allow-Headers': 'Content-Type',
         // Headers for webcal protocol compatibility
         'X-WR-CALNAME': calendar.name,
         'X-WR-CALDESC': `Calendario de exámenes: ${calendar.name}`,
@@ -166,9 +193,12 @@ export async function GET(
     
   } catch (error) {
     console.error('❌ [iCal API] Unexpected error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+    return new NextResponse(
+      `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      { 
+        status: 500,
+        headers: corsHeaders
+      }
     )
   }
 }
@@ -180,7 +210,7 @@ export async function OPTIONS() {
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     },
   })
 }
