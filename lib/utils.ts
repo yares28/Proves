@@ -868,7 +868,7 @@ export function getSmartCalendarUrl(icalUrl: string, provider: 'google' | 'apple
     // For other mobile devices or if app intent fails, use the mobile web URL
     return isMobile ? urls.googleMobile : urls.googleWeb;
   } else if (provider === 'apple') {
-    // For Apple devices, ensure the URL is using webcal protocol and is properly formatted
+    // For Apple Calendar, always use webcal protocol for proper subscription experience
     let webcalUrl = icalUrl;
     
     // Ensure we're using webcal protocol
@@ -876,13 +876,9 @@ export function getSmartCalendarUrl(icalUrl: string, provider: 'google' | 'apple
       webcalUrl = icalUrl.replace(/^https?:\/\//, 'webcal://');
     }
     
-    // For mobile Apple devices, use the webcal URL directly
-    // For desktop, we might want to download the file instead on some browsers
-    if (isMobile && (navigator.userAgent.toLowerCase().includes('iphone') || 
-                     navigator.userAgent.toLowerCase().includes('ipad'))) {
-      return webcalUrl;
-    }
+    console.log('🍎 [Smart URL] Generated Apple Calendar webcal URL:', webcalUrl);
     
+    // Always return webcal URL for proper calendar subscription
     return webcalUrl;
   }
   
