@@ -889,6 +889,20 @@ export function getSmartCalendarUrl(icalUrl: string, provider: 'google' | 'apple
   return icalUrl;
 }
 
+// Generate secure token for calendar access (compatible with webcal protocol)
+export function generateCalendarAccessToken(calendarId: string, userId: string): string {
+  const timestamp = Date.now().toString()
+  const tokenData = `${calendarId}:${userId}:${timestamp}`
+  
+  // Use browser-compatible base64 encoding
+  if (typeof window !== 'undefined') {
+    return btoa(tokenData)
+  } else {
+    // Node.js environment
+    return Buffer.from(tokenData).toString('base64')
+  }
+}
+
 export async function generateUPVTokenUrl(
   filters: Record<string, string[]>,
   calendarName: string = "UPV Exams"
