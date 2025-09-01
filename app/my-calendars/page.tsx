@@ -373,16 +373,6 @@ export default function MyCalendarsPage() {
 
   const exportExamsToGoogleCalendar = async (calendar: SavedCalendar) => {
     try {
-      // Import mobile utilities and token generator
-      const { getSmartCalendarUrl, generateCalendarAccessToken } = await import("@/lib/utils");
-      
-      // Generate secure access token for this calendar
-      if (!user?.id) {
-        throw new Error("Usuario no autenticado");
-      }
-      
-      const accessToken = generateCalendarAccessToken(calendar.id, user.id);
-      
       // Use production domain instead of localhost to prevent Google Calendar refresh loops
       let baseUrl = window.location.origin;
 
@@ -393,9 +383,12 @@ export default function MyCalendarsPage() {
           process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
       }
 
-      // Construct iCal calendar feed URL with secure token (using working endpoint)
-      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical-working?token=${encodeURIComponent(accessToken)}`;
+      // Construct iCal calendar feed URL using webcal protocol for better calendar app integration
+      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
+
+      // Import mobile utilities
+      const { getSmartCalendarUrl } = await import("@/lib/utils");
 
       // Use smart URL generation for mobile-aware calendar opening
       const smartCalendarUrl = getSmartCalendarUrl(calendarFeed, 'google', calendar.name);
@@ -419,139 +412,28 @@ export default function MyCalendarsPage() {
 
   const handleAppleCalendarExport = async (calendar: SavedCalendar) => {
     try {
-      // Import mobile utilities and token generator
-      const { getSmartCalendarUrl, isMobileDevice, generateCalendarAccessToken } = await import("@/lib/utils");
-      
-      // Generate secure access token for this calendar
-      if (!user?.id) {
-        throw new Error("Usuario no autenticado");
-      }
-      
-      const accessToken = generateCalendarAccessToken(calendar.id, user.id);
-      
-      // Debug token generation
-      console.log("🔍 [Token Debug] Generated token for:", {
-        calendarId: calendar.id,
-        userId: user.id,
-        token: accessToken,
-        decodedToken: atob(accessToken)
-      });
-      
       const baseUrl = window.location.origin;
-      // Temporarily use the working endpoint
-      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical-working?token=${encodeURIComponent(accessToken)}`;
+      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
       
-      console.log("🍎 [Apple Export] Starting Apple Calendar export for:", calendar.name);
-      console.log("🍎 [Apple Export] iCal URL:", icalUrl.replace(/token=[^&]+/, 'token=***'));
-      
-      // Check if we're on mobile
-      const isMobile = isMobileDevice();
-      console.log("🍎 [Apple Export] Is mobile device:", isMobile);
+      // Import mobile utilities
+      const { getSmartCalendarUrl } = await import("@/lib/utils");
       
       // Use smart URL generation for mobile-aware calendar opening
       const smartCalendarUrl = getSmartCalendarUrl(icalUrl, 'apple', calendar.name);
-      console.log("🍎 [Apple Export] Smart URL:", smartCalendarUrl);
-      console.log("🍎 [Apple Export] Original iCal URL:", icalUrl);
-      console.log("🍎 [Apple Export] User Agent:", navigator.userAgent);
 
-      // For proper Apple Calendar subscription experience, always use webcal protocol
-      console.log("🍎 [Apple Export] Using webcal protocol for Apple Calendar subscription");
-      
-      // Use the smart URL which should already be in webcal format
-      try {
-        // For all devices, try to trigger the calendar app subscription
-        console.log("🍎 [Apple Export] Opening calendar subscription:", smartCalendarUrl);
-        
-        // Try multiple approaches for better browser compatibility
-        console.log("🍎 [Apple Export] Attempting to open calendar subscription:", smartCalendarUrl);
-        
-        // First, try the webcal protocol directly
-        try {
-          if (navigator.userAgent.toLowerCase().includes('safari') || 
-              navigator.userAgent.toLowerCase().includes('iphone') || 
-              navigator.userAgent.toLowerCase().includes('ipad') || 
-              navigator.userAgent.toLowerCase().includes('mac')) {
-            // For Apple devices: Use window.location.href
-            console.log("🍎 [Apple Export] Using window.location.href for Apple devices");
-            window.location.href = smartCalendarUrl;
-          } else {
-            // For other browsers: Try creating a link and clicking it
-            console.log("🍎 [Apple Export] Using link click method for other browsers");
-            const link = document.createElement('a');
-            link.href = smartCalendarUrl;
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            
-            // Try to trigger the link
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-          }
-          
-          // Give it a moment to try the webcal protocol
-          setTimeout(() => {
-            console.log("🍎 [Apple Export] Webcal protocol attempted");
-          }, 1000);
-          
-        } catch (webcalError) {
-          console.warn("🍎 [Apple Export] Webcal method failed:", webcalError);
-          
-          // Fallback: provide manual instructions
-          navigator.clipboard.writeText(smartCalendarUrl).then(() => {
-            toast({
-              title: "URL copiada",
-              description: "La URL del calendario se ha copiado. Pégala en tu aplicación de calendario para suscribirte.",
-            });
-          }).catch(() => {
-            toast({
-              title: "Instrucciones manuales",
-              description: `Copia esta URL en tu aplicación de calendario: ${smartCalendarUrl}`,
-            });
-          });
-          return;
-        }
-        
-        // Show different instructions based on device
-        let description = "Se está abriendo Apple Calendar. Haz clic en 'Añadir' para suscribirte al calendario.";
-        
-        if (navigator.userAgent.toLowerCase().includes('iphone') || 
-            navigator.userAgent.toLowerCase().includes('ipad')) {
-          description = "Se está abriendo la app Calendario. Toca 'Añadir' para suscribirte al calendario.";
-        } else if (navigator.userAgent.toLowerCase().includes('mac')) {
-          description = "Se está abriendo Apple Calendar. Haz clic en 'Suscribirse' para añadir el calendario.";
-        } else {
-          description = "Si el calendario no se abre automáticamente, copia esta URL en tu aplicación de calendario: " + smartCalendarUrl;
-        }
-        
-        toast({
-          title: "Abriendo Apple Calendar",
-          description: description,
-        });
-        
-      } catch (webcalError) {
-        console.warn("🍎 [Apple Export] Webcal protocol failed:", webcalError);
-        throw new Error("No se pudo abrir Apple Calendar. Asegúrate de que Apple Calendar esté instalado.");
-      }
+      // For Apple Calendar, we use window.location.href to trigger the calendar app
+      window.location.href = smartCalendarUrl;
+
+      toast({
+        title: "Abriendo Apple Calendar",
+        description:
+          "Se intentará abrir Apple Calendar con el enlace de suscripción.",
+      });
     } catch (error) {
-      console.error("❌ [Apple Export] Error opening Apple Calendar:", error);
-      
-      // Provide more specific error message
-      let errorDescription = "No se pudo exportar el calendario. Inténtalo de nuevo.";
-      if (error instanceof Error) {
-        if (error.message.includes('401')) {
-          errorDescription = "Error de autenticación. Por favor, inicia sesión de nuevo.";
-        } else if (error.message.includes('404')) {
-          errorDescription = "Calendario no encontrado. Verifica que el calendario existe.";
-        } else if (error.message.includes('empty') || error.message.includes('vacío')) {
-          errorDescription = "El calendario no tiene exámenes para exportar.";
-        } else if (error.message !== "No se pudo exportar el calendario. Inténtalo de nuevo.") {
-          errorDescription = `Error: ${error.message}`;
-        }
-      }
-      
+      console.error("❌ Error opening Apple Calendar:", error);
       toast({
         title: "Error",
-        description: errorDescription,
+        description: "No se pudo abrir Apple Calendar.",
         variant: "destructive",
       });
     }
