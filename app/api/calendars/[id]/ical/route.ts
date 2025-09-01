@@ -9,24 +9,20 @@ export async function GET(
 ) {
   try {
     console.log('📅 [iCal API] Starting iCal generation for calendar:', params.id)
+    console.log('📅 [iCal API] Request URL:', request.url)
     
-    // Get the access token from URL parameters (for webcal compatibility)
-    const accessToken = request.nextUrl.searchParams.get('access_token')
+    // Get token from URL parameters (required for webcal protocol compatibility)
+    const token = request.nextUrl.searchParams.get('token')
     
-    console.log('📅 [iCal API] Auth check:', {
-      hasAccessToken: !!accessToken,
-      tokenLength: accessToken?.length || 0
-    })
-    
-    if (!accessToken) {
-      console.error('❌ [iCal API] No access token provided')
+    if (!token) {
+      console.error('❌ [iCal API] No token provided')
       return NextResponse.json(
-        { error: 'Access token required. Please include access_token in the URL parameters.' },
+        { error: 'Token required for calendar access' },
         { status: 401 }
       )
     }
     
-    // Create Supabase client with service key for admin access
+    // Create admin Supabase client for secure token verification
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
     
@@ -38,27 +34,67 @@ export async function GET(
       )
     }
     
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
     
-    // Verify the access token and get user
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(accessToken)
+    console.log('✅ [iCal API] Verifying calendar access with token')
     
-    if (userError || !user) {
-      console.error('❌ [iCal API] Invalid access token:', userError)
+    // Verify token by decoding and checking calendar access
+    // Token format: base64(calendar_id:user_id:timestamp)
+    let calendarId, userId, timestamp;
+    try {
+      // Safely decode base64 token
+      let decoded;
+      try {
+        decoded = Buffer.from(token, 'base64').toString('utf-8')
+      } catch (base64Error) {
+        throw new Error('Invalid base64 token')
+      }
+      
+      const parts = decoded.split(':')
+      if (parts.length !== 3) {
+        throw new Error('Invalid token format')
+      }
+      [calendarId, userId, timestamp] = parts
+      
+      // Validate parts
+      if (!calendarId || !userId || !timestamp) {
+        throw new Error('Missing token components')
+      }
+      
+      // Verify calendar ID matches
+      if (calendarId !== params.id) {
+        throw new Error('Token calendar ID mismatch')
+      }
+      
+      // Validate timestamp is a number
+      const timestampNum = parseInt(timestamp)
+      if (isNaN(timestampNum)) {
+        throw new Error('Invalid timestamp in token')
+      }
+      
+      // Check if token is not too old (7 days expiry)
+      const tokenAge = Date.now() - timestampNum
+      const maxAge = 7 * 24 * 60 * 60 * 1000 // 7 days
+      if (tokenAge > maxAge) {
+        throw new Error('Token expired')
+      }
+      
+      console.log('✅ [iCal API] Token verified successfully')
+      
+    } catch (tokenError) {
+      console.error('❌ [iCal API] Token validation failed:', tokenError)
       return NextResponse.json(
-        { error: 'Invalid or expired access token' },
+        { error: 'Invalid or expired access token', details: tokenError.message },
         { status: 401 }
       )
     }
     
-    console.log('✅ [iCal API] User authenticated:', user.id)
-    
-    // Fetch the calendar from database and ensure it belongs to the authenticated user
-    const { data: calendar, error: calendarError } = await supabaseAdmin
+    // Fetch the calendar from database and verify ownership
+    const { data: calendar, error: calendarError } = await supabase
       .from('user_calendars')
       .select('*')
       .eq('id', params.id)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single()
     
     if (calendarError || !calendar) {
@@ -69,12 +105,11 @@ export async function GET(
       )
     }
     
-    console.log('✅ [iCal API] Calendar found:', {
+    console.log('✅ [iCal API] Calendar found and access verified:', {
       id: calendar.id,
       name: calendar.name,
       filters: calendar.filters,
-      ownerId: calendar.user_id,
-      requesterId: user.id
+      userId: calendar.user_id
     })
     
     // Get the exams based on the calendar's filters

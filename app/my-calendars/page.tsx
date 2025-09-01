@@ -373,6 +373,16 @@ export default function MyCalendarsPage() {
 
   const exportExamsToGoogleCalendar = async (calendar: SavedCalendar) => {
     try {
+      // Import mobile utilities and token generator
+      const { getSmartCalendarUrl, generateCalendarAccessToken } = await import("@/lib/utils");
+      
+      // Generate secure access token for this calendar
+      if (!user?.id) {
+        throw new Error("Usuario no autenticado");
+      }
+      
+      const accessToken = generateCalendarAccessToken(calendar.id, user.id);
+      
       // Use production domain instead of localhost to prevent Google Calendar refresh loops
       let baseUrl = window.location.origin;
 
@@ -383,12 +393,9 @@ export default function MyCalendarsPage() {
           process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
       }
 
-      // Construct iCal calendar feed URL using webcal protocol for better calendar app integration
-      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
+      // Construct iCal calendar feed URL with secure token
+      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical?token=${encodeURIComponent(accessToken)}`;
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
-
-      // Import mobile utilities
-      const { getSmartCalendarUrl } = await import("@/lib/utils");
 
       // Use smart URL generation for mobile-aware calendar opening
       const smartCalendarUrl = getSmartCalendarUrl(calendarFeed, 'google', calendar.name);
@@ -412,22 +419,21 @@ export default function MyCalendarsPage() {
 
   const handleAppleCalendarExport = async (calendar: SavedCalendar) => {
     try {
-      // Get the current user's access token
-      const { getFreshAuthTokens } = await import("@/utils/auth-helpers");
-      const tokens = await getFreshAuthTokens();
+      // Import mobile utilities and token generator
+      const { getSmartCalendarUrl, isMobileDevice, generateCalendarAccessToken } = await import("@/lib/utils");
       
-      if (!tokens?.accessToken) {
-        throw new Error("No access token found. Please log in again.");
+      // Generate secure access token for this calendar
+      if (!user?.id) {
+        throw new Error("Usuario no autenticado");
       }
       
-      const baseUrl = window.location.origin;
-      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical?access_token=${encodeURIComponent(tokens.accessToken)}`;
+      const accessToken = generateCalendarAccessToken(calendar.id, user.id);
       
-      // Import mobile utilities
-      const { getSmartCalendarUrl, isMobileDevice } = await import("@/lib/utils");
+      const baseUrl = window.location.origin;
+      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical?token=${encodeURIComponent(accessToken)}`;
       
       console.log("🍎 [Apple Export] Starting Apple Calendar export for:", calendar.name);
-      console.log("🍎 [Apple Export] iCal URL (without token):", `${baseUrl}/api/calendars/${calendar.id}/ical`);
+      console.log("🍎 [Apple Export] iCal URL:", icalUrl.replace(/token=[^&]+/, 'token=***'));
       
       // Check if we're on mobile
       const isMobile = isMobileDevice();
