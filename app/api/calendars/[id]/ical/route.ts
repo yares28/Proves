@@ -90,7 +90,13 @@ export async function GET(
       
       // Verify calendar ID matches
       if (calendarId !== params.id) {
-        throw new Error('Token calendar ID mismatch')
+        console.error('❌ [iCal API] Calendar ID mismatch details:', {
+          tokenCalendarId: calendarId,
+          urlCalendarId: params.id,
+          tokenParts: parts,
+          decodedToken: decoded
+        })
+        throw new Error(`Token calendar ID mismatch: token=${calendarId}, url=${params.id}`)
       }
       
       // Validate timestamp is a number

@@ -30,7 +30,14 @@ export async function GET(
       if (parts.length !== 3) throw new Error('Invalid token format')
       [calendarId, userId, timestamp] = parts
       
-      if (calendarId !== params.id) throw new Error('Calendar ID mismatch')
+      if (calendarId !== params.id) {
+        console.error('❌ [Simple iCal] Calendar ID mismatch:', {
+          tokenCalendarId: calendarId,
+          urlCalendarId: params.id,
+          tokenParts: parts
+        })
+        throw new Error(`Calendar ID mismatch: token=${calendarId}, url=${params.id}`)
+      }
       
       const tokenAge = Date.now() - parseInt(timestamp)
       if (tokenAge > 7 * 24 * 60 * 60 * 1000) throw new Error('Token expired')
