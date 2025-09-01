@@ -37,13 +37,23 @@ export async function GET(
     }
     
     // Create admin Supabase client for secure token verification
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    
+    console.log('🔑 [iCal API] Environment check:', {
+      hasSupabaseUrl: !!supabaseUrl,
+      hasServiceKey: !!supabaseServiceKey,
+      supabaseUrlLength: supabaseUrl?.length || 0,
+      serviceKeyLength: supabaseServiceKey?.length || 0
+    })
     
     if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('❌ [iCal API] Missing Supabase environment variables')
+      console.error('❌ [iCal API] Missing Supabase environment variables:', {
+        supabaseUrl: !!supabaseUrl,
+        serviceKey: !!supabaseServiceKey
+      })
       return new NextResponse(
-        'Server configuration error',
+        'Server configuration error: Missing environment variables',
         { 
           status: 500,
           headers: corsHeaders
