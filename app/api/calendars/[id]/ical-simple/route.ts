@@ -25,10 +25,26 @@ export async function GET(
     // Decode and validate token
     let calendarId, userId, timestamp;
     try {
+      console.log('🔍 [Token Decode] Original token:', token)
+      console.log('🔍 [Token Decode] Token length:', token.length)
+      
       const decoded = Buffer.from(token, 'base64').toString('utf-8')
+      console.log('🔍 [Token Decode] Decoded string:', decoded)
+      
       const parts = decoded.split(':')
-      if (parts.length !== 3) throw new Error('Invalid token format')
+      console.log('🔍 [Token Decode] Split parts:', parts)
+      console.log('🔍 [Token Decode] Parts count:', parts.length)
+      
+      if (parts.length !== 3) throw new Error(`Invalid token format: expected 3 parts, got ${parts.length}`)
       [calendarId, userId, timestamp] = parts
+      
+      console.log('🔍 [Token Decode] Extracted values:', {
+        calendarId,
+        userId,
+        timestamp,
+        calendarIdType: typeof calendarId,
+        userIdType: typeof userId
+      })
       
       if (calendarId !== params.id) {
         console.error('❌ [Simple iCal] Calendar ID mismatch:', {

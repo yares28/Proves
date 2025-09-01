@@ -887,16 +887,37 @@ export function getSmartCalendarUrl(icalUrl: string, provider: 'google' | 'apple
 
 // Generate secure token for calendar access (compatible with webcal protocol)
 export function generateCalendarAccessToken(calendarId: string, userId: string): string {
+  console.log('🔧 [Token Generation] Input parameters:', {
+    calendarId,
+    userId,
+    calendarIdType: typeof calendarId,
+    userIdType: typeof userId,
+    calendarIdLength: calendarId?.length,
+    userIdLength: userId?.length
+  })
+  
+  if (!calendarId || !userId) {
+    throw new Error(`Missing parameters for token generation: calendarId=${!!calendarId}, userId=${!!userId}`)
+  }
+  
   const timestamp = Date.now().toString()
   const tokenData = `${calendarId}:${userId}:${timestamp}`
   
+  console.log('🔧 [Token Generation] Token data before encoding:', tokenData)
+  
   // Use browser-compatible base64 encoding
+  let token
   if (typeof window !== 'undefined') {
-    return btoa(tokenData)
+    token = btoa(tokenData)
   } else {
     // Node.js environment
-    return Buffer.from(tokenData).toString('base64')
+    token = Buffer.from(tokenData).toString('base64')
   }
+  
+  console.log('🔧 [Token Generation] Generated token:', token)
+  console.log('🔧 [Token Generation] Token length:', token.length)
+  
+  return token
 }
 
 export async function generateUPVTokenUrl(
