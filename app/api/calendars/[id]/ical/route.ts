@@ -36,24 +36,21 @@ export async function GET(
       )
     }
     
-    // Create admin Supabase client for secure token verification
+    // Create Supabase client - try service role first, fallback to anon
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     
     console.log('🔑 [iCal API] Environment check:', {
       hasSupabaseUrl: !!supabaseUrl,
       hasServiceKey: !!supabaseServiceKey,
-      supabaseUrlLength: supabaseUrl?.length || 0,
-      serviceKeyLength: supabaseServiceKey?.length || 0
+      hasAnonKey: !!supabaseAnonKey
     })
     
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('❌ [iCal API] Missing Supabase environment variables:', {
-        supabaseUrl: !!supabaseUrl,
-        serviceKey: !!supabaseServiceKey
-      })
+    if (!supabaseUrl) {
+      console.error('❌ [iCal API] Missing Supabase URL')
       return new NextResponse(
-        'Server configuration error: Missing environment variables',
+        'Server configuration error: Missing Supabase URL',
         { 
           status: 500,
           headers: corsHeaders
@@ -61,7 +58,22 @@ export async function GET(
       )
     }
     
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    // Use service role if available, otherwise use anon key
+    const supabaseKey = supabaseServiceKey || supabaseAnonKey
+    
+    if (!supabaseKey) {
+      console.error('❌ [iCal API] No Supabase key available')
+      return new NextResponse(
+        'Server configuration error: No Supabase key available',
+        { 
+          status: 500,
+          headers: corsHeaders
+        }
+      )
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey)
+    console.log('✅ [iCal API] Using Supabase with', supabaseServiceKey ? 'service role' : 'anon key')
     
     console.log('✅ [iCal API] Verifying calendar access with token')
     
@@ -197,17 +209,24 @@ export async function GET(
     console.log('📄 [iCal API] iCal content generated successfully, length:', icalContent.length)
     
     // Return iCal file with proper headers for webcal protocol
+    const responseHeaders = {
+      ...corsHeaders,
+      'Content-Type': 'text/calendar; charset=utf-8',
+      'Content-Disposition': `inline; filename="${calendar.name.replace(/[^a-zA-Z0-9]/g, '_')}.ics"`,
+      'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
+      // Headers for webcal protocol compatibility
+      'X-WR-CALNAME': calendar.name,
+      'X-WR-CALDESC': `Calendario de exámenes: ${calendar.name}`,
+      // Additional headers for better calendar app integration
+      'X-Content-Type-Options': 'nosniff',
+      'Vary': 'Accept-Encoding',
+    }
+    
+    console.log('📄 [iCal API] Returning iCal content with headers:', Object.keys(responseHeaders))
+    
     return new NextResponse(icalContent, {
       status: 200,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/calendar; charset=utf-8',
-        'Content-Disposition': `inline; filename="${calendar.name.replace(/[^a-zA-Z0-9]/g, '_')}.ics"`,
-        'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
-        // Headers for webcal protocol compatibility
-        'X-WR-CALNAME': calendar.name,
-        'X-WR-CALDESC': `Calendario de exámenes: ${calendar.name}`,
-      },
+      headers: responseHeaders,
     })
     
   } catch (error) {

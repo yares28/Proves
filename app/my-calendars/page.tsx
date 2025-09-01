@@ -462,25 +462,52 @@ export default function MyCalendarsPage() {
         console.log("🍎 [Apple Export] Opening calendar subscription:", smartCalendarUrl);
         
         // Try multiple approaches for better browser compatibility
-        if (navigator.userAgent.toLowerCase().includes('safari') || 
-            navigator.userAgent.toLowerCase().includes('iphone') || 
-            navigator.userAgent.toLowerCase().includes('ipad') || 
-            navigator.userAgent.toLowerCase().includes('mac')) {
-          // For Safari/iOS/macOS: Use window.location.href
-          console.log("🍎 [Apple Export] Using window.location.href for Safari/iOS/macOS");
-          window.location.href = smartCalendarUrl;
-        } else {
-          // For other browsers: Try creating a link and clicking it
-          console.log("🍎 [Apple Export] Using link click method for other browsers");
-          const link = document.createElement('a');
-          link.href = smartCalendarUrl;
-          link.target = '_blank';
-          link.rel = 'noopener noreferrer';
+        console.log("🍎 [Apple Export] Attempting to open calendar subscription:", smartCalendarUrl);
+        
+        // First, try the webcal protocol directly
+        try {
+          if (navigator.userAgent.toLowerCase().includes('safari') || 
+              navigator.userAgent.toLowerCase().includes('iphone') || 
+              navigator.userAgent.toLowerCase().includes('ipad') || 
+              navigator.userAgent.toLowerCase().includes('mac')) {
+            // For Apple devices: Use window.location.href
+            console.log("🍎 [Apple Export] Using window.location.href for Apple devices");
+            window.location.href = smartCalendarUrl;
+          } else {
+            // For other browsers: Try creating a link and clicking it
+            console.log("🍎 [Apple Export] Using link click method for other browsers");
+            const link = document.createElement('a');
+            link.href = smartCalendarUrl;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            
+            // Try to trigger the link
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }
           
-          // Try to trigger the link
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+          // Give it a moment to try the webcal protocol
+          setTimeout(() => {
+            console.log("🍎 [Apple Export] Webcal protocol attempted");
+          }, 1000);
+          
+        } catch (webcalError) {
+          console.warn("🍎 [Apple Export] Webcal method failed:", webcalError);
+          
+          // Fallback: provide manual instructions
+          navigator.clipboard.writeText(smartCalendarUrl).then(() => {
+            toast({
+              title: "URL copiada",
+              description: "La URL del calendario se ha copiado. Pégala en tu aplicación de calendario para suscribirte.",
+            });
+          }).catch(() => {
+            toast({
+              title: "Instrucciones manuales",
+              description: `Copia esta URL en tu aplicación de calendario: ${smartCalendarUrl}`,
+            });
+          });
+          return;
         }
         
         // Show different instructions based on device
