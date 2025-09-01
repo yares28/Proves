@@ -503,12 +503,25 @@ export function generateAppleCalendarSubscriptionUrl(calendarName: string = "UPV
   // Apple Calendar uses webcal protocol for subscription URLs
   // This function generates a basic subscription URL that Apple Calendar can use to subscribe to the calendar feed
   
-  // Generate the base iCal feed URL
-  const baseUrl = `${window.location.origin}/api/ical?name=${encodeURIComponent(calendarName)}`;
+  // Safe way to get origin that works in both client and server environments
+  let baseUrl: string;
+  
+  if (typeof window !== 'undefined') {
+    // Client-side: use window.location.origin
+    baseUrl = window.location.origin;
+  } else {
+    // Server-side: use environment variable or default
+    baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : 'https://upv-cal.vercel.app'; // fallback
+  }
+  
+  // Generate the iCal feed URL
+  const icalUrl = `${baseUrl}/api/ical?name=${encodeURIComponent(calendarName)}`;
   
   // Convert to webcal protocol for Apple Calendar subscription
   // Apple Calendar automatically handles webcal:// protocol and converts it to https://
-  const webcalUrl = baseUrl.replace(/^https?:/, "webcal:");
+  const webcalUrl = icalUrl.replace(/^https?:/, "webcal:");
   
   return webcalUrl;
 }
@@ -977,8 +990,21 @@ export async function generateAppleCalendarSubscriptionUrlWithFilters(
     subjects: filters.subject?.length || 0
   });
 
+  // Safe way to get origin that works in both client and server environments
+  let baseUrl: string;
+  
+  if (typeof window !== 'undefined') {
+    // Client-side: use window.location.origin
+    baseUrl = window.location.origin;
+  } else {
+    // Server-side: use environment variable or default
+    baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : 'https://upv-cal.vercel.app'; // fallback
+  }
+
   // Use direct API route for Apple Calendar subscription
-  const directUrl = `/api/ical?${queryString}`;
+  const directUrl = `${baseUrl}/api/ical?${queryString}`;
   console.log("🍎 [generateAppleCalendarSubscriptionUrlWithFilters] Direct API URL:", directUrl);
   
   // Convert to webcal protocol for Apple Calendar subscription
