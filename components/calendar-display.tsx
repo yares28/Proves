@@ -405,7 +405,7 @@ export function CalendarDisplay({
     }
   };
 
-  // Export to Google Calendar with modern URL pattern
+  // Export to Google Calendar with mobile-aware URL handling
   const exportToGoogleCalendar = async (calendarName: string) => {
     try {
       console.log("🔄 Starting Google Calendar export with name:", calendarName);
@@ -421,7 +421,7 @@ export function CalendarDisplay({
       });
 
       // Generate UPV-style token URL
-      const { generateUPVTokenUrl } = await import("@/lib/utils");
+      const { generateUPVTokenUrl, getSmartCalendarUrl } = await import("@/lib/utils");
       console.log("📦 Utils imported successfully");
       
       const tokenPath = await generateUPVTokenUrl(activeFilters, calendarName);
@@ -440,15 +440,12 @@ export function CalendarDisplay({
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
       console.log("📱 Calendar feed URL:", calendarFeed);
 
-      // Use Google Calendar's modern subscription URL with /r?cid= pattern
-      // This opens the "Add this calendar?" dialog with Add/Cancel options
-      const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(
-        calendarFeed
-      )}`;
-      console.log("🔗 Final Google Calendar URL:", googleCalendarUrl);
+      // Use smart URL generation for mobile-aware calendar opening
+      const smartCalendarUrl = getSmartCalendarUrl(calendarFeed, 'google', calendarName);
+      console.log("🔗 Smart Calendar URL:", smartCalendarUrl);
 
       // Open Google Calendar in a new tab with proper security attributes
-      window.open(googleCalendarUrl, "_blank", "noopener,noreferrer");
+      window.open(smartCalendarUrl, "_blank", "noopener,noreferrer");
 
       toast({
         title: "Redirigiendo a Google Calendar",

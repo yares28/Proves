@@ -387,14 +387,14 @@ export default function MyCalendarsPage() {
       const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
 
-      // Use Google Calendar's modern subscription URL with /r?cid= pattern
-      // This opens the "Add this calendar?" dialog with Add/Cancel options
-      const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(
-        calendarFeed
-      )}`;
+      // Import mobile utilities
+      const { getSmartCalendarUrl } = await import("@/lib/utils");
+
+      // Use smart URL generation for mobile-aware calendar opening
+      const smartCalendarUrl = getSmartCalendarUrl(calendarFeed, 'google', calendar.name);
 
       // Open Google Calendar in a new tab with proper security attributes
-      window.open(googleCalendarUrl, "_blank", "noopener,noreferrer");
+      window.open(smartCalendarUrl, "_blank", "noopener,noreferrer");
 
       toast({
         title: "Redirigiendo a Google Calendar",
@@ -414,22 +414,88 @@ export default function MyCalendarsPage() {
     try {
       const baseUrl = window.location.origin;
       const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
-      // Convert http/https to webcal protocol for Apple Calendar
-      const webcalUrl = icalUrl.replace(/^https?:/, "webcal:");
+      
+      // Import mobile utilities
+      const { getSmartCalendarUrl, isMobileDevice } = await import("@/lib/utils");
+      
+      console.log("🍎 [Apple Export] Starting Apple Calendar export for:", calendar.name);
+      console.log("🍎 [Apple Export] iCal URL:", icalUrl);
+      
+      // Check if we're on mobile
+      const isMobile = isMobileDevice();
+      console.log("🍎 [Apple Export] Is mobile device:", isMobile);
+      
+      // Use smart URL generation for mobile-aware calendar opening
+      const smartCalendarUrl = getSmartCalendarUrl(icalUrl, 'apple', calendar.name);
+      console.log("🍎 [Apple Export] Smart URL:", smartCalendarUrl);
 
-      // Try to open with webcal protocol
-      window.location.href = webcalUrl;
-
-      toast({
-        title: "Abriendo Apple Calendar",
-        description:
-          "Se intentará abrir Apple Calendar con el enlace de suscripción.",
-      });
+      // Try multiple approaches for better compatibility
+      if (isMobile && (navigator.userAgent.toLowerCase().includes('iphone') || 
+                       navigator.userAgent.toLowerCase().includes('ipad'))) {
+        // iOS devices: try webcal first, fallback to download
+        console.log("🍎 [Apple Export] iOS device detected, using webcal protocol");
+        
+        try {
+          // First try to open with webcal protocol
+          window.location.href = smartCalendarUrl;
+          
+          toast({
+            title: "Abriendo Apple Calendar",
+            description: "Se está abriendo Apple Calendar con el calendario.",
+          });
+        } catch (webcalError) {
+          console.warn("🍎 [Apple Export] Webcal failed, falling back to download");
+          // Fallback to direct download
+          const response = await fetch(icalUrl);
+          const icsContent = await response.text();
+          
+          const blob = new Blob([icsContent], { type: 'text/calendar' });
+          const downloadUrl = URL.createObjectURL(blob);
+          
+          const link = document.createElement('a');
+          link.href = downloadUrl;
+          link.download = `${calendar.name.replace(/[^a-zA-Z0-9]/g, '_')}.ics`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(downloadUrl);
+          
+          toast({
+            title: "Calendario descargado",
+            description: "Abre el archivo descargado para importar en Apple Calendar.",
+          });
+        }
+      } else {
+        // Desktop or other devices: download the file
+        console.log("🍎 [Apple Export] Desktop/other device, downloading file");
+        
+        const response = await fetch(icalUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const icsContent = await response.text();
+        const blob = new Blob([icsContent], { type: 'text/calendar' });
+        const downloadUrl = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = `${calendar.name.replace(/[^a-zA-Z0-9]/g, '_')}.ics`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(downloadUrl);
+        
+        toast({
+          title: "Archivo descargado",
+          description: "Abre el archivo .ics para importar en Apple Calendar.",
+        });
+      }
     } catch (error) {
-      console.error("❌ Error opening Apple Calendar:", error);
+      console.error("❌ [Apple Export] Error opening Apple Calendar:", error);
       toast({
         title: "Error",
-        description: "No se pudo abrir Apple Calendar.",
+        description: "No se pudo exportar el calendario. Inténtalo de nuevo.",
         variant: "destructive",
       });
     }

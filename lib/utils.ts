@@ -819,6 +819,76 @@ function generateStableId(exam: Exam): string {
 }
 
 // Generate UPV-style token URL with direct parameter encoding (more reliable than token storage)
+// Mobile detection utility
+export function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  
+  // Check user agent for mobile indicators
+  const userAgent = navigator.userAgent.toLowerCase();
+  const mobileIndicators = [
+    'android', 'iphone', 'ipad', 'ipod', 'blackberry', 
+    'windows phone', 'mobile', 'tablet'
+  ];
+  
+  return mobileIndicators.some(indicator => userAgent.includes(indicator)) ||
+         // Also check screen size as backup
+         window.innerWidth < 768;
+}
+
+// Generate mobile app URLs for calendar exports
+export function generateMobileCalendarUrls(icalUrl: string, calendarName: string = "UPV Exams") {
+  const encodedIcalUrl = encodeURIComponent(icalUrl);
+  const encodedCalendarName = encodeURIComponent(calendarName);
+  
+  return {
+    // Google Calendar app URL scheme for mobile
+    googleMobile: `https://calendar.google.com/calendar/u/0/r?cid=${encodedIcalUrl}`,
+    // Alternative deep link for Google Calendar app
+    googleApp: `intent://calendar.google.com/calendar/u/0/r?cid=${encodedIcalUrl}#Intent;scheme=https;package=com.google.android.calendar;end`,
+    
+    // Apple Calendar uses webcal protocol which automatically opens the native app
+    appleMobile: icalUrl.replace(/^https?:/, "webcal:"),
+    
+    // Web fallbacks
+    googleWeb: `https://calendar.google.com/calendar/r?cid=${encodedIcalUrl}`,
+    appleWeb: icalUrl
+  };
+}
+
+// Smart calendar export that chooses the best URL based on device
+export function getSmartCalendarUrl(icalUrl: string, provider: 'google' | 'apple', calendarName: string = "UPV Exams"): string {
+  const urls = generateMobileCalendarUrls(icalUrl, calendarName);
+  const isMobile = isMobileDevice();
+  
+  if (provider === 'google') {
+    // For Android devices, try to use the app intent
+    if (isMobile && navigator.userAgent.toLowerCase().includes('android')) {
+      return urls.googleApp;
+    }
+    // For other mobile devices or if app intent fails, use the mobile web URL
+    return isMobile ? urls.googleMobile : urls.googleWeb;
+  } else if (provider === 'apple') {
+    // For Apple devices, ensure the URL is using webcal protocol and is properly formatted
+    let webcalUrl = icalUrl;
+    
+    // Ensure we're using webcal protocol
+    if (!webcalUrl.startsWith('webcal://')) {
+      webcalUrl = icalUrl.replace(/^https?:\/\//, 'webcal://');
+    }
+    
+    // For mobile Apple devices, use the webcal URL directly
+    // For desktop, we might want to download the file instead on some browsers
+    if (isMobile && (navigator.userAgent.toLowerCase().includes('iphone') || 
+                     navigator.userAgent.toLowerCase().includes('ipad'))) {
+      return webcalUrl;
+    }
+    
+    return webcalUrl;
+  }
+  
+  return icalUrl;
+}
+
 export async function generateUPVTokenUrl(
   filters: Record<string, string[]>,
   calendarName: string = "UPV Exams"
