@@ -81,7 +81,10 @@ export async function GET(
       if (parts.length !== 3) {
         throw new Error('Invalid token format')
       }
-      [calendarId, userId, timestamp] = parts
+      
+      calendarId = parts[0]
+      userId = parts[1]
+      timestamp = parts[2]
       
       // Validate parts
       if (!calendarId || !userId || !timestamp) {
