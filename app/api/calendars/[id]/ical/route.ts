@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
 import { getExams } from '@/actions/exam-actions'
 import { generateICalContent } from '@/lib/utils'
 
@@ -10,43 +9,62 @@ export async function GET(
 ) {
   try {
     console.log('📅 [iCal API] Starting iCal generation for calendar:', params.id)
-    console.log('📅 [iCal API] Request URL:', request.url)
-    console.log('📅 [iCal API] Request headers:', Object.fromEntries(request.headers.entries()))
     
-    // Create Supabase client
-    const supabase = createRouteHandlerClient({ cookies })
+    // Get the access token from URL parameters (for webcal compatibility)
+    const accessToken = request.nextUrl.searchParams.get('access_token')
     
-    // Get current user session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    
-    console.log('📅 [iCal API] Session check result:', {
-      hasSession: !!session,
-      sessionError: sessionError?.message,
-      userId: session?.user?.id
+    console.log('📅 [iCal API] Auth check:', {
+      hasAccessToken: !!accessToken,
+      tokenLength: accessToken?.length || 0
     })
     
-    if (sessionError || !session) {
-      console.error('❌ [iCal API] Authentication error:', sessionError)
+    if (!accessToken) {
+      console.error('❌ [iCal API] No access token provided')
       return NextResponse.json(
-        { error: 'Unauthorized', details: sessionError?.message || 'No session found' },
+        { error: 'Access token required. Please include access_token in the URL parameters.' },
         { status: 401 }
       )
     }
     
-    console.log('✅ [iCal API] User authenticated:', session.user.id)
+    // Create Supabase client with service key for admin access
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
     
-    // Fetch the calendar from database
-    const { data: calendar, error: calendarError } = await supabase
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('❌ [iCal API] Missing Supabase environment variables')
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      )
+    }
+    
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+    
+    // Verify the access token and get user
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(accessToken)
+    
+    if (userError || !user) {
+      console.error('❌ [iCal API] Invalid access token:', userError)
+      return NextResponse.json(
+        { error: 'Invalid or expired access token' },
+        { status: 401 }
+      )
+    }
+    
+    console.log('✅ [iCal API] User authenticated:', user.id)
+    
+    // Fetch the calendar from database and ensure it belongs to the authenticated user
+    const { data: calendar, error: calendarError } = await supabaseAdmin
       .from('user_calendars')
       .select('*')
       .eq('id', params.id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single()
     
     if (calendarError || !calendar) {
       console.error('❌ [iCal API] Calendar not found:', calendarError)
       return NextResponse.json(
-        { error: 'Calendar not found' },
+        { error: 'Calendar not found or access denied' },
         { status: 404 }
       )
     }
@@ -54,7 +72,9 @@ export async function GET(
     console.log('✅ [iCal API] Calendar found:', {
       id: calendar.id,
       name: calendar.name,
-      filters: calendar.filters
+      filters: calendar.filters,
+      ownerId: calendar.user_id,
+      requesterId: user.id
     })
     
     // Get the exams based on the calendar's filters
