@@ -148,16 +148,19 @@ export async function GET(
     
     console.log('📄 [iCal API] iCal content generated successfully, length:', icalContent.length)
     
-    // Return iCal file with proper headers
+    // Return iCal file with proper headers for webcal protocol
     return new NextResponse(icalContent, {
       status: 200,
       headers: {
         'Content-Type': 'text/calendar; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${calendar.name.replace(/[^a-zA-Z0-9]/g, '_')}.ics"`,
+        'Content-Disposition': `inline; filename="${calendar.name.replace(/[^a-zA-Z0-9]/g, '_')}.ics"`,
         'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET',
         'Access-Control-Allow-Headers': 'Content-Type',
+        // Headers for webcal protocol compatibility
+        'X-WR-CALNAME': calendar.name,
+        'X-WR-CALDESC': `Calendario de exámenes: ${calendar.name}`,
       },
     })
     
