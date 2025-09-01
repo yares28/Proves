@@ -412,14 +412,22 @@ export default function MyCalendarsPage() {
 
   const handleAppleCalendarExport = async (calendar: SavedCalendar) => {
     try {
+      // Get the current user's access token
+      const { getFreshAuthTokens } = await import("@/utils/auth-helpers");
+      const tokens = await getFreshAuthTokens();
+      
+      if (!tokens?.accessToken) {
+        throw new Error("No access token found. Please log in again.");
+      }
+      
       const baseUrl = window.location.origin;
-      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
+      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical?access_token=${encodeURIComponent(tokens.accessToken)}`;
       
       // Import mobile utilities
       const { getSmartCalendarUrl, isMobileDevice } = await import("@/lib/utils");
       
       console.log("🍎 [Apple Export] Starting Apple Calendar export for:", calendar.name);
-      console.log("🍎 [Apple Export] iCal URL:", icalUrl);
+      console.log("🍎 [Apple Export] iCal URL (without token):", `${baseUrl}/api/calendars/${calendar.id}/ical`);
       
       // Check if we're on mobile
       const isMobile = isMobileDevice();
