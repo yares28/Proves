@@ -429,6 +429,14 @@ export default function MyCalendarsPage() {
       
       const accessToken = generateCalendarAccessToken(calendar.id, user.id);
       
+      // Debug token generation
+      console.log("🔍 [Token Debug] Generated token for:", {
+        calendarId: calendar.id,
+        userId: user.id,
+        token: accessToken,
+        decodedToken: atob(accessToken)
+      });
+      
       const baseUrl = window.location.origin;
       const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical?token=${encodeURIComponent(accessToken)}`;
       
