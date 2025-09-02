@@ -837,22 +837,22 @@ export function isMobileDevice(): boolean {
 
 // Generate mobile app URLs for calendar exports
 export function generateMobileCalendarUrls(icalUrl: string, calendarName: string = "UPV Exams") {
-  // Convert to webcal for Google Calendar subscription URLs (Google Calendar expects webcal protocol in cid parameter)
+  // Prepare URLs for different providers
   const webcalUrl = icalUrl.replace(/^https?:/, "webcal:");
-  const encodedWebcalUrl = encodeURIComponent(webcalUrl);
+  const encodedHttpsUrl = encodeURIComponent(icalUrl);
   const encodedCalendarName = encodeURIComponent(calendarName);
   
   return {
-    // Google Calendar app URL scheme for mobile (uses webcal URL for subscription)
-    googleMobile: `https://calendar.google.com/calendar/u/0/r?cid=${encodedWebcalUrl}`,
-    // Alternative deep link for Google Calendar app (uses webcal URL for subscription)
-    googleApp: `intent://calendar.google.com/calendar/u/0/r?cid=${encodedWebcalUrl}#Intent;scheme=https;package=com.google.android.calendar;end`,
+    // Google Calendar app/web should use the HTTPS feed in the cid parameter
+    googleMobile: `https://calendar.google.com/calendar/u/0/r?cid=${encodedHttpsUrl}`,
+    // Alternative deep link for Google Calendar app (uses HTTPS feed in cid)
+    googleApp: `intent://calendar.google.com/calendar/u/0/r?cid=${encodedHttpsUrl}#Intent;scheme=https;package=com.google.android.calendar;end`,
     
     // Apple Calendar uses webcal protocol which automatically opens the native app
     appleMobile: webcalUrl,
     
-    // Web fallbacks (Google Calendar web also uses webcal URL for subscription)
-    googleWeb: `https://calendar.google.com/calendar/r?cid=${encodedWebcalUrl}`,
+    // Web fallbacks
+    googleWeb: `https://calendar.google.com/calendar/r?cid=${encodedHttpsUrl}`,
     appleWeb: icalUrl
   };
 }
