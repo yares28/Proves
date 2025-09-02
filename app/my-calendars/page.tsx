@@ -571,13 +571,21 @@ export default function MyCalendarsPage() {
 
       console.log("🔗 [DEBUG] Generated iCal URL:", icalUrl);
 
-      // Copy to clipboard
-      await navigator.clipboard.writeText(icalUrl);
+      // Import mobile utilities to generate proper Google Calendar import link
+      const { getSmartCalendarUrl } = await import("@/lib/utils");
+
+      // Generate Google Calendar import link instead of raw iCal URL
+      const googleCalendarUrl = getSmartCalendarUrl(icalUrl, 'google', calendar.name);
+
+      console.log("🔗 [DEBUG] Generated Google Calendar URL:", googleCalendarUrl);
+
+      // Copy Google Calendar import link to clipboard
+      await navigator.clipboard.writeText(googleCalendarUrl);
 
       toast({
         title: "¡URL copiada!",
         description:
-          "El enlace de suscripción se ha copiado al portapapeles. Pégalo en Google Calendar para añadir la suscripción.",
+          "El enlace de Google Calendar se ha copiado al portapapeles. Pégalo en tu navegador para añadir la suscripción.",
       });
     } catch (error) {
       console.error("❌ Error copying URL:", error);
