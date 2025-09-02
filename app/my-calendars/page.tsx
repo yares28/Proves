@@ -373,6 +373,18 @@ export default function MyCalendarsPage() {
 
   const exportExamsToGoogleCalendar = async (calendar: SavedCalendar) => {
     try {
+      console.log("🔄 [DEBUG] Starting Google Calendar export for:", calendar.name);
+      
+      // Validate calendar data
+      if (!calendar.id || !calendar.name) {
+        throw new Error("Invalid calendar data");
+      }
+      
+      // Validate filters
+      if (!calendar.filters || typeof calendar.filters !== 'object') {
+        console.warn("⚠️ [DEBUG] Calendar has no filters or invalid filters:", calendar.filters);
+      }
+      
       // Use production domain instead of localhost to prevent Google Calendar refresh loops
       let baseUrl = window.location.origin;
 
@@ -383,27 +395,58 @@ export default function MyCalendarsPage() {
           process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
       }
 
-      // STANDARDIZED: For Google Calendar, always use Google Calendar Import Links (not webcal)
+      console.log("🔗 [DEBUG] Base URL:", baseUrl);
+
+      // Generate the iCal subscription URL using the calendar ID to get the specific calendar with its filters
       const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
+      console.log("🔗 [DEBUG] iCal URL:", icalUrl);
 
       // Import mobile utilities
-      const { getSmartCalendarUrl } = await import("@/lib/utils");
+      const { generateGoogleCalendarImportUrl } = await import("@/lib/utils");
 
-      // Use smart URL generation for mobile-aware calendar opening with the original HTTPS URL
-      const smartCalendarUrl = getSmartCalendarUrl(icalUrl, 'google', calendar.name);
+      // Use proper Google Calendar import URL format
+      const googleCalendarUrl = generateGoogleCalendarImportUrl(icalUrl, calendar.name);
+      console.log("🔗 [DEBUG] Google Calendar import URL:", googleCalendarUrl);
+
+      // Test the iCal URL first to ensure it's accessible
+      try {
+        const response = await fetch(icalUrl, { method: 'HEAD' });
+        if (!response.ok) {
+          throw new Error(`iCal endpoint returned ${response.status}: ${response.statusText}`);
+        }
+        console.log("✅ [DEBUG] iCal endpoint is accessible");
+      } catch (fetchError) {
+        console.error("❌ [DEBUG] iCal endpoint test failed:", fetchError);
+        throw new Error(`Cannot access calendar feed: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
+      }
 
       // Open Google Calendar in a new tab with proper security attributes
-      window.open(smartCalendarUrl, "_blank", "noopener,noreferrer");
+      window.open(googleCalendarUrl, "_blank", "noopener,noreferrer");
 
       toast({
         title: "Redirigiendo a Google Calendar",
         description: "Se abrirá Google Calendar con el enlace de suscripción.",
       });
+      
+      console.log("✅ [DEBUG] Google Calendar export completed successfully");
     } catch (error) {
       console.error("❌ Error opening Google Calendar:", error);
+      
+      // Provide more specific error messages
+      let errorMessage = "No se pudo abrir Google Calendar.";
+      if (error instanceof Error) {
+        if (error.message.includes("Invalid calendar data")) {
+          errorMessage = "Datos del calendario inválidos. Intenta recargar la página.";
+        } else if (error.message.includes("Cannot access calendar feed")) {
+          errorMessage = "No se puede acceder al feed del calendario. Verifica que el calendario esté disponible.";
+        } else if (error.message.includes("iCal endpoint")) {
+          errorMessage = "Error en el servidor del calendario. Intenta más tarde.";
+        }
+      }
+      
       toast({
         title: "Error",
-        description: "No se pudo abrir Google Calendar.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -415,13 +458,13 @@ export default function MyCalendarsPage() {
       const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
       
       // Import mobile utilities
-      const { getSmartCalendarUrl } = await import("@/lib/utils");
+      const { generateAppleCalendarImportUrl } = await import("@/lib/utils");
       
-      // Use smart URL generation for mobile-aware calendar opening
-      const smartCalendarUrl = getSmartCalendarUrl(icalUrl, 'apple', calendar.name);
+      // Use proper Apple Calendar import URL format
+      const appleCalendarUrl = generateAppleCalendarImportUrl(icalUrl, calendar.name);
 
       // For Apple Calendar, we use window.location.href to trigger the calendar app
-      window.location.href = smartCalendarUrl;
+      window.location.href = appleCalendarUrl;
 
       toast({
         title: "Abriendo Apple Calendar",
@@ -572,10 +615,10 @@ export default function MyCalendarsPage() {
       console.log("🔗 [DEBUG] Generated iCal URL:", icalUrl);
 
       // Import mobile utilities to generate proper Google Calendar import link
-      const { getSmartCalendarUrl } = await import("@/lib/utils");
+      const { generateGoogleCalendarImportUrl } = await import("@/lib/utils");
 
       // Generate Google Calendar import link instead of raw iCal URL
-      const googleCalendarUrl = getSmartCalendarUrl(icalUrl, 'google', calendar.name);
+      const googleCalendarUrl = generateGoogleCalendarImportUrl(icalUrl, calendar.name);
 
       console.log("🔗 [DEBUG] Generated Google Calendar URL:", googleCalendarUrl);
 
