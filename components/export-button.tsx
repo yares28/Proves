@@ -35,52 +35,32 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
     }
   }
 
-  const exportToGoogleCalendar = () => {
+  const exportToGoogleCalendar = async () => {
     if (exams.length === 0) {
       toast.error("No hay exámenes para exportar")
       return
     }
 
-
-    
     try {
-      // Generate iCal content for the exams
-      const icalContent = generateICalContent(exams, {
-        calendarName: "Mis Exámenes UPV",
-        useUPVFormat: true
-      })
-      
-      // Create a data URL for the iCal content
-      const blob = new Blob([icalContent], { type: 'text/calendar' })
-      const icalUrl = URL.createObjectURL(blob)
-      
-      // Convert to a proper URL that can be used by calendar apps
-      const baseUrl = window.location.origin
-      const tempIcalUrl = `${baseUrl}/api/temp-ical` // This would need to be implemented
-      
-      // For now, use the smart URL generation with a webcal approach
-      const webcalUrl = `webcal://calendar.google.com/calendar/ical/${encodeURIComponent('upv-exams')}/public/basic.ics`
-      const smartUrl = getSmartCalendarUrl(webcalUrl, 'google', 'Mis Exámenes UPV')
-      
-      window.open(smartUrl, '_blank')
+      // Determine base URL (prefer production on localhost)
+      let baseUrl = window.location.origin
+      if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")) {
+        baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app"
+      }
+
+      // Build iCal endpoint with current filters using our utils
+      const { generateUPVTokenUrl, getSmartCalendarUrl } = await import("@/lib/utils")
+      const tokenPath = await generateUPVTokenUrl(filters || {}, "Mis Exámenes UPV")
+      const icalUrl = `${baseUrl}${tokenPath}`
+
+      // Generate Google Calendar import link (non-webcal wrapper)
+      const smartUrl = getSmartCalendarUrl(icalUrl, 'google', 'Mis Exámenes UPV')
+
+      window.open(smartUrl, '_blank', 'noopener,noreferrer')
       toast.success("Abriendo Google Calendar")
-      
-      // Clean up the blob URL
-      setTimeout(() => URL.revokeObjectURL(icalUrl), 1000)
-      
     } catch (error) {
       console.error('Error exporting to Google Calendar:', error)
-      // Fallback to original method
-      const events = exams.map(exam => ({
-        text: `${exam.subject} (${exam.code})`,
-        dates: exam.date,
-        details: `${exam.time} - ${exam.location}\n${exam.school} - ${exam.degree}\n${exam.year} - ${exam.semester}`
-      }))
-
-      const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(events[0].text)}&dates=${encodeURIComponent(events[0].dates)}&details=${encodeURIComponent(events[0].details)}`
-      
-      window.open(googleUrl, '_blank')
-      toast.success("Abriendo Google Calendar")
+      toast.error("No se pudo abrir Google Calendar")
     }
   }
 
