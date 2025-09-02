@@ -874,28 +874,10 @@ export function getSmartCalendarUrl(
   calendarType: 'google' | 'apple',
   calendarName: string
 ): string {
-  switch (calendarType) {
-    case 'google':
-      // For Google Calendar, use the "Add by URL" feature with cid parameter
-      // This triggers Google Calendar's subscription dialog instead of opening the .ics file
-      const googleCalendarUrl = new URL('https://calendar.google.com/calendar/r');
-      googleCalendarUrl.searchParams.set('cid', icalUrl);
-      googleCalendarUrl.searchParams.set('ctz', 'Europe/Madrid');
-      return googleCalendarUrl.toString();
-    
-    case 'apple':
-      // For Apple Calendar, convert to webcal:// protocol
-      // This triggers the default calendar app on macOS/iOS
-      if (icalUrl.startsWith('https://')) {
-        return icalUrl.replace('https://', 'webcal://');
-      } else if (icalUrl.startsWith('http://')) {
-        return icalUrl.replace('http://', 'webcal://');
-      }
-      // If it's already webcal:// or other protocol, return as-is
-      return icalUrl;
-    
-    default:
-      // Fallback to original URL
-      return icalUrl;
+  if (calendarType === 'google') {
+    const cid = encodeURIComponent(icalUrl);
+    return `https://calendar.google.com/calendar/render?cid=${cid}`;
   }
+  // Apple: trigger Calendar.app
+  return icalUrl.replace(/^https?:\/\//, 'webcal://');
 }
