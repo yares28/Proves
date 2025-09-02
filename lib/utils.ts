@@ -837,32 +837,34 @@ export function isMobileDevice(): boolean {
 
 // Generate mobile app URLs for calendar exports
 export function generateMobileCalendarUrls(icalUrl: string, calendarName: string = "UPV Exams") {
-  const encodedIcalUrl = encodeURIComponent(icalUrl);
+  // Convert to webcal for Google Calendar subscription URLs (Google Calendar expects webcal protocol in cid parameter)
+  const webcalUrl = icalUrl.replace(/^https?:/, "webcal:");
+  const encodedWebcalUrl = encodeURIComponent(webcalUrl);
   const encodedCalendarName = encodeURIComponent(calendarName);
   
   return {
-    // Google Calendar app URL scheme for mobile
-    googleMobile: `https://calendar.google.com/calendar/u/0/r?cid=${encodedIcalUrl}`,
-    // Alternative deep link for Google Calendar app
-    googleApp: `intent://calendar.google.com/calendar/u/0/r?cid=${encodedIcalUrl}#Intent;scheme=https;package=com.google.android.calendar;end`,
+    // Google Calendar app URL scheme for mobile (uses webcal URL for subscription)
+    googleMobile: `https://calendar.google.com/calendar/u/0/r?cid=${encodedWebcalUrl}`,
+    // Alternative deep link for Google Calendar app (uses webcal URL for subscription)
+    googleApp: `intent://calendar.google.com/calendar/u/0/r?cid=${encodedWebcalUrl}#Intent;scheme=https;package=com.google.android.calendar;end`,
     
     // Apple Calendar uses webcal protocol which automatically opens the native app
-    appleMobile: icalUrl.replace(/^https?:/, "webcal:"),
+    appleMobile: webcalUrl,
     
-    // Web fallbacks
-    googleWeb: `https://calendar.google.com/calendar/r?cid=${encodedIcalUrl}`,
+    // Web fallbacks (Google Calendar web also uses webcal URL for subscription)
+    googleWeb: `https://calendar.google.com/calendar/r?cid=${encodedWebcalUrl}`,
     appleWeb: icalUrl
   };
 }
 
 // Smart calendar export that chooses the best URL based on device
-// STANDARDIZED: Google Calendar always uses Google Calendar Import Links, Apple Calendar always uses Webcal Protocol Links
+// STANDARDIZED: Google Calendar uses Import Links with webcal feeds, Apple Calendar uses direct Webcal Protocol Links
 export function getSmartCalendarUrl(icalUrl: string, provider: 'google' | 'apple', calendarName: string = "UPV Exams"): string {
   const urls = generateMobileCalendarUrls(icalUrl, calendarName);
   const isMobile = isMobileDevice();
   
   if (provider === 'google') {
-    // STANDARDIZED: Always use Google Calendar Import Links for Google Calendar
+    // STANDARDIZED: Google Calendar Import Links (calendar.google.com URLs with webcal feeds in cid parameter)
     // For Android devices, try to use the app intent
     if (isMobile && navigator.userAgent.toLowerCase().includes('android')) {
       return urls.googleApp;
@@ -870,7 +872,7 @@ export function getSmartCalendarUrl(icalUrl: string, provider: 'google' | 'apple
     // For other mobile devices or if app intent fails, use the mobile web URL
     return isMobile ? urls.googleMobile : urls.googleWeb;
   } else if (provider === 'apple') {
-    // STANDARDIZED: Always use Webcal Protocol Links for Apple Calendar
+    // STANDARDIZED: Direct Webcal Protocol Links for Apple Calendar
     // Apple devices (iOS/macOS) automatically handle webcal protocol
     return urls.appleMobile;
   }
