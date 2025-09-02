@@ -819,67 +819,6 @@ function generateStableId(exam: Exam): string {
 }
 
 // Generate UPV-style token URL with direct parameter encoding (more reliable than token storage)
-// Mobile detection utility
-export function isMobileDevice(): boolean {
-  if (typeof window === 'undefined') return false;
-  
-  // Check user agent for mobile indicators
-  const userAgent = navigator.userAgent.toLowerCase();
-  const mobileIndicators = [
-    'android', 'iphone', 'ipad', 'ipod', 'blackberry', 
-    'windows phone', 'mobile', 'tablet'
-  ];
-  
-  return mobileIndicators.some(indicator => userAgent.includes(indicator)) ||
-         // Also check screen size as backup
-         window.innerWidth < 768;
-}
-
-// Generate mobile app URLs for calendar exports
-export function generateMobileCalendarUrls(icalUrl: string, calendarName: string = "UPV Exams") {
-  // Prepare URLs for different providers
-  const webcalUrl = icalUrl.replace(/^https?:/, "webcal:");
-  const encodedHttpsUrl = encodeURIComponent(icalUrl);
-  const encodedCalendarName = encodeURIComponent(calendarName);
-  
-  return {
-    // Google Calendar app/web should use the HTTPS feed in the cid parameter
-    googleMobile: `https://calendar.google.com/calendar/u/0/r?cid=${encodedHttpsUrl}`,
-    // Alternative deep link for Google Calendar app (uses HTTPS feed in cid)
-    googleApp: `intent://calendar.google.com/calendar/u/0/r?cid=${encodedHttpsUrl}#Intent;scheme=https;package=com.google.android.calendar;end`,
-    
-    // Apple Calendar uses webcal protocol which automatically opens the native app
-    appleMobile: webcalUrl,
-    
-    // Web fallbacks
-    googleWeb: `https://calendar.google.com/calendar/r?cid=${encodedHttpsUrl}`,
-    appleWeb: icalUrl
-  };
-}
-
-// Smart calendar export that chooses the best URL based on device
-// STANDARDIZED: Google Calendar uses Import Links with webcal feeds, Apple Calendar uses direct Webcal Protocol Links
-export function getSmartCalendarUrl(icalUrl: string, provider: 'google' | 'apple', calendarName: string = "UPV Exams"): string {
-  const urls = generateMobileCalendarUrls(icalUrl, calendarName);
-  const isMobile = isMobileDevice();
-  
-  if (provider === 'google') {
-    // STANDARDIZED: Google Calendar Import Links (calendar.google.com URLs with webcal feeds in cid parameter)
-    // For Android devices, try to use the app intent
-    if (isMobile && navigator.userAgent.toLowerCase().includes('android')) {
-      return urls.googleApp;
-    }
-    // For other mobile devices or if app intent fails, use the mobile web URL
-    return isMobile ? urls.googleMobile : urls.googleWeb;
-  } else if (provider === 'apple') {
-    // STANDARDIZED: Direct Webcal Protocol Links for Apple Calendar
-    // Apple devices (iOS/macOS) automatically handle webcal protocol
-    return urls.appleMobile;
-  }
-  
-  return icalUrl;
-}
-
 export async function generateUPVTokenUrl(
   filters: Record<string, string[]>,
   calendarName: string = "UPV Exams"
@@ -927,19 +866,4 @@ export async function generateUPVTokenUrl(
   console.log("🔧 [generateUPVTokenUrl] Direct API URL:", directUrl);
   
   return directUrl;
-}
-
-// Generate proper Google Calendar import URL
-export function generateGoogleCalendarImportUrl(icalUrl: string, calendarName: string = "UPV Exams"): string {
-  // Google Calendar expects the iCal feed URL to be properly encoded
-  const encodedUrl = encodeURIComponent(icalUrl);
-  
-  // Use the standard Google Calendar import format
-  return `https://calendar.google.com/calendar/r?cid=${encodedUrl}`;
-}
-
-// Generate proper Apple Calendar import URL
-export function generateAppleCalendarImportUrl(icalUrl: string, calendarName: string = "UPV Exams"): string {
-  // Apple Calendar uses webcal protocol
-  return icalUrl.replace(/^https?:/, "webcal:");
 }
