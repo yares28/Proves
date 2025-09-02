@@ -867,3 +867,33 @@ export async function generateUPVTokenUrl(
   
   return directUrl;
 }
+
+// Generate smart calendar URLs for different calendar applications
+export function getSmartCalendarUrl(
+  icalUrl: string,
+  calendarType: 'google' | 'apple',
+  calendarName: string
+): string {
+  switch (calendarType) {
+    case 'google':
+      // For Google Calendar, use the direct import URL
+      // Google Calendar can handle both webcal:// and https:// URLs
+      // Using https:// is more reliable and secure
+      return icalUrl;
+    
+    case 'apple':
+      // For Apple Calendar, convert to webcal:// protocol
+      // This triggers the default calendar app on macOS/iOS
+      if (icalUrl.startsWith('https://')) {
+        return icalUrl.replace('https://', 'webcal://');
+      } else if (icalUrl.startsWith('http://')) {
+        return icalUrl.replace('http://', 'webcal://');
+      }
+      // If it's already webcal:// or other protocol, return as-is
+      return icalUrl;
+    
+    default:
+      // Fallback to original URL
+      return icalUrl;
+  }
+}
