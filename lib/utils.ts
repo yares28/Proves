@@ -928,3 +928,18 @@ export async function generateUPVTokenUrl(
   
   return directUrl;
 }
+
+// Generate proper Google Calendar import URL
+export function generateGoogleCalendarImportUrl(icalUrl: string, calendarName: string = "UPV Exams"): string {
+  // Google Calendar expects the iCal feed URL to be properly encoded
+  const encodedUrl = encodeURIComponent(icalUrl);
+  
+  // Use the standard Google Calendar import format
+  return `https://calendar.google.com/calendar/r?cid=${encodedUrl}`;
+}
+
+// Generate proper Apple Calendar import URL
+export function generateAppleCalendarImportUrl(icalUrl: string, calendarName: string = "UPV Exams"): string {
+  // Apple Calendar uses webcal protocol
+  return icalUrl.replace(/^https?:/, "webcal:");
+}

@@ -39,7 +39,20 @@ export async function GET(_req: Request, context: { params: { id: string } }) {
       useUPVFormat: true,
     })
 
+    // Validate that iCal content was generated
+    if (!ics || typeof ics !== 'string' || ics.length === 0) {
+      console.error('❌ [ICAL API] Failed to generate iCal content');
+      return NextResponse.json({ error: 'Failed to generate calendar content' }, { status: 500 })
+    }
+
+    // Validate iCal format
+    if (!ics.includes('BEGIN:VCALENDAR') || !ics.includes('END:VCALENDAR')) {
+      console.error('❌ [ICAL API] Generated iCal content is invalid');
+      return NextResponse.json({ error: 'Invalid calendar format' }, { status: 500 })
+    }
+
     const filename = `${sanitizeFilename(name)}.ics`
+    console.log(`📄 [ICAL API] Generated iCal file: ${filename} (${ics.length} characters)`);
 
     return new Response(ics, {
       status: 200,
@@ -47,6 +60,9 @@ export async function GET(_req: Request, context: { params: { id: string } }) {
         'Content-Type': 'text/calendar; charset=utf-8',
         'Content-Disposition': `attachment; filename="${filename}"`,
         'Cache-Control': 'public, max-age=300',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, HEAD',
+        'Access-Control-Allow-Headers': 'Content-Type',
       },
     })
   } catch (e: any) {
