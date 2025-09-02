@@ -876,10 +876,12 @@ export function getSmartCalendarUrl(
 ): string {
   switch (calendarType) {
     case 'google':
-      // For Google Calendar, use the direct import URL
-      // Google Calendar can handle both webcal:// and https:// URLs
-      // Using https:// is more reliable and secure
-      return icalUrl;
+      // For Google Calendar, use the "Add by URL" feature with cid parameter
+      // This triggers Google Calendar's subscription dialog instead of opening the .ics file
+      const googleCalendarUrl = new URL('https://calendar.google.com/calendar/r');
+      googleCalendarUrl.searchParams.set('cid', icalUrl);
+      googleCalendarUrl.searchParams.set('ctz', 'Europe/Madrid');
+      return googleCalendarUrl.toString();
     
     case 'apple':
       // For Apple Calendar, convert to webcal:// protocol
