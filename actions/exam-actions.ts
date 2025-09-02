@@ -393,11 +393,10 @@ export async function getSchools() {
     const startTime = performance.now();
     
     // Use a more efficient query that leverages indexes
-    // Only select distinct school column, which should use an index
+    // Select distinct school names to avoid duplicates
     const { data, error } = await supabase
       .from('ETSINF')
       .select('school')
-      .limit(100) // Safety limit, we don't expect more than this many schools
       .order('school', { ascending: true });
 
     if (error) {
