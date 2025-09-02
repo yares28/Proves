@@ -383,15 +383,14 @@ export default function MyCalendarsPage() {
           process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
       }
 
-      // Construct iCal calendar feed URL using webcal protocol for better calendar app integration
+      // STANDARDIZED: For Google Calendar, always use Google Calendar Import Links (not webcal)
       const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
-      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
 
       // Import mobile utilities
       const { getSmartCalendarUrl } = await import("@/lib/utils");
 
-      // Use smart URL generation for mobile-aware calendar opening
-      const smartCalendarUrl = getSmartCalendarUrl(calendarFeed, 'google', calendar.name);
+      // Use smart URL generation for mobile-aware calendar opening with the original HTTPS URL
+      const smartCalendarUrl = getSmartCalendarUrl(icalUrl, 'google', calendar.name);
 
       // Open Google Calendar in a new tab with proper security attributes
       window.open(smartCalendarUrl, "_blank", "noopener,noreferrer");
