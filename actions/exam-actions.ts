@@ -151,7 +151,7 @@ export async function getExams(
     // Only select needed columns for better network performance
     let query = (client as any)
       .from('ETSINF')
-      .select('exam_instance_id, exam_date, exam_time, duration_minutes, duration_day, code, subject, acronym, degree, year, semester, place, comment, school')
+      .select('exam_instance_id, exam_date, exam_time, duration_minutes, code, subject, acronym, degree, year, semester, place, comment, school')
       .order('exam_date', { ascending: true });
 
     // Apply filters using a strategy that leverages indexes

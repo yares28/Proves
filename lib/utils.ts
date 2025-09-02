@@ -182,34 +182,17 @@ export function generateICalContent(
 
   exams.forEach((exam) => {
     const hasTime = Boolean(exam.time && exam.time.trim().length);
-    const hasWholeDayDuration = Boolean(exam.duration_day && exam.duration_day.trim().length);
-    
     // Validate required fields
     if (!exam.date || !exam.subject) {
       invalidExams.push({ exam, reason: "Missing required fields" });
       return;
     }
 
-    // Validate that exam has either duration_day OR (time + duration_minutes)
-    if (!hasWholeDayDuration && (!hasTime || !exam.duration_minutes)) {
-      invalidExams.push({ exam, reason: "Missing duration information - must have either duration_day or (time + duration_minutes)" });
-      return;
-    }
-
     // Parse and validate date/time ONLY when a clock‑time exists
-    if (hasTime && !hasWholeDayDuration) {
+    if (hasTime) {
       const parseResult = parseExamDateTime(exam.date, exam.time, timeZone);
       if (!parseResult.isValid) {
         invalidExams.push({ exam, reason: "Invalid date/time format" });
-        return;
-      }
-    }
-
-    // Validate duration_day format if present
-    if (hasWholeDayDuration && exam.duration_day) {
-      const durationMatch = exam.duration_day.match(/^P(\d+)D$/);
-      if (!durationMatch) {
-        invalidExams.push({ exam, reason: "Invalid duration_day format - must be P[number]D (e.g., P1D, P3D)" });
         return;
       }
     }
@@ -227,21 +210,9 @@ export function generateICalContent(
 
   validExams.forEach((exam) => {
     const hasTime = Boolean(exam.time && exam.time.trim().length);
-    const hasWholeDayDuration = Boolean(exam.duration_day && exam.duration_day.trim().length);
     let startTime: Date | undefined;
     let endTime: Date | undefined;
-    let isWholeDayEvent = false;
-    let wholeDayDuration = 1; // Default to 1 day
-
-    if (hasWholeDayDuration && exam.duration_day) {
-      // Handle whole-day event
-      isWholeDayEvent = true;
-      const durationMatch = exam.duration_day.match(/^P(\d+)D$/);
-      if (durationMatch) {
-        wholeDayDuration = parseInt(durationMatch[1], 10);
-      }
-    } else if (hasTime) {
-      // Handle timed event
+    if (hasTime) {
       const parseResult = parseExamDateTime(exam.date, exam.time, timeZone);
       startTime = parseResult.start;
       endTime = new Date(startTime);
@@ -326,38 +297,13 @@ export function generateICalContent(
 
     const now = new Date();
 
-    if (isWholeDayEvent) {
-      // Handle whole-day event with duration_day
-      const startDate = exam.date.replace(/-/g, ""); // e.g. 20251031
-      const endObj = new Date(exam.date);
-      endObj.setDate(endObj.getDate() + wholeDayDuration); // Add the specified duration
-      const endDate = endObj.toISOString().slice(0, 10).replace(/-/g, "");
-      
-      const summaryText = wholeDayDuration === 1 
-        ? `${exam.subject} - Exam (Whole Day)`
-        : `${exam.subject} - Exam (${wholeDayDuration} Days)`;
-      
-      icalLines.push(
-        "BEGIN:VEVENT",
-        `UID:exam-${exam.id}-${exam.date}-wholeday-${wholeDayDuration}@upv-exam-calendar.com`,
-        `DTSTART;VALUE=DATE:${startDate}`,
-        `DTEND;VALUE=DATE:${endDate}`,
-        foldLine(`SUMMARY:${escapeICalText(summaryText)}`),
-        foldLine(`DESCRIPTION:${description}`),
-        foldLine(`LOCATION:${escapeICalLocation(exam.location || "")}`),
-        `CREATED:${formatICalUtcDate(now)}`,
-        `LAST-MODIFIED:${formatICalUtcDate(now)}`,
-        "STATUS:CONFIRMED",
-        "TRANSP:OPAQUE",
-        "CATEGORIES:EXAM,UNIVERSITY"
-      );
-    } else if (hasTime && startTime && endTime) {
-      // Handle timed event with exam_time and duration_minutes
+    if (hasTime) {
+      // --- original code for timed exams (unchanged) ---
       icalLines.push(
         "BEGIN:VEVENT",
         `UID:exam-${exam.id}-${exam.date}-${exam.time}@upv-exam-calendar.com`,
-        `DTSTART;TZID=${timeZone}:${formatICalLocalDate(startTime, false)}`,
-        `DTEND;TZID=${timeZone}:${formatICalLocalDate(endTime, true)}`,
+        `DTSTART;TZID=${timeZone}:${formatICalLocalDate(startTime!, false)}`,
+        `DTEND;TZID=${timeZone}:${formatICalLocalDate(endTime!, true)}`,
         foldLine(`SUMMARY:${escapeICalText(exam.subject + " - Exam")}`),
         foldLine(`DESCRIPTION:${description}`),
         foldLine(`LOCATION:${escapeICalLocation(exam.location || "")}`),
@@ -368,7 +314,7 @@ export function generateICalContent(
         "CATEGORIES:EXAM,UNIVERSITY"
       );
     } else {
-      // Fallback for exams without time or duration_day (legacy support)
+      // --- new code for all-day exams when hour is unknown ---
       const startDate = exam.date.replace(/-/g, ""); // e.g. 20251031
       const endObj = new Date(exam.date); // +1 day
       endObj.setDate(endObj.getDate() + 1);
@@ -390,6 +336,7 @@ export function generateICalContent(
         "STATUS:CONFIRMED",
         "TRANSP:OPAQUE",
         "CATEGORIES:EXAM,UNIVERSITY"
+        // Google expects end = next day
       );
     }
 
@@ -495,137 +442,61 @@ export function downloadICalFile(
 }
 
 export function generateGoogleCalendarUrl(exam: Exam): string {
-  const hasTime = Boolean(exam.time && exam.time.trim().length);
-  const hasWholeDayDuration = Boolean(exam.duration_day && exam.duration_day.trim().length);
+  // Use the same timezone-aware parsing as iCal generation to ensure consistency
+  const parseResult = parseExamDateTime(exam.date, exam.time, "Europe/Madrid");
 
   let startTime: Date;
   let endTime: Date;
-  let isWholeDayEvent = false;
-  let title: string;
-  let details: string;
 
-  if (hasWholeDayDuration && exam.duration_day) {
-    // Handle whole-day event
-    isWholeDayEvent = true;
-    const durationMatch = exam.duration_day.match(/^P(\d+)D$/);
-    const wholeDayDuration = durationMatch ? parseInt(durationMatch[1], 10) : 1;
-
-    startTime = new Date(exam.date);
-    endTime = new Date(exam.date);
-    endTime.setDate(endTime.getDate() + wholeDayDuration);
-
-    const titleText = wholeDayDuration === 1 
-      ? `${exam.subject} - Exam (Whole Day)`
-      : `${exam.subject} - Exam (${wholeDayDuration} Days)`;
-    title = encodeURIComponent(titleText);
-
-    details = encodeURIComponent(
-      [
-        `Subject: ${exam.subject}`,
-        `Code: ${exam.code}`,
-        `School: ${exam.school}`,
-        `Degree: ${exam.degree}`,
-        `Year: ${exam.year}`,
-        `Semester: ${exam.semester}`,
-        exam.acronym ? `Acronym: ${exam.acronym}` : "",
-        "",
-        `Duration: ${wholeDayDuration} day${wholeDayDuration > 1 ? 's' : ''} (Whole Day Event)`,
-        "Added from UPV Exam Calendar",
-      ]
-        .filter(Boolean)
-        .join("\n")
+  if (!parseResult.isValid) {
+    // Fallback to original parsing if timezone-aware parsing fails
+    console.warn(
+      `Failed to parse exam time with timezone awareness for exam ${exam.id}, falling back to local parsing`
     );
-  } else if (hasTime) {
-    // Handle timed event
-    const parseResult = parseExamDateTime(exam.date, exam.time, "Europe/Madrid");
-
-    if (!parseResult.isValid) {
-      // Fallback to original parsing if timezone-aware parsing fails
-      console.warn(
-        `Failed to parse exam time with timezone awareness for exam ${exam.id}, falling back to local parsing`
-      );
-      const examDate = new Date(exam.date);
-      const [hours, minutes] = exam.time.split(":").map(Number);
-      startTime = new Date(examDate);
-      startTime.setHours(hours, minutes, 0, 0);
-    } else {
-      // Use timezone-aware parsing result
-      startTime = parseResult.start;
-    }
-
-    // Set end time using exam's duration_minutes
-    endTime = new Date(startTime);
-    endTime.setMinutes(startTime.getMinutes() + exam.duration_minutes);
-
-    title = encodeURIComponent(`${exam.subject} - Exam`);
-    details = encodeURIComponent(
-      [
-        `Subject: ${exam.subject}`,
-        `Code: ${exam.code}`,
-        `School: ${exam.school}`,
-        `Degree: ${exam.degree}`,
-        `Year: ${exam.year}`,
-        `Semester: ${exam.semester}`,
-        exam.acronym ? `Acronym: ${exam.acronym}` : "",
-        "",
-        `Duration: ${exam.duration_minutes} minutes (${
-          Math.round((exam.duration_minutes / 60) * 10) / 10
-        } hours)`,
-        "Added from UPV Exam Calendar",
-      ]
-        .filter(Boolean)
-        .join("\n")
-    );
+    const examDate = new Date(exam.date);
+    const [hours, minutes] = exam.time.split(":").map(Number);
+    startTime = new Date(examDate);
+    startTime.setHours(hours, minutes, 0, 0);
   } else {
-    // Fallback for legacy exams without time or duration_day
-    startTime = new Date(exam.date);
-    endTime = new Date(exam.date);
-    endTime.setDate(endTime.getDate() + 1);
-    isWholeDayEvent = true;
-
-    title = encodeURIComponent(`${exam.subject} - Exam (Time TBD)`);
-    details = encodeURIComponent(
-      [
-        `Subject: ${exam.subject}`,
-        `Code: ${exam.code}`,
-        `School: ${exam.school}`,
-        `Degree: ${exam.degree}`,
-        `Year: ${exam.year}`,
-        `Semester: ${exam.semester}`,
-        exam.acronym ? `Acronym: ${exam.acronym}` : "",
-        "",
-        "Time to be confirmed",
-        "Added from UPV Exam Calendar",
-      ]
-        .filter(Boolean)
-        .join("\n")
-    );
+    // Use timezone-aware parsing result
+    startTime = parseResult.start;
   }
+
+  // Set end time using exam's duration_minutes
+  endTime = new Date(startTime);
+  endTime.setMinutes(startTime.getMinutes() + exam.duration_minutes);
+
+  const formatGoogleDate = (date: Date) => {
+    return date
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace(/\.\d{3}Z$/, "Z");
+  };
+
+  const title = encodeURIComponent(`${exam.subject} - Exam`);
+  const details = encodeURIComponent(
+    [
+      `Subject: ${exam.subject}`,
+      `Code: ${exam.code}`,
+      `School: ${exam.school}`,
+      `Degree: ${exam.degree}`,
+      `Year: ${exam.year}`,
+      `Semester: ${exam.semester}`,
+      exam.acronym ? `Acronym: ${exam.acronym}` : "",
+      "",
+      `Duration: ${exam.duration_minutes} minutes (${
+        Math.round((exam.duration_minutes / 60) * 10) / 10
+      } hours)`,
+      "Added from UPV Exam Calendar",
+    ]
+      .filter(Boolean)
+      .join("\n")
+  );
 
   const location = encodeURIComponent(exam.location || "Location TBD");
+  const dates = `${formatGoogleDate(startTime)}/${formatGoogleDate(endTime)}`;
 
-  // Format dates for Google Calendar
-  if (isWholeDayEvent) {
-    // For whole-day events, use YYYYMMDD format (no time)
-    const formatGoogleDateOnly = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      return `${year}${month}${day}`;
-    };
-    const dates = `${formatGoogleDateOnly(startTime)}/${formatGoogleDateOnly(endTime)}`;
-    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}&location=${location}`;
-  } else {
-    // For timed events, use full datetime format
-    const formatGoogleDate = (date: Date) => {
-      return date
-        .toISOString()
-        .replace(/[-:]/g, "")
-        .replace(/\.\d{3}Z$/, "Z");
-    };
-    const dates = `${formatGoogleDate(startTime)}/${formatGoogleDate(endTime)}`;
-    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}&location=${location}`;
-  }
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}&location=${location}`;
 }
 
 export function generateAppleCalendarSubscriptionUrl(calendarName: string = "UPV Exams"): string {
@@ -716,32 +587,17 @@ function generateUPVCompatibleICalContent(
   const validExams: Exam[] = [];
   exams.forEach((exam) => {
     const hasTime = Boolean(exam.time && exam.time.trim().length);
-    const hasWholeDayDuration = Boolean(exam.duration_day && exam.duration_day.trim().length);
-    
     if (!exam.date || !exam.subject) {
       return;
     }
 
-    // Validate that exam has either duration_day OR (time + duration_minutes)
-    if (!hasWholeDayDuration && (!hasTime || !exam.duration_minutes)) {
-      return;
-    }
-
-    if (hasTime && !hasWholeDayDuration) {
+    if (hasTime) {
       const parseResult = parseExamDateTime(
         exam.date,
         exam.time,
         "Europe/Madrid"
       );
       if (!parseResult.isValid) {
-        return;
-      }
-    }
-
-    // Validate duration_day format if present
-    if (hasWholeDayDuration && exam.duration_day) {
-      const durationMatch = exam.duration_day.match(/^P(\d+)D$/);
-      if (!durationMatch) {
         return;
       }
     }
@@ -784,21 +640,10 @@ function generateUPVCompatibleICalContent(
   // Step 3: Process each valid exam
   validExams.forEach((exam) => {
     const hasTime = Boolean(exam.time && exam.time.trim().length);
-    const hasWholeDayDuration = Boolean(exam.duration_day && exam.duration_day.trim().length);
     let startTime: Date | undefined;
     let endTime: Date | undefined;
-    let isWholeDayEvent = false;
-    let wholeDayDuration = 1; // Default to 1 day
 
-    if (hasWholeDayDuration && exam.duration_day) {
-      // Handle whole-day event
-      isWholeDayEvent = true;
-      const durationMatch = exam.duration_day.match(/^P(\d+)D$/);
-      if (durationMatch) {
-        wholeDayDuration = parseInt(durationMatch[1], 10);
-      }
-    } else if (hasTime) {
-      // Handle timed event
+    if (hasTime) {
       const [examHours, examMinutes] = exam.time.split(":").map(Number);
       const examDate = new Date(exam.date);
 
@@ -861,37 +706,8 @@ function generateUPVCompatibleICalContent(
     }
 
     // Canonical template for each exam (exact order from UPV)
-    if (isWholeDayEvent) {
-      // Handle whole-day event with duration_day
-      const startDate = exam.date.replace(/-/g, ""); // e.g. 20251031
-      const endObj = new Date(exam.date);
-      endObj.setDate(endObj.getDate() + wholeDayDuration); // Add the specified duration
-      const endDate = endObj.toISOString().slice(0, 10).replace(/-/g, "");
-      
-      const summaryText = wholeDayDuration === 1 
-        ? `Examen ${exam.subject} (Día Completo)`
-        : `Examen ${exam.subject} (${wholeDayDuration} Días)`;
-      
-      icalLines.push(
-        "BEGIN:VEVENT",
-        `DTSTART;VALUE=DATE:${startDate}`,
-        `DTEND;VALUE=DATE:${endDate}`,
-        `DTSTAMP:${nowUtc}`,
-        `UID:${uid}`,
-        `CREATED:${nowUtc}`,
-        foldLine(`DESCRIPTION:${description}`),
-        `LAST-MODIFIED:${nowUtc}`,
-        foldLine(`LOCATION:${escapeICalLocation(location)}`),
-        "SEQUENCE:0",
-        "STATUS:CONFIRMED",
-        foldLine(`SUMMARY:${summaryText}`),
-        "TRANSP:OPAQUE",
-        `UPV_BGCOLOR:${colors.bg}`,
-        `UPV_FGCOLOR:${colors.fg}`,
-        "END:VEVENT"
-      );
-    } else if (hasTime && startTime && endTime) {
-      // Handle timed event with exam_time and duration_minutes
+    if (hasTime && startTime && endTime) {
+      // --- original code for timed exams (unchanged) ---
       icalLines.push(
         "BEGIN:VEVENT",
         `DTSTART:${formatUTCDate(startTime)}`,
@@ -911,7 +727,7 @@ function generateUPVCompatibleICalContent(
         "END:VEVENT"
       );
     } else {
-      // Fallback for exams without time or duration_day (legacy support)
+      // --- new code for all-day exams when hour is unknown ---
       const startDate = exam.date.replace(/-/g, ""); // e.g. 20251031
       const endObj = new Date(exam.date); // +1 day
       endObj.setDate(endObj.getDate() + 1);
@@ -933,6 +749,7 @@ function generateUPVCompatibleICalContent(
         `UPV_BGCOLOR:${colors.bg}`,
         `UPV_FGCOLOR:${colors.fg}`,
         "END:VEVENT"
+        // Google expects end = next day
       );
     }
   });
