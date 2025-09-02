@@ -585,7 +585,7 @@ export default function MyCalendarsPage() {
       toast({
         title: "¡URL copiada!",
         description:
-          "El enlace de Google Calendar se ha copiado al portapapeles. Pégalo en tu navegador para añadir la suscripción.",
+          "Enlace de suscripción copiado. Para obtener formato @import.calendar.google.com, descarga el .ics e impórtalo manualmente en Google Calendar.",
       });
     } catch (error) {
       console.error("❌ Error copying URL:", error);
