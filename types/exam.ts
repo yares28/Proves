@@ -5,6 +5,7 @@ export interface Exam {
   date: string
   time: string
   duration_minutes: number
+  duration_day?: string | null  // ISO 8601 duration format like "P1D", "P3D", etc.
   location: string
   comment?: string
   school: string
