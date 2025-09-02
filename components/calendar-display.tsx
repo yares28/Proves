@@ -436,12 +436,9 @@ export function CalendarDisplay({
       console.log("🌐 Generated iCal URL:", icalUrl);
       console.log("📱 This URL will be used directly for Google Calendar subscription");
 
-      // Construct calendar feed URL using webcal protocol for better calendar app integration
-      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
-      console.log("📱 Calendar feed URL:", calendarFeed);
-
-      // Use smart URL generation for mobile-aware calendar opening
-      const smartCalendarUrl = getSmartCalendarUrl(calendarFeed, 'google', calendarName);
+      // STANDARDIZED: For Google Calendar, always use Google Calendar Import Links (not webcal)
+      // Use smart URL generation for mobile-aware calendar opening with the original HTTPS URL
+      const smartCalendarUrl = getSmartCalendarUrl(icalUrl, 'google', calendarName);
       console.log("🔗 Smart Calendar URL:", smartCalendarUrl);
 
       // Open Google Calendar in a new tab with proper security attributes

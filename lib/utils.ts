@@ -856,11 +856,13 @@ export function generateMobileCalendarUrls(icalUrl: string, calendarName: string
 }
 
 // Smart calendar export that chooses the best URL based on device
+// STANDARDIZED: Google Calendar always uses Google Calendar Import Links, Apple Calendar always uses Webcal Protocol Links
 export function getSmartCalendarUrl(icalUrl: string, provider: 'google' | 'apple', calendarName: string = "UPV Exams"): string {
   const urls = generateMobileCalendarUrls(icalUrl, calendarName);
   const isMobile = isMobileDevice();
   
   if (provider === 'google') {
+    // STANDARDIZED: Always use Google Calendar Import Links for Google Calendar
     // For Android devices, try to use the app intent
     if (isMobile && navigator.userAgent.toLowerCase().includes('android')) {
       return urls.googleApp;
@@ -868,6 +870,7 @@ export function getSmartCalendarUrl(icalUrl: string, provider: 'google' | 'apple
     // For other mobile devices or if app intent fails, use the mobile web URL
     return isMobile ? urls.googleMobile : urls.googleWeb;
   } else if (provider === 'apple') {
+    // STANDARDIZED: Always use Webcal Protocol Links for Apple Calendar
     // Apple devices (iOS/macOS) automatically handle webcal protocol
     return urls.appleMobile;
   }
