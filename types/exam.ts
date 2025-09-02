@@ -5,7 +5,7 @@ export interface Exam {
   date: string
   time: string
   duration_minutes: number
-  duration_day?: string | null  // ISO 8601 duration format like "P1D", "P3D", etc.
+  duration_day?: string // Format: P1D, P3D, P5D etc. for whole day events
   location: string
   comment?: string
   school: string
