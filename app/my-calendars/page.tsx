@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/auth-context";
-import { useSettings } from "@/context/settings-context";
 import { getUserCalendars, deleteUserCalendar } from "@/actions/user-calendars";
 import { getExams } from "@/actions/exam-actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import {
   Trash2,
   Eye,
-  EyeOff,
   X,
   Clock,
   MapPin,
@@ -19,26 +17,11 @@ import {
   Loader2,
   Download,
   Copy,
-  MoreHorizontal,
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { getFreshAuthTokens } from "@/utils/auth-helpers";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-  ExamTooltipContent,
-} from "@/components/ui/tooltip";
-import { motion, AnimatePresence } from "framer-motion";
 
 interface SavedCalendar {
   id: string;
@@ -49,12 +32,12 @@ interface SavedCalendar {
 
 export default function MyCalendarsPage() {
   const { user } = useAuth();
-  const { settings, updateSettings } = useSettings();
   const [calendars, setCalendars] = useState<SavedCalendar[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCalendar, setSelectedCalendar] = useState<any>(null);
   const [selectedExams, setSelectedExams] = useState<any[]>([]);
   const [examsLoading, setExamsLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
   const { toast } = useToast();
@@ -145,13 +128,6 @@ export default function MyCalendarsPage() {
   }, [user?.id, toast]);
 
   async function handleViewCalendar(calendar: any) {
-    // If the same calendar is already selected, toggle it off
-    if (selectedCalendar?.id === calendar.id) {
-      setSelectedCalendar(null);
-      setSelectedExams([]);
-      return;
-    }
-
     setExamsLoading(true);
     setSelectedCalendar(calendar);
 
@@ -348,13 +324,6 @@ export default function MyCalendarsPage() {
       );
 
       setCalendars((prev) => prev.filter((cal) => cal.id !== calendarId));
-      
-      // If the deleted calendar was being viewed, close the view
-      if (selectedCalendar?.id === calendarId) {
-        setSelectedCalendar(null);
-        setSelectedExams([]);
-      }
-      
       toast({
         title: "¡Éxito!",
         description: `Calendario "${calendarName}" eliminado correctamente.`,
@@ -373,18 +342,6 @@ export default function MyCalendarsPage() {
 
   const exportExamsToGoogleCalendar = async (calendar: SavedCalendar) => {
     try {
-      console.log("🔄 [DEBUG] Starting Google Calendar export for:", calendar.name);
-      
-      // Validate calendar data
-      if (!calendar.id || !calendar.name) {
-        throw new Error("Invalid calendar data");
-      }
-      
-      // Validate filters
-      if (!calendar.filters || typeof calendar.filters !== 'object') {
-        console.warn("⚠️ [DEBUG] Calendar has no filters or invalid filters:", calendar.filters);
-      }
-      
       // Use production domain instead of localhost to prevent Google Calendar refresh loops
       let baseUrl = window.location.origin;
 
@@ -395,30 +352,15 @@ export default function MyCalendarsPage() {
           process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
       }
 
-      console.log("🔗 [DEBUG] Base URL:", baseUrl);
-
-      // Generate the iCal subscription URL using the calendar ID to get the specific calendar with its filters
+      // Construct iCal calendar feed URL using webcal protocol for better calendar app integration
       const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
-      console.log("🔗 [DEBUG] iCal URL:", icalUrl);
+      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
 
-      // Import mobile utilities
-      const { generateGoogleCalendarImportUrl } = await import("@/lib/utils");
-
-      // Use proper Google Calendar import URL format
-      const googleCalendarUrl = generateGoogleCalendarImportUrl(icalUrl, calendar.name);
-      console.log("🔗 [DEBUG] Google Calendar import URL:", googleCalendarUrl);
-
-      // Test the iCal URL first to ensure it's accessible
-      try {
-        const response = await fetch(icalUrl, { method: 'HEAD' });
-        if (!response.ok) {
-          throw new Error(`iCal endpoint returned ${response.status}: ${response.statusText}`);
-        }
-        console.log("✅ [DEBUG] iCal endpoint is accessible");
-      } catch (fetchError) {
-        console.error("❌ [DEBUG] iCal endpoint test failed:", fetchError);
-        throw new Error(`Cannot access calendar feed: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
-      }
+      // Use Google Calendar's modern subscription URL with /r?cid= pattern
+      // This opens the "Add this calendar?" dialog with Add/Cancel options
+      const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(
+        calendarFeed
+      )}`;
 
       // Open Google Calendar in a new tab with proper security attributes
       window.open(googleCalendarUrl, "_blank", "noopener,noreferrer");
@@ -427,26 +369,11 @@ export default function MyCalendarsPage() {
         title: "Redirigiendo a Google Calendar",
         description: "Se abrirá Google Calendar con el enlace de suscripción.",
       });
-      
-      console.log("✅ [DEBUG] Google Calendar export completed successfully");
     } catch (error) {
       console.error("❌ Error opening Google Calendar:", error);
-      
-      // Provide more specific error messages
-      let errorMessage = "No se pudo abrir Google Calendar.";
-      if (error instanceof Error) {
-        if (error.message.includes("Invalid calendar data")) {
-          errorMessage = "Datos del calendario inválidos. Intenta recargar la página.";
-        } else if (error.message.includes("Cannot access calendar feed")) {
-          errorMessage = "No se puede acceder al feed del calendario. Verifica que el calendario esté disponible.";
-        } else if (error.message.includes("iCal endpoint")) {
-          errorMessage = "Error en el servidor del calendario. Intenta más tarde.";
-        }
-      }
-      
       toast({
         title: "Error",
-        description: errorMessage,
+        description: "No se pudo abrir Google Calendar.",
         variant: "destructive",
       });
     }
@@ -456,15 +383,11 @@ export default function MyCalendarsPage() {
     try {
       const baseUrl = window.location.origin;
       const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
-      
-      // Import mobile utilities
-      const { generateAppleCalendarImportUrl } = await import("@/lib/utils");
-      
-      // Use proper Apple Calendar import URL format
-      const appleCalendarUrl = generateAppleCalendarImportUrl(icalUrl, calendar.name);
+      // Convert http/https to webcal protocol for Apple Calendar
+      const webcalUrl = icalUrl.replace(/^https?:/, "webcal:");
 
-      // For Apple Calendar, we use window.location.href to trigger the calendar app
-      window.location.href = appleCalendarUrl;
+      // Try to open with webcal protocol
+      window.location.href = webcalUrl;
 
       toast({
         title: "Abriendo Apple Calendar",
@@ -614,21 +537,13 @@ export default function MyCalendarsPage() {
 
       console.log("🔗 [DEBUG] Generated iCal URL:", icalUrl);
 
-      // Import mobile utilities to generate proper Google Calendar import link
-      const { generateGoogleCalendarImportUrl } = await import("@/lib/utils");
-
-      // Generate Google Calendar import link instead of raw iCal URL
-      const googleCalendarUrl = generateGoogleCalendarImportUrl(icalUrl, calendar.name);
-
-      console.log("🔗 [DEBUG] Generated Google Calendar URL:", googleCalendarUrl);
-
-      // Copy Google Calendar import link to clipboard
-      await navigator.clipboard.writeText(googleCalendarUrl);
+      // Copy to clipboard
+      await navigator.clipboard.writeText(icalUrl);
 
       toast({
         title: "¡URL copiada!",
         description:
-          "Enlace de suscripción copiado. Para obtener formato @import.calendar.google.com, descarga el .ics e impórtalo manualmente en Google Calendar.",
+          "El enlace de suscripción se ha copiado al portapapeles. Pégalo en Google Calendar para añadir la suscripción.",
       });
     } catch (error) {
       console.error("❌ Error copying URL:", error);
@@ -688,6 +603,38 @@ export default function MyCalendarsPage() {
           MIS CALENDARIOS
         </h1>
 
+        {/* Calendar Export Help Section */}
+        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 mt-0.5">
+              <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                <svg
+                  className="w-3 h-3 text-white"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                Añadir a tu calendario
+              </h3>
+              <p className="text-sm text-blue-700 dark:text-blue-200">
+                Haz clic en <strong>Google Calendar</strong> o{" "}
+                <strong>Apple Calendar</strong> para abrir tu aplicación de
+                calendario y añadir automáticamente la suscripción. Los exámenes
+                se actualizarán automáticamente.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-6">
           {loading ? (
             <div className="flex justify-center p-8">
@@ -696,122 +643,123 @@ export default function MyCalendarsPage() {
           ) : calendars.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {calendars.map((calendar) => (
-                <motion.div
+                <Card
                   key={calendar.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 * calendars.indexOf(calendar) }}
+                  className={`overflow-hidden border-2 hover:shadow-md transition-all ${
+                    selectedCalendar?.id === calendar.id
+                      ? "ring-2 ring-primary ring-offset-2 border-primary"
+                      : ""
+                  }`}
                 >
-                  <Card
-                    className={`overflow-hidden border-2 hover:shadow-md transition-all ${
-                      selectedCalendar?.id === calendar.id
-                        ? "ring-2 ring-primary ring-offset-2 border-primary"
-                        : ""
-                    }`}
-                  >
-                    <CardContent className="p-0">
-                      <div className="flex flex-col h-[200px]">
-                        <div className="flex-1 flex items-center justify-center p-6">
-                          <h3 className="text-lg font-medium text-center">
-                            {calendar.name}
-                          </h3>
-                        </div>
+                  <CardContent className="p-0">
+                    <div className="flex flex-col h-[200px]">
+                      <div className="flex-1 flex items-center justify-center p-6">
+                        <h3 className="text-lg font-medium text-center">
+                          {calendar.name}
+                        </h3>
+                      </div>
 
-                        {/* Action buttons row */}
-                        <div className="bg-muted/30 p-3 flex justify-between items-center">
+                      {/* Action buttons row */}
+                      <div className="bg-muted/30 p-3 flex justify-between items-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive/80"
+                          onClick={() =>
+                            handleDelete(calendar.id, calendar.name)
+                          }
+                          disabled={deletingId === calendar.id}
+                        >
+                          {deletingId === calendar.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+
+                        <div className="flex items-center gap-1">
+                          {/* Export buttons */}
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-destructive hover:text-destructive/80"
-                            onClick={() =>
-                              handleDelete(calendar.id, calendar.name)
-                            }
-                            disabled={deletingId === calendar.id}
+                            className="h-8 w-8 p-0"
+                            onClick={() => exportExamsToGoogleCalendar(calendar)}
+                            title="Add to Google Calendar"
                           >
-                            {deletingId === calendar.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
+                            <Image
+                              src="/google-cal.png"
+                              alt="Google Calendar"
+                              width={16}
+                              height={16}
+                              className="w-4 h-4"
+                            />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleAppleCalendarExport(calendar)}
+                            title="Add to Apple Calendar"
+                          >
+                            <Image
+                              src="/apple-cal.png"
+                              alt="Apple Calendar"
+                              width={16}
+                              height={16}
+                              className="w-4 h-4"
+                            />
                           </Button>
 
-                          <div className="flex items-center gap-1">
-                            {/* View button */}
+                          {/* Copy URL Button */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                            onClick={() => handleCopyUrl(calendar)}
+                            title="Copy subscription URL"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+
+                          {/* Direct Download Button */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
+                            onClick={() => handleDirectDownload(calendar)}
+                            title="Download .ics file"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+
+                          {/* Development: Manual iCal download */}
+                          {process.env.NODE_ENV === "development" && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={() => handleViewCalendar(calendar)}
-                              title={selectedCalendar?.id === calendar.id ? "Ocultar calendario" : "Ver calendario"}
+                              className="h-8 w-8 p-0 text-orange-600"
+                              onClick={() => handleDevIcalDownload(calendar)}
+                              title="Development: Download .ics file"
                             >
-                              {selectedCalendar?.id === calendar.id ? (
-                                <EyeOff className="h-4 w-4" />
-                              ) : (
-                                <Eye className="h-4 w-4" />
-                              )}
+                              <Download className="h-4 w-4" />
                             </Button>
+                          )}
 
-                            {/* Export options dropdown */}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                  title="Más opciones"
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuItem
-                                  onClick={() => exportExamsToGoogleCalendar(calendar)}
-                                  className="flex items-center gap-2"
-                                >
-                                  <Image
-                                    src="/google-cal.png"
-                                    alt="Google Calendar"
-                                    width={20}
-                                    height={20}
-                                    className="w-5 h-5"
-                                  />
-                                  <span>Google Calendar</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleAppleCalendarExport(calendar)}
-                                  className="flex items-center gap-2"
-                                >
-                                  <Image
-                                    src="/apple-cal.png"
-                                    alt="Apple Calendar"
-                                    width={14}
-                                    height={14}
-                                    className="w-3.5 h-3.5"
-                                  />
-                                  <span>Apple Calendar</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleCopyUrl(calendar)}
-                                  className="flex items-center gap-2"
-                                >
-                                  <Copy className="h-4 w-4" />
-                                  <span>Copiar URL</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleDirectDownload(calendar)}
-                                  className="flex items-center gap-2"
-                                >
-                                  <Download className="h-4 w-4" />
-                                  <span>Descargar .ics</span>
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                          {/* View button */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleViewCalendar(calendar)}
+                            title="Ver calendario"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           ) : (
@@ -831,288 +779,249 @@ export default function MyCalendarsPage() {
         </div>
 
         {/* Exams View Section */}
-        <AnimatePresence>
-          {selectedCalendar && (
-            <motion.div
-              id="exams-section"
-              className="mt-12 space-y-6"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold tracking-tight">
-                  Exámenes para "{selectedCalendar.name}"
-                </h2>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center border rounded-lg p-1">
-                    <Button
-                      variant={settings.viewMode === "calendar" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => updateSettings({ viewMode: "calendar" })}
-                      className="h-8 px-3"
-                    >
-                      <CalendarDays className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant={settings.viewMode === "list" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => updateSettings({ viewMode: "list" })}
-                      className="h-8 px-3"
-                    >
-                      <List className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={closeExamsView}>
-                    <X className="h-4 w-4 mr-2" />
-                    Cerrar
+        {selectedCalendar && (
+          <div
+            id="exams-section"
+            className="mt-12 space-y-6 animate-in fade-in-50 slide-in-from-bottom-4 duration-500"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold tracking-tight">
+                Exámenes para "{selectedCalendar.name}"
+              </h2>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center border rounded-lg p-1">
+                  <Button
+                    variant={viewMode === "calendar" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("calendar")}
+                    className="h-8 px-3"
+                  >
+                    <CalendarDays className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === "list" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("list")}
+                    className="h-8 px-3"
+                  >
+                    <List className="h-4 w-4" />
                   </Button>
                 </div>
+                <Button variant="outline" size="sm" onClick={closeExamsView}>
+                  <X className="h-4 w-4 mr-2" />
+                  Cerrar
+                </Button>
               </div>
+            </div>
 
-              {examsLoading ? (
-                <div className="flex justify-center p-8">
-                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
-                </div>
-              ) : selectedExams.length > 0 ? (
-                settings.viewMode === "calendar" ? (
-                  <TooltipProvider>
-                    <motion.div 
-                      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      {Object.entries(groupExamsByMonth(selectedExams)).map(
-                        ([month, exams], monthArrayIndex) => {
-                          // Extract year and month from the month key
-                          const [monthName, yearStr] = month.split(" ");
-                          const year = parseInt(yearStr);
-                          const monthIndex = [
-                            "Enero",
-                            "Febrero",
-                            "Marzo",
-                            "Abril",
-                            "Mayo",
-                            "Junio",
-                            "Julio",
-                            "Agosto",
-                            "Septiembre",
-                            "Octubre",
-                            "Noviembre",
-                            "Diciembre",
-                          ].indexOf(monthName);
+            {examsLoading ? (
+              <div className="flex justify-center p-8">
+                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+              </div>
+            ) : selectedExams.length > 0 ? (
+              viewMode === "calendar" ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {Object.entries(groupExamsByMonth(selectedExams)).map(
+                    ([month, exams]) => {
+                      // Extract year and month from the month key
+                      const [monthName, yearStr] = month.split(" ");
+                      const year = parseInt(yearStr);
+                      const monthIndex = [
+                        "Enero",
+                        "Febrero",
+                        "Marzo",
+                        "Abril",
+                        "Mayo",
+                        "Junio",
+                        "Julio",
+                        "Agosto",
+                        "Septiembre",
+                        "Octubre",
+                        "Noviembre",
+                        "Diciembre",
+                      ].indexOf(monthName);
 
-                          const calendarDays = generateCalendarGrid(
-                            year,
-                            monthIndex
-                          );
-                          const weekDays = [
-                            "Lun",
-                            "Mar",
-                            "Mié",
-                            "Jue",
-                            "Vie",
-                            "Sáb",
-                            "Dom",
-                          ];
+                      const calendarDays = generateCalendarGrid(
+                        year,
+                        monthIndex
+                      );
+                      const weekDays = [
+                        "Lun",
+                        "Mar",
+                        "Mié",
+                        "Jue",
+                        "Vie",
+                        "Sáb",
+                        "Dom",
+                      ];
 
-                          return (
-                            <motion.div
-                              key={month}
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ 
-                                delay: 0.1 * monthArrayIndex,
-                                duration: 0.4,
-                                ease: "easeOut"
-                              }}
-                            >
-                              <Card className="overflow-hidden">
-                                <CardHeader className="bg-muted/30 pb-2">
-                                  <CardTitle className="text-sm font-semibold">
-                                    {month}
-                                  </CardTitle>
-                                  <p className="text-xs text-muted-foreground">
-                                    {exams.length}{" "}
-                                    {exams.length === 1 ? "examen" : "exámenes"}
-                                  </p>
-                                </CardHeader>
-                                <CardContent className="p-3">
-                                  {/* Calendar Header */}
-                                  <div className="grid grid-cols-7 gap-0.5 mb-1">
-                                    {weekDays.map((day) => (
-                                      <div
-                                        key={day}
-                                        className="text-center text-xs font-medium text-muted-foreground py-0.5"
-                                      >
-                                        {day}
-                                      </div>
-                                    ))}
-                                  </div>
-
-                                  {/* Calendar Grid */}
-                                  <div className="grid grid-cols-7 gap-0.5">
-                                    {calendarDays.map((day, index) => {
-                                      if (day === null) {
-                                        return (
-                                          <div
-                                            key={`empty-${index}`}
-                                            className="h-14 border rounded"
-                                          ></div>
-                                        );
-                                      }
-
-                                      const dayExams = getExamsForDate(
-                                        exams,
-                                        year,
-                                        monthIndex,
-                                        day
-                                      );
-                                      const hasExams = dayExams.length > 0;
-
-                                      const dayContent = (
-                                        <div
-                                          className={`h-14 border rounded p-0.5 flex flex-col items-center justify-between ${
-                                            hasExams
-                                              ? "bg-primary/10 border-primary/30"
-                                              : "bg-background hover:bg-muted/20"
-                                          } transition-colors`}
-                                        >
-                                          <div className="text-xs font-medium text-center">
-                                            {day}
-                                          </div>
-                                          {hasExams && (
-                                            <div className="w-full flex flex-col gap-0.5 min-h-0">
-                                              {dayExams
-                                                .slice(0, 1)
-                                                .map((exam, examIndex) => (
-                                                  <div
-                                                    key={`${exam.id}-${examIndex}`}
-                                                    className="text-xs bg-primary/20 text-primary px-1 py-0.5 rounded truncate text-center w-full"
-                                                  >
-                                                    {exam.acronym ||
-                                                      exam.subject.substring(0, 4)}
-                                                  </div>
-                                                ))}
-                                              {dayExams.length > 1 && (
-                                                <div className="text-xs text-muted-foreground px-1 text-center w-full">
-                                                  +{dayExams.length - 1}
-                                                </div>
-                                              )}
-                                            </div>
-                                          )}
-                                        </div>
-                                      );
-
-                                      if (hasExams) {
-                                        return (
-                                          <Tooltip key={day}>
-                                            <TooltipTrigger asChild>
-                                              {dayContent}
-                                            </TooltipTrigger>
-                                            <ExamTooltipContent 
-                                              side="top" 
-                                              date={new Date(year, monthIndex, day)}
-                                              exams={dayExams}
-                                            />
-                                          </Tooltip>
-                                        );
-                                      }
-
-                                      return dayContent;
-                                    })}
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            </motion.div>
-                          );
-                        }
-                      )}
-                    </motion.div>
-                  </TooltipProvider>
-                ) : (
-                  <div className="space-y-6">
-                    {Object.entries(groupExamsByMonth(selectedExams)).map(
-                      ([month, exams]) => (
+                      return (
                         <Card key={month} className="overflow-hidden">
-                          <CardHeader className="bg-muted/30">
-                            <CardTitle className="text-xl font-semibold">
+                          <CardHeader className="bg-muted/30 pb-3">
+                            <CardTitle className="text-lg font-semibold">
                               {month}
                             </CardTitle>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-xs text-muted-foreground">
                               {exams.length}{" "}
                               {exams.length === 1 ? "examen" : "exámenes"}
                             </p>
                           </CardHeader>
-                          <CardContent className="p-0">
-                            <div className="space-y-2">
-                              {exams.map((exam, index) => (
+                          <CardContent className="p-4">
+                            {/* Calendar Header */}
+                            <div className="grid grid-cols-7 gap-1 mb-2">
+                              {weekDays.map((day) => (
                                 <div
-                                  key={`${exam.id}-${index}`}
-                                  className="flex items-center justify-between p-4 border-b last:border-b-0 hover:bg-muted/20 transition-colors"
+                                  key={day}
+                                  className="text-center text-xs font-medium text-muted-foreground py-1"
                                 >
-                                  <div className="flex-1">
-                                    <h4 className="font-medium text-sm mb-1">
-                                      {exam.subject}
-                                    </h4>
-                                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                      <span className="font-medium">
-                                        {new Date(exam.date).toLocaleDateString(
-                                          "es-ES",
-                                          {
-                                            weekday: "long",
-                                            day: "numeric",
-                                            month: "long",
-                                          }
-                                        )}
-                                      </span>
-                                      <div className="flex items-center gap-1">
-                                        <Clock className="h-3 w-3" />
-                                        <span>{exam.time}</span>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <MapPin className="h-3 w-3" />
-                                        <span>{exam.location}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="text-xs font-medium text-muted-foreground">
-                                      {exam.school}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                      {exam.degree}
-                                    </div>
-                                    {exam.code && (
-                                      <div className="text-xs text-muted-foreground">
-                                        ({exam.code})
-                                      </div>
-                                    )}
-                                  </div>
+                                  {day}
                                 </div>
                               ))}
                             </div>
+
+                            {/* Calendar Grid */}
+                            <div className="grid grid-cols-7 gap-1">
+                              {calendarDays.map((day, index) => {
+                                if (day === null) {
+                                  return (
+                                    <div
+                                      key={`empty-${index}`}
+                                      className="h-16 border rounded"
+                                    ></div>
+                                  );
+                                }
+
+                                const dayExams = getExamsForDate(
+                                  exams,
+                                  year,
+                                  monthIndex,
+                                  day
+                                );
+                                const hasExams = dayExams.length > 0;
+
+                                return (
+                                  <div
+                                    key={day}
+                                    className={`h-16 border rounded p-1 flex flex-col items-center ${
+                                      hasExams
+                                        ? "bg-primary/10 border-primary/30"
+                                        : "bg-background hover:bg-muted/20"
+                                    } transition-colors`}
+                                  >
+                                    <div className="text-xs font-medium mb-1 text-center">
+                                      {day}
+                                    </div>
+                                    {hasExams && (
+                                      <div className="space-y-0.5">
+                                        {dayExams
+                                          .slice(0, 1)
+                                          .map((exam, examIndex) => (
+                                            <div
+                                              key={`${exam.id}-${examIndex}`}
+                                              className="text-xs bg-primary/20 text-primary px-0.5 py-0.5 rounded truncate text-center"
+                                              title={`${exam.subject} - ${exam.time} - ${exam.location}`}
+                                            >
+                                              {exam.acronym ||
+                                                exam.subject.substring(0, 6)}
+                                            </div>
+                                          ))}
+                                        {dayExams.length > 1 && (
+                                          <div className="text-xs text-muted-foreground px-0.5 text-center">
+                                            +{dayExams.length - 1}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </CardContent>
                         </Card>
-                      )
-                    )}
-                  </div>
-                )
-              ) : (
-                <div className="text-center p-8 border rounded-lg bg-muted/10">
-                  <CalendarDays className="mx-auto h-12 w-12 text-muted-foreground opacity-20 mb-2" />
-                  <h3 className="text-lg font-medium mb-1">No hay exámenes</h3>
-                  <p className="text-sm text-muted-foreground">
-                    No se encontraron exámenes para los filtros de este
-                    calendario.
-                  </p>
+                      );
+                    }
+                  )}
                 </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+              ) : (
+                <div className="space-y-6">
+                  {Object.entries(groupExamsByMonth(selectedExams)).map(
+                    ([month, exams]) => (
+                      <Card key={month} className="overflow-hidden">
+                        <CardHeader className="bg-muted/30">
+                          <CardTitle className="text-xl font-semibold">
+                            {month}
+                          </CardTitle>
+                          <p className="text-sm text-muted-foreground">
+                            {exams.length}{" "}
+                            {exams.length === 1 ? "examen" : "exámenes"}
+                          </p>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                          <div className="space-y-2">
+                            {exams.map((exam, index) => (
+                              <div
+                                key={`${exam.id}-${index}`}
+                                className="flex items-center justify-between p-4 border-b last:border-b-0 hover:bg-muted/20 transition-colors"
+                              >
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-sm mb-1">
+                                    {exam.subject}
+                                  </h4>
+                                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                    <span className="font-medium">
+                                      {new Date(exam.date).toLocaleDateString(
+                                        "es-ES",
+                                        {
+                                          weekday: "long",
+                                          day: "numeric",
+                                          month: "long",
+                                        }
+                                      )}
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                      <Clock className="h-3 w-3" />
+                                      <span>{exam.time}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <MapPin className="h-3 w-3" />
+                                      <span>{exam.location}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-xs font-medium text-muted-foreground">
+                                    {exam.school}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {exam.degree}
+                                  </div>
+                                  {exam.code && (
+                                    <div className="text-xs text-muted-foreground">
+                                      ({exam.code})
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )
+                  )}
+                </div>
+              )
+            ) : (
+              <div className="text-center p-8 border rounded-lg bg-muted/10">
+                <CalendarDays className="mx-auto h-12 w-12 text-muted-foreground opacity-20 mb-2" />
+                <h3 className="text-lg font-medium mb-1">No hay exámenes</h3>
+                <p className="text-sm text-muted-foreground">
+                  No se encontraron exámenes para los filtros de este
+                  calendario.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
