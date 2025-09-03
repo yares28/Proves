@@ -220,11 +220,10 @@ export async function getExams(
         
         // Check if subject has an acronym in parentheses
         if (subject.includes('(') && subject.includes(')')) {
-          // Extract the acronym from the LAST parentheses group (e.g., "(B1) (IN1)" -> "IN1")
-          const matches = subject.match(/\(([^)]+)\)/g);
-          if (matches && matches.length > 0) {
-            const lastGroup = matches[matches.length - 1];
-            const acronym = lastGroup.replace(/[()]/g, '');
+          // Extract the acronym from the parentheses
+          const match = subject.match(/\(([^)]+)\)/);
+          if (match && match[1]) {
+            const acronym = match[1];
             // Use exact acronym matching for better precision
             query = query.eq('acronym', acronym);
             console.log(`Using exact acronym match for: "${acronym}"`);
@@ -246,11 +245,10 @@ export async function getExams(
         
         for (const subject of subjects) {
           if (subject.includes('(') && subject.includes(')')) {
-            // Extract acronym from the LAST parentheses group
-            const matches = subject.match(/\(([^)]+)\)/g);
-            if (matches && matches.length > 0) {
-              const lastGroup = matches[matches.length - 1];
-              const acronym = lastGroup.replace(/[()]/g, '');
+            // Extract acronym and use exact matching
+            const match = subject.match(/\(([^)]+)\)/);
+            if (match && match[1]) {
+              const acronym = match[1];
               acronyms.push(acronym);
             } else {
               // Fallback to subject name
@@ -393,10 +391,11 @@ export async function getSchools() {
     const startTime = performance.now();
     
     // Use a more efficient query that leverages indexes
-    // Select distinct school names to avoid duplicates
+    // Only select distinct school column, which should use an index
     const { data, error } = await supabase
       .from('ETSINF')
       .select('school')
+      .limit(100) // Safety limit, we don't expect more than this many schools
       .order('school', { ascending: true });
 
     if (error) {

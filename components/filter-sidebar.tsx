@@ -18,8 +18,6 @@ import { useAuth } from "@/context/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { saveUserCalendar, getUserCalendarNames } from "@/actions/user-calendars"
 import { getFreshAuthTokens } from "@/utils/auth-helpers"
-import { useTheme } from "next-themes"
-import { useSettings } from "@/context/settings-context"
 import Image from "next/image"
 
 type FilterCategory = {
@@ -38,13 +36,10 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
   const [expandedItems, setExpandedItems] = useState<string[]>([]) // Start with nothing expanded
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [existingNames, setExistingNames] = useState<string[]>([])
-  const [mounted, setMounted] = useState(false)
   const prevSchoolsRef = useRef<string[]>([]);
 
   const { user, syncToken } = useAuth()
   const { toast } = useToast()
-  const { theme } = useTheme()
-  const { settings } = useSettings()
 
   // Get the selected filters
   const selectedSchools = activeFilters.school || []
@@ -68,18 +63,6 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
   useEffect(() => {
     prevSchoolsRef.current = selectedSchools;
   }, [selectedSchools]);
-
-  // Handle mounted state for theme detection
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Determine which logoY icon to use based on theme (same logic as header)
-  const getLogoYIcon = () => {
-    if (!mounted) return "/logoYdark.png" // Default fallback during SSR
-    const currentTheme = settings.theme === 'system' ? theme : settings.theme
-    return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
-  }
 
   const { schools, degrees, semesters, years, subjects, isLoading, error } = useFilterData(
     selectedSchoolsForData,
@@ -545,12 +528,11 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
         <div className="relative">
           <div className="bg-white dark:bg-card rounded-full p-3 shadow-lg border border-border/50">
             <Image 
-              src={getLogoYIcon()} 
+              src="/logo-icon.png" 
               alt="UPV Logo" 
-              width={56} 
-              height={56}
-              className="h-14 w-14"
-              key={mounted ? 'mounted' : 'unmounted'}
+              width={32} 
+              height={32}
+              className="h-8 w-8"
             />
           </div>
           {/* Subtle glow effect */}
@@ -578,22 +560,20 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
         {Object.keys(activeFilters).length > 0 && (
           <div className="mt-4">
             <h3 className="text-sm font-medium mb-2">Filtros Activos</h3>
-            <div className="flex flex-wrap items-center gap-2 overflow-hidden">
+            <div className="flex flex-wrap items-center gap-2">
               {Object.entries(activeFilters).map(([category, values], idx, arr) => (
-                <span key={category} className="flex flex-wrap items-center gap-2">
+                <span key={category} className="flex items-center gap-2">
                   {values.map((value) => (
                     <Badge
                       key={`${category}-${value}`}
                       variant="secondary"
-                      className="flex items-center gap-1 max-w-full text-xs break-all"
+                      className="flex items-center gap-1"
                     >
-                      <span className="truncate max-w-[120px]">
-                        {category === 'subject' ? getSubjectAcronym(value) : value}
-                      </span>
+                      {category === 'subject' ? getSubjectAcronym(value) : value}
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-4 w-4 p-0 flex-shrink-0"
+                        className="h-4 w-4 p-0"
                         onClick={() => removeFilter(category, value)}
                       >
                         <X className="h-3 w-3" />
@@ -602,7 +582,7 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
                   ))}
                   {/* Separator between categories, except after the last */}
                   {idx < arr.length - 1 && (
-                    <span className="mx-1 text-muted-foreground select-none font-bold flex-shrink-0">|</span>
+                    <span className="mx-1 text-muted-foreground select-none font-bold">|</span>
                   )}
                 </span>
               ))}

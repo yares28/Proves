@@ -163,8 +163,8 @@ export function CalendarDisplay({
         // For debugging - log all unique dates in the exam data
         if (data.length > 0) {
           const uniqueDates = [
-            ...new Set(data.map((exam: any) => exam.date)),
-          ].sort() as string[];
+            ...new Set(data.map((exam) => exam.date)),
+          ].sort();
           console.log("CalendarDisplay - Unique exam dates:", uniqueDates);
 
           // Detect academic year from exam dates
@@ -405,7 +405,7 @@ export function CalendarDisplay({
     }
   };
 
-  // Export to Google Calendar with mobile-aware URL handling
+  // Export to Google Calendar with modern URL pattern
   const exportToGoogleCalendar = async (calendarName: string) => {
     try {
       console.log("🔄 Starting Google Calendar export with name:", calendarName);
@@ -421,7 +421,7 @@ export function CalendarDisplay({
       });
 
       // Generate UPV-style token URL
-      const { generateUPVTokenUrl, getSmartCalendarUrl } = await import("@/lib/utils");
+      const { generateUPVTokenUrl } = await import("@/lib/utils");
       console.log("📦 Utils imported successfully");
       
       const tokenPath = await generateUPVTokenUrl(activeFilters, calendarName);
@@ -436,13 +436,19 @@ export function CalendarDisplay({
       console.log("🌐 Generated iCal URL:", icalUrl);
       console.log("📱 This URL will be used directly for Google Calendar subscription");
 
-      // STANDARDIZED: For Google Calendar, always use Google Calendar Import Links (not webcal)
-      // Use smart URL generation for mobile-aware calendar opening with the original HTTPS URL
-      const smartCalendarUrl = getSmartCalendarUrl(icalUrl, 'google', calendarName);
-      console.log("🔗 Smart Calendar URL:", smartCalendarUrl);
+      // Construct calendar feed URL using webcal protocol for better calendar app integration
+      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
+      console.log("📱 Calendar feed URL:", calendarFeed);
+
+      // Use Google Calendar's modern subscription URL with /r?cid= pattern
+      // This opens the "Add this calendar?" dialog with Add/Cancel options
+      const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(
+        calendarFeed
+      )}`;
+      console.log("🔗 Final Google Calendar URL:", googleCalendarUrl);
 
       // Open Google Calendar in a new tab with proper security attributes
-      window.open(smartCalendarUrl, "_blank", "noopener,noreferrer");
+      window.open(googleCalendarUrl, "_blank", "noopener,noreferrer");
 
       toast({
         title: "Redirigiendo a Google Calendar",
@@ -591,12 +597,12 @@ export function CalendarDisplay({
                             )
                           )}
                         </div>
-                        <div className="grid grid-cols-7 gap-1.5 text-center text-sm justify-items-center">
+                        <div className="grid grid-cols-7 gap-1.5 text-center text-sm">
                           {Array.from({ length: month.startDay }).map(
                             (_, i) => (
                               <div
                                 key={`empty-start-${i}`}
-                                className="rounded-md bg-muted/30 w-8 h-8 flex-shrink-0"
+                                className="rounded-md bg-muted/30 p-2"
                               ></div>
                             )
                           )}
@@ -614,7 +620,7 @@ export function CalendarDisplay({
                                   <motion.div
                                     whileHover={{ scale: 1.02 }}
                                     transition={{ duration: 0.1 }}
-                                    className={`relative rounded-md w-8 h-8 flex items-center justify-center transition-all cursor-pointer flex-shrink-0 ${
+                                    className={`relative rounded-md p-2 transition-all cursor-pointer ${
                                       isSelected
                                         ? "bg-primary text-primary-foreground shadow-md"
                                         : dayHasExam
@@ -630,7 +636,7 @@ export function CalendarDisplay({
                                   >
                                     {day}
                                     {dayHasExam && (
-                                      <span className="absolute bottom-0.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-primary"></span>
+                                      <span className="absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-primary"></span>
                                     )}
                                   </motion.div>
                                 </TooltipTrigger>
@@ -762,7 +768,7 @@ export function CalendarDisplay({
                           }).map((_, i) => (
                             <div
                               key={`empty-end-${i}`}
-                              className="rounded-md bg-muted/30 w-8 h-8"
+                              className="rounded-md bg-muted/30 p-2"
                             ></div>
                           ))}
                         </div>
