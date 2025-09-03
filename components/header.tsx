@@ -3,16 +3,16 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { Globe, Moon, Sun } from "lucide-react"
+import { Menu, Globe, Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
-
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { UserButton } from "@/components/auth/user-button"
 import { useSettings } from "@/context/settings-context"
 
 export function Header() {
-
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const [mounted, setMounted] = useState(false)
   const { theme, setTheme } = useTheme()
@@ -53,11 +53,11 @@ export function Header() {
     updateSettings({ language: newLanguage })
   }
 
-  // Determine which logoY icon to use based on theme
-  const getLogoYIcon = () => {
-    if (!mounted) return "/logoYdark.png" // Default fallback during SSR
+  // Determine which logo to use based on theme
+  const getHeaderLogo = () => {
+    if (!mounted) return "/logo-full.png" // Default fallback during SSR
     const currentTheme = settings.theme === 'system' ? theme : settings.theme
-    return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
+    return currentTheme === "light" ? "/logo-full2-light.png" : "/logo-full.png"
   }
 
   return (
@@ -69,15 +69,21 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap">
           <Image 
-            src={getLogoYIcon()} 
+            src="/logo-icon.png" 
             alt="UPV Icon" 
-            width={56} 
-            height={56}
-            className="h-14 w-14"
+            width={50} 
+            height={50}
+            className="h-10 w-10"
             priority
-            key={mounted ? 'mounted' : 'unmounted'}
           />
-
+          <Image 
+            src={getHeaderLogo()} 
+            alt="UPV Calendario de Exámenes" 
+            width={140} 
+            height={40}
+            className="h-10 w-auto"
+            priority
+          />
         </Link>
 
         <div className="flex items-center space-x-4">
@@ -114,6 +120,20 @@ export function Header() {
           </Button>
 
           <UserButton />
+
+          <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" className="md:hidden">
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Alternar menú</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+              <nav className="flex flex-col gap-4">
+                {/* Navigation items removed */}
+              </nav>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
     </header>
