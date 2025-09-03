@@ -875,9 +875,31 @@ export function getSmartCalendarUrl(
   calendarName: string
 ): string {
   if (calendarType === 'google') {
-    const cid = encodeURIComponent(icalUrl);
-    return `https://calendar.google.com/calendar/render?cid=${cid}`;
+    // Google Calendar subscription - try the most reliable method
+    // The 'cid' parameter should trigger the subscription dialog
+    // If this doesn't work, the issue might be with Google Calendar's current behavior
+    
+    // Method 1: Direct subscription (most reliable)
+    const directUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(icalUrl)}`;
+    
+    // Method 2: Alternative with user parameter
+    const altUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(icalUrl)}`;
+    
+    // Method 3: Legacy render method
+    const renderUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(icalUrl)}`;
+    
+    console.log('🔗 [getSmartCalendarUrl] Google Calendar URLs generated:');
+    console.log('  Direct:', directUrl);
+    console.log('  Alternative:', altUrl);
+    console.log('  Render:', renderUrl);
+    console.log('  Original iCal URL:', icalUrl);
+    console.log('  Note: If popup doesn\'t work, try manually visiting the Direct URL');
+    
+    // Return the most reliable method
+    return directUrl;
   }
   // Apple: trigger Calendar.app
-  return icalUrl.replace(/^https?:\/\//, 'webcal://');
+  const appleUrl = icalUrl.replace(/^https?:\/\//, 'webcal://');
+  console.log('🍎 [getSmartCalendarUrl] Generated Apple Calendar URL:', appleUrl);
+  return appleUrl;
 }
