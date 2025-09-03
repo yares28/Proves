@@ -395,7 +395,6 @@ export async function getSchools() {
     const { data, error } = await supabase
       .from('ETSINF')
       .select('school')
-      .limit(100) // Safety limit, we don't expect more than this many schools
       .order('school', { ascending: true });
 
     if (error) {
