@@ -16,7 +16,6 @@ export default async function ExamsPage({
 }) {
   const filters: ExamFilters = {
     acronym: typeof searchParams.acronym === "string" ? searchParams.acronym : undefined,
-    subject: typeof searchParams.subject === "string" ? searchParams.subject : undefined,
     school: typeof searchParams.school === "string" && searchParams.school !== "all" ? searchParams.school : undefined,
     degree: typeof searchParams.degree === "string" && searchParams.degree !== "all" ? searchParams.degree : undefined,
     year: typeof searchParams.year === "string" ? searchParams.year : undefined,

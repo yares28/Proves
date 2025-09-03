@@ -12,7 +12,6 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import { toast } from "sonner"
-import { getSmartCalendarUrl, generateICalContent, isMobileDevice } from "@/lib/utils"
 
 interface ExportButtonProps {
   exams: any[]
@@ -35,33 +34,22 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
     }
   }
 
-  const exportToGoogleCalendar = async () => {
+  const exportToGoogleCalendar = () => {
     if (exams.length === 0) {
       toast.error("No hay exámenes para exportar")
       return
     }
 
-    try {
-      // Determine base URL (prefer production on localhost)
-      let baseUrl = window.location.origin
-      if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")) {
-        baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app"
-      }
+    const events = exams.map(exam => ({
+      text: `${exam.subject} (${exam.code})`,
+      dates: exam.date,
+      details: `${exam.time} - ${exam.location}\n${exam.school} - ${exam.degree}\n${exam.year} - ${exam.semester}`
+    }))
 
-      // Build iCal endpoint with current filters using our utils
-      const { generateUPVTokenUrl, getSmartCalendarUrl } = await import("@/lib/utils")
-      const tokenPath = await generateUPVTokenUrl(filters || {}, "Mis Exámenes UPV")
-      const icalUrl = `${baseUrl}${tokenPath}`
-
-      // Generate Google Calendar import link (non-webcal wrapper)
-      const smartUrl = getSmartCalendarUrl(icalUrl, 'google', 'Mis Exámenes UPV')
-
-      window.open(smartUrl, '_blank', 'noopener,noreferrer')
-      toast.success("Abriendo Google Calendar")
-    } catch (error) {
-      console.error('Error exporting to Google Calendar:', error)
-      toast.error("No se pudo abrir Google Calendar")
-    }
+    const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(events[0].text)}&dates=${encodeURIComponent(events[0].dates)}&details=${encodeURIComponent(events[0].details)}`
+    
+    window.open(googleUrl, '_blank')
+    toast.success("Abriendo Google Calendar")
   }
 
   const exportToAppleCalendar = () => {
@@ -70,82 +58,20 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
       return
     }
 
-
+    // Generate .ics content
+    const icsContent = generateICSContent(exams)
+    const blob = new Blob([icsContent], { type: 'text/calendar' })
+    const url = URL.createObjectURL(blob)
     
-    try {
-      // Generate iCal content using the proper utility
-      const icsContent = generateICalContent(exams, {
-        calendarName: "Mis Exámenes UPV",
-        useUPVFormat: true
-      })
-      
-      const blob = new Blob([icsContent], { type: 'text/calendar' })
-      const url = URL.createObjectURL(blob)
-      
-      // Check if we're on mobile
-      const isMobile = isMobileDevice()
-      
-      if (isMobile) {
-        // On mobile, try to open with calendar app using webcal protocol
-        const webcalUrl = url.replace(/^blob:/, 'webcal://')
-        const smartUrl = getSmartCalendarUrl(url, 'apple', 'Mis Exámenes UPV')
-        
-        // For mobile devices, try to trigger the calendar app
-        if (navigator.userAgent.toLowerCase().includes('iphone') || 
-            navigator.userAgent.toLowerCase().includes('ipad') || 
-            navigator.userAgent.toLowerCase().includes('mac')) {
-          // iOS/macOS devices: create a temporary link with webcal protocol
-          const tempLink = document.createElement('a')
-          tempLink.href = `data:text/calendar;charset=utf8,${encodeURIComponent(icsContent)}`
-          tempLink.download = 'exams.ics'
-          document.body.appendChild(tempLink)
-          tempLink.click()
-          document.body.removeChild(tempLink)
-          
-          toast.success("Abriendo Apple Calendar")
-        } else {
-          // Android or other mobile: fallback to download
-          const link = document.createElement('a')
-          link.href = url
-          link.download = 'exams.ics'
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-          
-          toast.success("Archivo .ics descargado")
-        }
-      } else {
-        // Desktop: download the file
-        const link = document.createElement('a')
-        link.href = url
-        link.download = 'exams.ics'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        
-        toast.success("Archivo .ics descargado para Apple Calendar")
-      }
-      
-      // Clean up
-      setTimeout(() => URL.revokeObjectURL(url), 1000)
-      
-    } catch (error) {
-      console.error('Error exporting to Apple Calendar:', error)
-      // Fallback to original method
-      const icsContent = generateICSContent(exams)
-      const blob = new Blob([icsContent], { type: 'text/calendar' })
-      const url = URL.createObjectURL(blob)
-      
-      const link = document.createElement('a')
-      link.href = url
-      link.download = 'exams.ics'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-      
-      toast.success("Archivo .ics descargado para Apple Calendar")
-    }
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'exams.ics'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    
+    toast.success("Archivo .ics descargado para Apple Calendar")
   }
 
   const downloadICS = () => {
