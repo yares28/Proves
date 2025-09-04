@@ -22,31 +22,53 @@ export function Footer() {
 
   // Determine which logo to use based on theme
   const getFooterLogo = () => {
-    if (!mounted) return "/logo-full.png" // Default fallback during SSR
+    if (!mounted) return "/logoYdark.png" // Default fallback during SSR
     const currentTheme = settings.theme === 'system' ? theme : settings.theme
-    return currentTheme === "light" ? "/logo-full2-light.png" : "/logo-full.png"
+    return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
+  }
+
+  // Determine which icon logo to use based on theme
+  const getIconLogo = () => {
+    if (!mounted) return "/logoYdark.png" // Default fallback during SSR
+    const currentTheme = settings.theme === 'system' ? theme : settings.theme
+    return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
   }
 
   return (
-    <footer className="border-t bg-background">
+    <footer className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900">
+      {/* Background pattern */}
+      <div className="absolute inset-0 -z-10">
+        <svg
+          className="absolute inset-0 h-full w-full opacity-30 dark:opacity-10"
+          xmlns="http://www.w3.org/2000/svg"
+          width="100%"
+          height="100%"
+        >
+          <defs>
+            <pattern
+              id="dots-pattern-footer"
+              patternUnits="userSpaceOnUse"
+              width="20"
+              height="20"
+              patternTransform="scale(1) rotate(0)"
+            >
+              <rect x="0" y="0" width="100%" height="100%" fill="none" />
+              <circle cx="10" cy="10" r="1" fill="currentColor" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#dots-pattern-footer)" />
+        </svg>
+      </div>
       <div className="container mx-auto px-4 py-12 md:px-6">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
           <div>
             <div className="mb-6 flex items-center space-x+2">
               <Image 
-                src="/logo-icon.png" 
-                alt="UPV Icon" 
-                width={32} 
-                height={32}
-                className="h-8 w-8"
-                priority
-              />
-              <Image 
                 src={getFooterLogo()} 
                 alt="UPV Calendario de Exámenes" 
-                width={120} 
-                height={32}
-                className="h-8 w-auto"
+                width={600} 
+                height={160}
+                className="h-40 w-auto -ml-16"
                 priority
               />
             </div>

@@ -35,10 +35,10 @@ function AuthCallbackContent() {
   // Determine which logo to use based on theme - with proper hydration handling
   const getLogo = () => {
     // Always return the same logo during SSR to prevent hydration mismatch
-    if (!mounted) return "/logo-full2.png"
+    if (!mounted) return "/logoYdark.png"
     
     const currentTheme = settings.theme === 'system' ? theme : settings.theme
-    return currentTheme === "light" ? "/logo-full-light.png" : "/logo-full2.png"
+    return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
   }
 
   useEffect(() => {

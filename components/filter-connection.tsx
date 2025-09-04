@@ -16,7 +16,9 @@ export function FilterConnection() {
 
   return (
     <div className="grid grid-cols-1 gap-10 md:grid-cols-[350px_1fr]">
-      <FilterSidebar onFiltersChange={handleFiltersChange} />
+      <div className="hidden md:block">
+        <FilterSidebar onFiltersChange={handleFiltersChange} />
+      </div>
       <CalendarDisplay activeFilters={activeFilters} />
     </div>
   )

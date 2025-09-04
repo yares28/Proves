@@ -19,6 +19,8 @@ import { useToast } from "@/hooks/use-toast"
 import { saveUserCalendar, getUserCalendarNames } from "@/actions/user-calendars"
 import { getFreshAuthTokens } from "@/utils/auth-helpers"
 import Image from "next/image"
+import { useTheme } from "next-themes"
+import { useSettings } from "@/context/settings-context"
 
 type FilterCategory = {
   name: string;
@@ -36,10 +38,24 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
   const [expandedItems, setExpandedItems] = useState<string[]>([]) // Start with nothing expanded
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [existingNames, setExistingNames] = useState<string[]>([])
+  const [mounted, setMounted] = useState(false)
   const prevSchoolsRef = useRef<string[]>([]);
 
   const { user, syncToken } = useAuth()
   const { toast } = useToast()
+  const { theme } = useTheme()
+  const { settings } = useSettings()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Determine which icon logo to use based on theme
+  const getIconLogo = () => {
+    if (!mounted) return "/logoYdark.png" // Default fallback during SSR
+    const currentTheme = settings.theme === 'system' ? theme : settings.theme
+    return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
+  }
 
   // Get the selected filters
   const selectedSchools = activeFilters.school || []
@@ -523,16 +539,16 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
         whileInView={{ opacity: 1, scale: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.6, delay: 0.2 }}
-        className="absolute -top-6 left-1/2 transform -translate-x-1/2 -ml-6 z-10"
+        className="absolute -top-8 left-36 transform -translate-x-1/2 z-10"
       >
         <div className="relative">
-          <div className="bg-white dark:bg-card rounded-full p-3 shadow-lg border border-border/50">
+          <div className="bg-white dark:bg-card rounded-full p-1 shadow-lg border border-border/50">
             <Image 
-              src="/logo-icon.png" 
+              src={getIconLogo()} 
               alt="UPV Logo" 
-              width={32} 
-              height={32}
-              className="h-8 w-8"
+              width={64} 
+              height={64}
+              className="h-16 w-16"
             />
           </div>
           {/* Subtle glow effect */}
