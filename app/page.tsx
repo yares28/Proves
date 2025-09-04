@@ -7,6 +7,7 @@ import { Footer } from "@/components/footer"
 import { Header } from "@/components/header"
 import { HeroSection } from "@/components/hero-section"
 import { StatisticsSection } from "@/components/statistics-section"
+import { FAQSection } from "@/components/faq-section"
 import { FilterConnection } from "@/components/filter-connection"
 import { AuthDialog } from "@/components/auth/auth-dialog"
 import { useAuth } from "@/context/auth-context"
@@ -38,6 +39,9 @@ export default function Home() {
         
         {/* Statistics Section */}
         <StatisticsSection />
+        
+        {/* FAQ Section */}
+        <FAQSection />
       </main>
       <Footer />
       

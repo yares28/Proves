@@ -22,9 +22,17 @@ export function HeroSection() {
   // Determine which logo to use based on theme
   const getHeroLogo = () => {
     // Always return the same logo during SSR and initial render to prevent hydration mismatch
-    if (!mounted) return "/logo-full2.png"
+    if (!mounted) return "/logoYdark.png"
     const currentTheme = settings.theme === 'system' ? theme : settings.theme
-    return currentTheme === "light" ? "/logo-full-light.png" : "/logo-full2.png"
+    return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
+  }
+
+  // Determine which icon logo to use based on theme
+  const getIconLogo = () => {
+    // Always return the same logo during SSR and initial render to prevent hydration mismatch
+    if (!mounted) return "/logoYdark.png"
+    const currentTheme = settings.theme === 'system' ? theme : settings.theme
+    return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
   }
 
   return (
@@ -78,7 +86,7 @@ export function HeroSection() {
           }}
         >
           <Image 
-            src="/logo-icon.png" 
+            src={getIconLogo()} 
             alt="UPV Logo" 
             width={32} 
             height={32}
@@ -99,7 +107,7 @@ export function HeroSection() {
           }}
         >
           <Image 
-            src="/logo-icon.png" 
+            src={getIconLogo()} 
             alt="UPV Logo" 
             width={28} 
             height={28}
@@ -120,7 +128,7 @@ export function HeroSection() {
           }}
         >
           <Image 
-            src="/logo-icon.png" 
+            src={getIconLogo()} 
             alt="UPV Logo" 
             width={24} 
             height={24}
@@ -141,7 +149,7 @@ export function HeroSection() {
           }}
         >
           <Image 
-            src="/logo-icon.png" 
+            src={getIconLogo()} 
             alt="UPV Logo" 
             width={36} 
             height={36}

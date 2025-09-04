@@ -55,9 +55,16 @@ export function Header() {
 
   // Determine which logo to use based on theme
   const getHeaderLogo = () => {
-    if (!mounted) return "/logo-full.png" // Default fallback during SSR
+    if (!mounted) return "/logoYdark.png" // Default fallback during SSR
     const currentTheme = settings.theme === 'system' ? theme : settings.theme
-    return currentTheme === "light" ? "/logo-full2-light.png" : "/logo-full.png"
+    return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
+  }
+
+  // Determine which icon logo to use based on theme
+  const getIconLogo = () => {
+    if (!mounted) return "/logoYdark.png" // Default fallback during SSR
+    const currentTheme = settings.theme === 'system' ? theme : settings.theme
+    return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
   }
 
   return (
@@ -68,14 +75,6 @@ export function Header() {
     >
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap">
-          <Image 
-            src="/logo-icon.png" 
-            alt="UPV Icon" 
-            width={50} 
-            height={50}
-            className="h-10 w-10"
-            priority
-          />
           <Image 
             src={getHeaderLogo()} 
             alt="UPV Calendario de Exámenes" 
@@ -123,7 +122,7 @@ export function Header() {
 
           <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="md:hidden">
+              <Button variant="outline" size="icon" className="hidden">
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">Alternar menú</span>
               </Button>
