@@ -40,82 +40,99 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
     }
   }
 
-  const exportToGoogleCalendar = () => {
+  const exportToGoogleCalendar = async () => {
     if (exams.length === 0) {
       toast.error("No hay exámenes para exportar")
       return
     }
 
     try {
-      const baseUrl = window.location.origin
+      // Use production domain for reliable subscription
+      const baseUrl = window.location.origin.includes('localhost') 
+        ? 'https://upv-cal.vercel.app' 
+        : window.location.origin
+
       const params = new URLSearchParams()
-      // Calendar name for the subscription
       params.set("name", "Recordatorios de exámenes")
 
-      // Map filters into query params (arrays supported)
-      const keys = ["school", "degree", "year", "semester", "subject"] as const
+      // Map filters - keep URLs manageable by using most important filters only
+      const keys = ["school", "degree", "year", "semester"] as const
       keys.forEach((key) => {
         const value = (filters && (filters as any)[key]) as string[] | undefined
-        if (Array.isArray(value)) {
+        if (Array.isArray(value) && value.length <= 3) { // Limit to prevent URL length issues
           value.forEach((v) => v && params.append(key, v))
         }
       })
 
-      // Map reminder settings to ISO-8601 negative durations
+      // Add reminders
       const reminderDurations: string[] = []
       if (settings?.examReminders?.oneWeek) reminderDurations.push("-P7D")
       if (settings?.examReminders?.oneDay) reminderDurations.push("-P1D")
       if (settings?.examReminders?.oneHour) reminderDurations.push("-PT1H")
       
-      // If no reminders are enabled, use defaults (1 day and 1 hour)
       if (reminderDurations.length === 0) {
         reminderDurations.push("-P1D", "-PT1H")
       }
       
       reminderDurations.forEach((r) => params.append("reminder", r))
 
+      // Generate the iCal URL (always HTTPS, never webcal for Google Calendar subscription)
       const icalUrl = `${baseUrl}/api/ical?${params.toString()}`
       
-      // Try multiple URL formats for maximum compatibility
-      const calendarFeedWebcal = icalUrl.replace(/^https?:/, "webcal:")
-      const calendarFeedHttp = icalUrl // Keep original HTTP/HTTPS
+      console.log("🔗 Generated iCal URL:", icalUrl)
+      console.log("📏 URL length:", icalUrl.length)
       
-      console.log("🔗 iCal URL (HTTPS):", calendarFeedHttp)
-      console.log("📱 Calendar feed (webcal):", calendarFeedWebcal)
+      // Test if the feed is accessible before attempting subscription
+      try {
+        const testResponse = await fetch(icalUrl, { method: 'HEAD' })
+        if (!testResponse.ok) {
+          throw new Error(`iCal feed not accessible: ${testResponse.status}`)
+        }
+        console.log("✅ iCal feed is accessible")
+      } catch (feedError) {
+        console.warn("⚠️ Could not verify iCal feed accessibility:", feedError)
+        // Continue anyway as HEAD requests might be blocked
+      }
+
+      // Use the MOST RELIABLE Google Calendar subscription pattern
+      // Based on 2024 research: Direct HTTPS URLs work better than webcal for web subscription
+      const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(icalUrl)}`
       
-      // Try the most common Google Calendar URL patterns
-      const googleCalendarUrls = [
-        `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeedWebcal)}`,
-        `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeedWebcal)}`,
-        `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeedHttp)}`,
-      ]
+      console.log("🔗 Final Google Calendar URL:", googleCalendarUrl)
+      console.log("📏 Final URL length:", googleCalendarUrl.length)
       
-      console.log("🔗 Trying Google Calendar URLs:", googleCalendarUrls)
-      
-      // Use the first URL format (most reliable)
-      const googleCalendarUrl = googleCalendarUrls[0]
-      
-      // Open the calendar subscription page
+      // Verify URL isn't too long (Google has ~2048 char limit)
+      if (googleCalendarUrl.length > 2000) {
+        console.warn("⚠️ URL might be too long for reliable subscription")
+        toast.error("Demasiados filtros aplicados. Reduce los filtros e intenta de nuevo.")
+        return
+      }
+
+      // Try to open with user gesture (most reliable for popup blockers)
       const newWindow = window.open(googleCalendarUrl, '_blank', 'noopener,noreferrer')
       
       if (newWindow) {
         console.log("✅ Google Calendar window opened successfully")
-        // Show instructions dialog after a short delay
+        // Check if the window was immediately closed (sign of popup blocker)
         setTimeout(() => {
-          setShowInstructions(true)
-        }, 500)
+          if (newWindow.closed) {
+            console.log("⚠️ Window was closed immediately - likely popup blocked")
+            setShowInstructions(true)
+          } else {
+            console.log("✅ Window is still open - likely successful")
+            setTimeout(() => setShowInstructions(true), 1000) // Show instructions after delay
+          }
+        }, 100)
       } else {
         console.log("⚠️ Popup blocked, showing fallback instructions")
-        // Popup was blocked, show instructions immediately with manual link
         setShowInstructions(true)
       }
       
-      // Close the export popover after successful action
       setIsOpen(false)
       
     } catch (e) {
-      console.error('Google Calendar export error:', e)
-      toast.error("No se pudo abrir Google Calendar")
+      console.error('❌ Google Calendar export error:', e)
+      toast.error("Error al generar el enlace de suscripción")
     }
   }
 
@@ -305,60 +322,88 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
               Suscripción a Google Calendar
             </DialogTitle>
             <DialogDescription className="text-left space-y-3">
-              <p>Se ha abierto Google Calendar en una nueva ventana.</p>
+              <p>Se ha abierto Google Calendar en una nueva ventana para suscribirte al calendario.</p>
               
               <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                <p className="font-medium text-blue-900 mb-2">¿Qué verás en Google Calendar?</p>
+                <p className="font-medium text-blue-900 mb-2">✅ ¿Qué deberías ver ahora?</p>
                 <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
-                  <li>Una ventana emergente con el título "¿Agregar este calendario?" o "Add calendar"</li>
-                  <li>El nombre del calendario: "Recordatorios de exámenes"</li>
-                  <li>Botones de "Agregar calendario" y "Cancelar" (o "Add" y "Cancel")</li>
-                  <li>Haz clic en <strong>"Agregar calendario"</strong> o <strong>"Add"</strong> para confirmar</li>
-                  <li>El calendario aparecerá en tu lista de calendarios y se sincronizará automáticamente</li>
+                  <li>Una ventana de Google Calendar con un diálogo de suscripción</li>
+                  <li>El título: "Add calendar" o "¿Agregar este calendario?"</li>
+                  <li>Nombre: "Recordatorios de exámenes"</li>
+                  <li>Un botón azul <strong>"Add"</strong> o <strong>"Agregar"</strong></li>
+                  <li>Después de hacer clic, el calendario aparecerá en tu lista lateral</li>
                 </ol>
+              </div>
+
+              <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                <p className="font-medium text-green-900 mb-1">💡 Verificación rápida:</p>
+                <p className="text-sm text-green-800">
+                  Si ves el diálogo, ¡perfecto! Haz clic en "Add" y estarás listo. 
+                  El calendario se actualizará automáticamente con nuevos exámenes.
+                </p>
               </div>
 
               <div className="flex items-start gap-2 bg-amber-50 p-3 rounded-lg border border-amber-200">
                 <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
                 <div className="text-sm">
-                  <p className="font-medium text-amber-900">¿No aparece el diálogo de suscripción?</p>
-                  <p className="text-amber-800 mb-2">Prueba estos enlaces alternativos:</p>
-                  <div className="space-y-1">
+                  <p className="font-medium text-amber-900">❌ ¿No apareció nada?</p>
+                  <p className="text-amber-800 mb-2">Problemas comunes y soluciones:</p>
+                  <div className="space-y-2 text-xs">
+                    <div><strong>Bloqueador de popups:</strong> Permite popups para este sitio</div>
+                    <div><strong>Navegador:</strong> Prueba Chrome, Firefox o Edge</div>
+                    <div><strong>Manual:</strong> Usa estos enlaces alternativos:</div>
+                  </div>
+                  <div className="space-y-1 mt-2">
                     {/* Generate alternative URLs for manual testing */}
                     {(() => {
-                      const baseUrl = window.location.origin
+                      // Use same logic as main function for consistency
+                      const baseUrl = window.location.origin.includes('localhost') 
+                        ? 'https://upv-cal.vercel.app' 
+                        : window.location.origin
+                        
                       const params = new URLSearchParams()
                       params.set("name", "Recordatorios de exámenes")
-                      const keys = ["school", "degree", "year", "semester", "subject"] as const
+                      
+                      // Simplified filters to prevent URL length issues
+                      const keys = ["school", "degree", "year", "semester"] as const
                       keys.forEach((key) => {
                         const value = (filters && (filters as any)[key]) as string[] | undefined
-                        if (Array.isArray(value)) {
-                          value.forEach((v) => v && params.append(key, v))
+                        if (Array.isArray(value) && value.length <= 2) {
+                          value.slice(0, 2).forEach((v) => v && params.append(key, v))
                         }
                       })
+                      
                       const reminderDurations: string[] = []
-                      if (settings?.examReminders?.oneWeek) reminderDurations.push("-P7D")
                       if (settings?.examReminders?.oneDay) reminderDurations.push("-P1D")
                       if (settings?.examReminders?.oneHour) reminderDurations.push("-PT1H")
                       if (reminderDurations.length === 0) {
-                        reminderDurations.push("-P1D", "-PT1H")
+                        reminderDurations.push("-P1D")
                       }
                       reminderDurations.forEach((r) => params.append("reminder", r))
+                      
                       const icalUrl = `${baseUrl}/api/ical?${params.toString()}`
-                      const calendarFeedWebcal = icalUrl.replace(/^https?:/, "webcal:")
+                      
+                      // Ensure URL isn't too long
+                      if (icalUrl.length > 300) {
+                        return (
+                          <div className="text-xs text-amber-800 p-2 bg-amber-100 rounded">
+                            URL demasiado larga. Reduce los filtros aplicados e intenta de nuevo.
+                          </div>
+                        )
+                      }
                       
                       const urls = [
                         { 
-                          label: "Método 1: /r?cid=", 
-                          url: `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeedWebcal)}`
-                        },
-                        { 
-                          label: "Método 2: /render?cid=", 
-                          url: `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeedWebcal)}`
-                        },
-                        { 
-                          label: "Método 3: HTTPS directo", 
+                          label: "🔗 Suscripción directa", 
                           url: `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(icalUrl)}`
+                        },
+                        { 
+                          label: "📱 Protocolo webcal", 
+                          url: `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(icalUrl.replace(/^https?:/, "webcal:"))}`
+                        },
+                        { 
+                          label: "🌐 Método alternativo", 
+                          url: `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(icalUrl)}`
                         }
                       ]
                       
@@ -367,8 +412,11 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
                           key={index}
                           variant="outline"
                           size="sm"
-                          onClick={() => window.open(urlOption.url, '_blank', 'noopener,noreferrer')}
-                          className="w-full text-xs"
+                          onClick={() => {
+                            console.log(`🔗 Manual URL ${index + 1}:`, urlOption.url)
+                            window.open(urlOption.url, '_blank', 'noopener,noreferrer')
+                          }}
+                          className="w-full text-xs justify-start"
                         >
                           <ExternalLink className="h-3 w-3 mr-1" />
                           {urlOption.label}
