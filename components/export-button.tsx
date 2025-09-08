@@ -75,17 +75,28 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
       reminderDurations.forEach((r) => params.append("reminder", r))
 
       const icalUrl = `${baseUrl}/api/ical?${params.toString()}`
-      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
       
-      // Use the correct Google Calendar subscription URL format
-      // This should trigger the "Add this calendar?" popup with Add/Cancel buttons
-      const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeed)}`
+      // Try multiple URL formats for maximum compatibility
+      const calendarFeedWebcal = icalUrl.replace(/^https?:/, "webcal:")
+      const calendarFeedHttp = icalUrl // Keep original HTTP/HTTPS
       
-      console.log("🔗 Opening Google Calendar with URL:", googleCalendarUrl)
-      console.log("📱 Calendar feed URL:", calendarFeed)
+      console.log("🔗 iCal URL (HTTPS):", calendarFeedHttp)
+      console.log("📱 Calendar feed (webcal):", calendarFeedWebcal)
+      
+      // Try the most common Google Calendar URL patterns
+      const googleCalendarUrls = [
+        `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeedWebcal)}`,
+        `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeedWebcal)}`,
+        `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeedHttp)}`,
+      ]
+      
+      console.log("🔗 Trying Google Calendar URLs:", googleCalendarUrls)
+      
+      // Use the first URL format (most reliable)
+      const googleCalendarUrl = googleCalendarUrls[0]
       
       // Open the calendar subscription page
-      const newWindow = window.open(googleCalendarUrl, '_blank', 'noopener,noreferrer,width=800,height=600')
+      const newWindow = window.open(googleCalendarUrl, '_blank', 'noopener,noreferrer')
       
       if (newWindow) {
         console.log("✅ Google Calendar window opened successfully")
@@ -299,10 +310,10 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
               <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                 <p className="font-medium text-blue-900 mb-2">¿Qué verás en Google Calendar?</p>
                 <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
-                  <li>Una ventana emergente con el título "¿Agregar este calendario?"</li>
+                  <li>Una ventana emergente con el título "¿Agregar este calendario?" o "Add calendar"</li>
                   <li>El nombre del calendario: "Recordatorios de exámenes"</li>
-                  <li>Botones de "Agregar calendario" y "Cancelar"</li>
-                  <li>Haz clic en <strong>"Agregar calendario"</strong> para confirmar</li>
+                  <li>Botones de "Agregar calendario" y "Cancelar" (o "Add" y "Cancel")</li>
+                  <li>Haz clic en <strong>"Agregar calendario"</strong> o <strong>"Add"</strong> para confirmar</li>
                   <li>El calendario aparecerá en tu lista de calendarios y se sincronizará automáticamente</li>
                 </ol>
               </div>
@@ -310,12 +321,11 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
               <div className="flex items-start gap-2 bg-amber-50 p-3 rounded-lg border border-amber-200">
                 <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
                 <div className="text-sm">
-                  <p className="font-medium text-amber-900">¿No se abrió la ventana?</p>
-                  <p className="text-amber-800 mb-2">Verifica que tu navegador no esté bloqueando ventanas emergentes para este sitio.</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
+                  <p className="font-medium text-amber-900">¿No aparece el diálogo de suscripción?</p>
+                  <p className="text-amber-800 mb-2">Prueba estos enlaces alternativos:</p>
+                  <div className="space-y-1">
+                    {/* Generate alternative URLs for manual testing */}
+                    {(() => {
                       const baseUrl = window.location.origin
                       const params = new URLSearchParams()
                       params.set("name", "Recordatorios de exámenes")
@@ -335,15 +345,37 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
                       }
                       reminderDurations.forEach((r) => params.append("reminder", r))
                       const icalUrl = `${baseUrl}/api/ical?${params.toString()}`
-                      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
-                      const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeed)}`
-                      window.open(googleCalendarUrl, '_blank', 'noopener,noreferrer,width=800,height=600')
-                    }}
-                    className="mt-1"
-                  >
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    Abrir manualmente
-                  </Button>
+                      const calendarFeedWebcal = icalUrl.replace(/^https?:/, "webcal:")
+                      
+                      const urls = [
+                        { 
+                          label: "Método 1: /r?cid=", 
+                          url: `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeedWebcal)}`
+                        },
+                        { 
+                          label: "Método 2: /render?cid=", 
+                          url: `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeedWebcal)}`
+                        },
+                        { 
+                          label: "Método 3: HTTPS directo", 
+                          url: `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(icalUrl)}`
+                        }
+                      ]
+                      
+                      return urls.map((urlOption, index) => (
+                        <Button
+                          key={index}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(urlOption.url, '_blank', 'noopener,noreferrer')}
+                          className="w-full text-xs"
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          {urlOption.label}
+                        </Button>
+                      ))
+                    })()}
+                  </div>
                 </div>
               </div>
             </DialogDescription>
