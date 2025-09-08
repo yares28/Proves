@@ -75,6 +75,29 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
+  /* Custom scrollbars for scrollable lists: old shape, current colors */
+  .scroll-custom {
+    /* Firefox colors */
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--ring)) hsl(var(--muted));
+  }
+  .scroll-custom::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scroll-custom::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 8px;
+  }
+  .scroll-custom::-webkit-scrollbar-thumb {
+    background: hsl(var(--ring));
+    border-radius: 8px;
+    border: 2px solid hsl(var(--muted));
+  }
+  .scroll-custom::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary));
+  }
+
   h1,
   h2,
   h3,

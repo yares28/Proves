@@ -1,0 +1,23 @@
+# AI crawler preferences for UPV-Cal
+# This non-standard file is adopted by several AI crawlers. Keep robots.txt authoritative.
+
+User-Agent: *
+Allow: /
+
+# Major AI crawlers
+User-Agent: GPTBot
+Allow: /
+
+User-Agent: Google-Extended
+Allow: /
+
+User-Agent: ClaudeBot
+Allow: /
+
+User-Agent: CCBot
+Allow: /
+
+Sitemap: /sitemap.xml
+Host: /
+
+

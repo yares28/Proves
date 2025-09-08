@@ -23,6 +23,7 @@ import java.util.Optional;
 public class SupabaseClientService {
 
     private final SupabaseClient supabaseClient;
+    private static final String EXAMS_TABLE = System.getenv().getOrDefault("EXAMS_TABLE", "25-26");
 
     /**
      * Creates a user client for authenticated operations
@@ -72,7 +73,7 @@ public class SupabaseClientService {
     }
 
     /**
-     * Gets exams from the ETSINF table using Supabase REST API
+     * Gets exams from the exams table using Supabase REST API
      */
     public Optional<List<ExamDto>> getExamsFromSupabase() {
         log.info("🔄 [SERVICE] Getting exams from Supabase...");
@@ -81,7 +82,7 @@ public class SupabaseClientService {
         filters.put("select", "*");
         filters.put("order", "exam_date.asc");
 
-        return supabaseClient.query("ETSINF", filters, List.class)
+        return supabaseClient.query(EXAMS_TABLE, filters, List.class)
                 .map(response -> {
                     // Convert JsonNode response to ExamDto list
                     // This would need proper deserialization logic
@@ -101,7 +102,7 @@ public class SupabaseClientService {
         filters.put("degree", "eq." + degree);
         filters.put("order", "exam_date.asc");
 
-        return supabaseClient.query("ETSINF", filters, List.class)
+        return supabaseClient.query(EXAMS_TABLE, filters, List.class)
                 .map(response -> {
                     log.info("✅ [SERVICE] Retrieved exams for degree: {} from Supabase", degree);
                     return null; // Placeholder for actual conversion
@@ -114,7 +115,7 @@ public class SupabaseClientService {
     public Optional<ExamDto> createExamInSupabase(ExamDto examDto) {
         log.info("🔄 [SERVICE] Creating exam in Supabase...");
 
-        return supabaseClient.insert("ETSINF", examDto, ExamDto.class);
+        return supabaseClient.insert(EXAMS_TABLE, examDto, ExamDto.class);
     }
 
     /**
@@ -123,7 +124,7 @@ public class SupabaseClientService {
     public Optional<ExamDto> updateExamInSupabase(Long id, ExamDto examDto) {
         log.info("🔄 [SERVICE] Updating exam {} in Supabase...", id);
 
-        return supabaseClient.update("ETSINF", examDto, id.toString(), ExamDto.class);
+        return supabaseClient.update(EXAMS_TABLE, examDto, id.toString(), ExamDto.class);
     }
 
     /**
@@ -132,7 +133,7 @@ public class SupabaseClientService {
     public boolean deleteExamFromSupabase(Long id) {
         log.info("🔄 [SERVICE] Deleting exam {} from Supabase...", id);
 
-        return supabaseClient.delete("ETSINF", id.toString(), Void.class).isPresent();
+        return supabaseClient.delete(EXAMS_TABLE, id.toString(), Void.class).isPresent();
     }
 
     /**
@@ -200,7 +201,7 @@ public class SupabaseClientService {
         filters.put("textSearch", searchTerm);
         filters.put("order", "exam_date.asc");
 
-        return supabaseClient.query("ETSINF", filters, List.class)
+        return supabaseClient.query(EXAMS_TABLE, filters, List.class)
                 .map(response -> {
                     log.info("✅ [SERVICE] Search completed in Supabase");
                     return null; // Placeholder for actual conversion
@@ -217,7 +218,7 @@ public class SupabaseClientService {
         filters.put("select", "degree");
         filters.put("order", "degree.asc");
 
-        return supabaseClient.query("ETSINF", filters, List.class)
+        return supabaseClient.query(EXAMS_TABLE, filters, List.class)
                 .map(response -> {
                     log.info("✅ [SERVICE] Retrieved distinct degrees from Supabase");
                     return null; // Placeholder for actual conversion

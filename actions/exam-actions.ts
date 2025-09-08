@@ -1,6 +1,6 @@
 "use server"
 
-import { supabase } from "@/lib/supabase"
+import { supabase, EXAMS_TABLE, resolveExamsTable } from "@/lib/supabase"
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database.types'
 import type { ExamFilters } from "@/types/exam"
@@ -94,7 +94,8 @@ const cache = {
 
 export async function getExams(
   filters: ExamFilters = {},
-  client: SupabaseClient<Database> = supabase
+  client: SupabaseClient<Database> = supabase,
+  tableName?: string
 ) {
   // Check cache expiry first
   cache.checkExpiry();
@@ -150,7 +151,7 @@ export async function getExams(
     
     // Only select needed columns for better network performance
     let query = (client as any)
-      .from('ETSINF')
+      .from(((tableName ?? await resolveExamsTable())) as any)
       .select('exam_instance_id, exam_date, exam_time, duration_minutes, code, subject, acronym, degree, year, semester, place, comment, school')
       .order('exam_date', { ascending: true });
 
@@ -339,7 +340,7 @@ export async function getDegrees(schools?: string | string[]) {
     
     // Only select what we need
     let query = supabase
-      .from('ETSINF')
+      .from((await resolveExamsTable()) as any)
       .select('degree')
       .order('degree', { ascending: true });
 
@@ -376,7 +377,7 @@ export async function getDegrees(schools?: string | string[]) {
   }
 }
 
-export async function getSchools() {
+export async function getSchools(tableName?: string) {
   // Check cache expiry
   cache.checkExpiry();
   
@@ -393,7 +394,7 @@ export async function getSchools() {
     // Use a more efficient query that leverages indexes
     // Only select distinct school column, which should use an index
     const { data, error } = await supabase
-      .from('ETSINF')
+      .from(((tableName ?? await resolveExamsTable())) as any)
       .select('school')
       .order('school', { ascending: true });
 
@@ -449,7 +450,7 @@ export async function getSemesters(
     
     // Only select what we need
     let query = supabase
-      .from('ETSINF')
+      .from((await resolveExamsTable()) as any)
       .select('semester');
     
     // Apply filters to leverage indexes - ordered from most selective to least
@@ -532,7 +533,7 @@ export async function getYears(
     
     // Only select what we need
     let query = supabase
-      .from('ETSINF')
+      .from((await resolveExamsTable()) as any)
       .select('year');
     
     // Apply filters to leverage indexes - ordered from most selective to least
@@ -597,7 +598,8 @@ export async function getSubjects(
   schools?: string | string[],
   degrees?: string | string[],
   semesters?: string | string[],
-  years?: string | string[]
+  years?: string | string[],
+  tableName?: string
 ): Promise<string[]> {
   // Check cache expiry
   cache.checkExpiry();
@@ -628,7 +630,7 @@ export async function getSubjects(
     
     // Select only the columns we need
     let query = supabase
-      .from('ETSINF')
+      .from(((tableName ?? await resolveExamsTable())) as any)
       .select('subject, acronym')
       .order('subject', { ascending: true });
     
@@ -724,7 +726,7 @@ export async function debugCheckDataExists(
     const yearValues = years.map(y => isNaN(Number(y)) ? y : Number(y));
     
     let query = supabase
-      .from('ETSINF')
+      .from((await resolveExamsTable()) as any)
       .select('subject, acronym, school, degree, semester, year')
       .limit(5);
     
@@ -807,7 +809,7 @@ export async function getAcronyms(
   try {
     // Use the same approach as other functions - query the ETSINF table
     const { data, error } = await client
-      .from('ETSINF' as any) // Type assertion for now since ETSINF is not in types
+      .from((await resolveExamsTable()) as any)
       .select('acronym')
       .not('acronym', 'is', null)
       .not('acronym', 'eq', '')
@@ -857,7 +859,7 @@ export async function getFilteredAcronyms(
   
   try {
     let query = client
-      .from('ETSINF' as any)
+      .from((await resolveExamsTable()) as any)
       .select('acronym')
       .not('acronym', 'is', null)
       .not('acronym', 'eq', '')
@@ -916,7 +918,7 @@ export async function getFilteredAcronymsAndSubjects(
   }
   try {
     let query = (client as any)
-      .from('ETSINF')
+      .from((await resolveExamsTable()) as any)
       .select('acronym, subject')
       .not('acronym', 'is', null)
       .not('acronym', 'eq', '')
