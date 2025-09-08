@@ -373,6 +373,8 @@ export default function MyCalendarsPage() {
 
   const exportExamsToGoogleCalendar = async (calendar: SavedCalendar) => {
     try {
+      console.log("🔄 Starting Google Calendar export for calendar:", calendar.name);
+
       // Use production domain instead of localhost to prevent Google Calendar refresh loops
       let baseUrl = window.location.origin;
 
@@ -387,18 +389,77 @@ export default function MyCalendarsPage() {
       const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
 
-      // Use Google Calendar's modern subscription URL with /r?cid= pattern
-      // This opens the "Add this calendar?" dialog with Add/Cancel options
-      const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(
+      console.log("📅 Generated iCal URLs:", {
+        icalUrl,
         calendarFeed
-      )}`;
+      });
 
-      // Open Google Calendar in a new tab with proper security attributes
-      window.open(googleCalendarUrl, "_blank", "noopener,noreferrer");
+      // Test the iCal URL first to make sure it's working
+      console.log("🧪 Testing iCal URL accessibility:", icalUrl);
+      
+      try {
+        const testResponse = await fetch(icalUrl, { method: 'HEAD' });
+        console.log("📊 iCal URL test result:", {
+          status: testResponse.status,
+          statusText: testResponse.statusText,
+          headers: Object.fromEntries(testResponse.headers.entries())
+        });
+      } catch (testError) {
+        console.error("❌ iCal URL test failed:", testError);
+        toast({
+          title: "Error de Calendario",
+          description: "No se pudo acceder al feed del calendario. Verifica que el calendario existe.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Multiple Google Calendar URL patterns for compatibility
+      const googleCalendarUrls = [
+        // Modern pattern (current primary)
+        `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`,
+        // Alternative modern pattern
+        `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeed)}`,
+        // Direct ICS import pattern
+        `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(icalUrl)}`,
+      ];
+
+      console.log("🔗 Testing Google Calendar URL patterns:", googleCalendarUrls);
+
+      // Try the primary URL first
+      const primaryGoogleCalendarUrl = googleCalendarUrls[0];
+      console.log("🔗 Using primary Google Calendar URL:", primaryGoogleCalendarUrl);
+
+      // Use anchor element approach to avoid popup blockers (same as export-button.tsx)
+      const openCalendar = () => {
+        const link = document.createElement('a');
+        link.href = primaryGoogleCalendarUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.setAttribute('aria-label', `Abrir Google Calendar para suscribirse al calendario ${calendar.name}`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Fallback: if the primary doesn't work, provide manual options
+        setTimeout(() => {
+          if (confirm("¿No se abrió Google Calendar? Haz clic en OK para probar un método alternativo.")) {
+            const fallbackLink = document.createElement('a');
+            fallbackLink.href = googleCalendarUrls[1];
+            fallbackLink.target = '_blank';
+            fallbackLink.rel = 'noopener noreferrer';
+            document.body.appendChild(fallbackLink);
+            fallbackLink.click();
+            document.body.removeChild(fallbackLink);
+          }
+        }, 3000);
+      };
+
+      openCalendar();
 
       toast({
         title: "Redirigiendo a Google Calendar",
-        description: "Se abrirá Google Calendar con el enlace de suscripción.",
+        description: "Se abrirá Google Calendar con el enlace de suscripción para " + calendar.name,
       });
     } catch (error) {
       console.error("❌ Error opening Google Calendar:", error);

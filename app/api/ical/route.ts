@@ -43,19 +43,6 @@ function parseReminderDurations(searchParams: URLSearchParams): number[] | undef
   return Array.from(new Set(minutes)).sort((a, b) => b - a);
 }
 
-// Handle CORS preflight requests
-export async function OPTIONS(req: NextRequest) {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Max-Age": "86400",
-    },
-  });
-}
-
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
@@ -80,27 +67,10 @@ export async function GET(req: NextRequest) {
     return new NextResponse(ics, {
       status: 200,
       headers: {
-        // Essential iCal headers
         "Content-Type": "text/calendar; charset=utf-8",
         "Content-Disposition": `inline; filename=upv-exams.ics`,
-        
-        // Cache control for dynamic calendar content
         "Cache-Control": "no-store, must-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0",
-        
-        // CORS headers for cross-origin calendar subscription
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Max-Age": "86400",
-        
-        // Calendar-specific headers for better client recognition
-        "X-Content-Type-Options": "nosniff",
-        "X-Robots-Tag": "noindex, nofollow",
-        
-        // Support for both webcal and https protocols
-        "Link": `<webcal://${req.headers.get('host')}${req.nextUrl.pathname}${req.nextUrl.search}>; rel="alternate"; type="text/calendar"`,
+        Pragma: "no-cache",
       },
     });
   } catch (err) {
