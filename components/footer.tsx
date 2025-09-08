@@ -126,12 +126,12 @@ export function Footer() {
             <h3 className="mb-6 text-sm font-semibold uppercase tracking-wider">Documentación</h3>
             <ul className="space-y-4 text-sm">
               <li>
-                <Link href="#" className="text-muted-foreground transition-colors hover:text-primary">
+                <Link href="/lista-examenes" className="text-muted-foreground transition-colors hover:text-primary">
                   Lista de exámenes
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-muted-foreground transition-colors hover:text-primary">
+                <Link href="/lista-examenes-anteriores" className="text-muted-foreground transition-colors hover:text-primary">
                   Lista de exámenes de años anteriores
                 </Link>
               </li>

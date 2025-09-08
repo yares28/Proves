@@ -56,6 +56,7 @@ import {
   getUserCalendarNames,
 } from "@/actions/user-calendars";
 import { getCurrentSession, getFreshAuthTokens } from "@/utils/auth-helpers";
+import type { Exam } from "@/types/exam";
 
 // Default URL for SSR - will be updated on client
 const DEFAULT_GOOGLE_ICAL_BASE_URL = "https://upv-cal.vercel.app";
@@ -154,7 +155,7 @@ export function CalendarDisplay({
           activeFilters
         );
         // Pass filters directly to getExams
-        const data = await getExams(activeFilters);
+        const data = (await getExams(activeFilters)) as Exam[];
         console.log(
           `CalendarDisplay - Fetched ${data.length} exams. Sample:`,
           data.slice(0, 2)
@@ -162,8 +163,8 @@ export function CalendarDisplay({
 
         // For debugging - log all unique dates in the exam data
         if (data.length > 0) {
-          const uniqueDates = [
-            ...new Set(data.map((exam) => exam.date)),
+          const uniqueDates: string[] = [
+            ...new Set(data.map((exam: Exam) => exam.date)),
           ].sort();
           console.log("CalendarDisplay - Unique exam dates:", uniqueDates);
 
@@ -686,57 +687,29 @@ export function CalendarDisplay({
                                                 key={exam.id}
                                                 className={styles.examCard}
                                               >
-                                                <div className="mb-1 font-medium">
-                                                  {exam.name || exam.subject}
+                                                <div className="flex justify-between mb-1">
+                                                  <span className="font-medium">{exam.name || exam.subject}</span>
+                                                  <Badge variant="outline" className="text-xs">
+                                                    {new Date(exam.date).toLocaleDateString()}
+                                                  </Badge>
                                                 </div>
-                                                <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                                                   <span className="flex items-center gap-1">
                                                     <Clock className="h-3 w-3" />
                                                     {exam.time}
                                                   </span>
                                                   <span className="flex items-center gap-1">
                                                     <MapPin className="h-3 w-3" />
-                                                    {exam.location ||
-                                                      "No location"}
+                                                    {exam.location || "No location"}
                                                   </span>
                                                 </div>
                                                 <div className="flex flex-wrap gap-1">
-                                                  {exam.school && (
-                                                    <Badge
-                                                      variant="outline"
-                                                      className="text-xs"
-                                                    >
-                                                      {exam.school}
-                                                    </Badge>
-                                                  )}
-                                                  {exam.degree && (
-                                                    <Badge
-                                                      variant="outline"
-                                                      className="text-xs"
-                                                    >
-                                                      {exam.degree}
-                                                    </Badge>
-                                                  )}
-                                                  <Badge
-                                                    variant="outline"
-                                                    className="text-xs"
-                                                  >
+                                                  <Badge variant="secondary" className="text-xs">
                                                     {exam.year || "?"} Year
                                                   </Badge>
-                                                  <Badge
-                                                    variant="outline"
-                                                    className="text-xs"
-                                                  >
+                                                  <Badge variant="secondary" className="text-xs">
                                                     Sem. {exam.semester || "?"}
                                                   </Badge>
-                                                  {exam.code && (
-                                                    <Badge
-                                                      variant="secondary"
-                                                      className="text-xs"
-                                                    >
-                                                      Code: {exam.code}
-                                                    </Badge>
-                                                  )}
                                                 </div>
                                               </div>
                                             ))}
@@ -778,81 +751,88 @@ export function CalendarDisplay({
                 })}
               </TooltipProvider>
             </div>
-            <div className="mt-8 rounded-lg border bg-card p-5 shadow-sm">
-              {exams.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {exams
-                      .sort(
-                        (a, b) =>
-                          new Date(a.date).getTime() -
-                          new Date(b.date).getTime()
-                      ) // Sort by date ascending
-                      .slice(0, 6) // Show first 6 upcoming exams
-                      .map((exam) => (
-                        <div key={exam.id} className={styles.examCard}>
-                          <div className="flex justify-between mb-1">
-                            <span className="font-medium">{exam.name || exam.subject}</span>
-                            <Badge variant="outline">
-                              {new Date(exam.date).toLocaleDateString()}
-                            </Badge>
+            <Card className="mt-8 border bg-card/60 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/50">
+              <CardHeader className="flex flex-row items-center justify-between py-4">
+                <CardTitle className="text-base font-medium">Próximos exámenes</CardTitle>
+                {exams.length > 0 && (
+                  <Badge variant="secondary" className="text-xs">{exams.length}</Badge>
+                )}
+              </CardHeader>
+              <CardContent className="p-5">
+                {exams.length > 0 ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {exams
+                        .sort(
+                          (a, b) =>
+                            new Date(a.date).getTime() -
+                            new Date(b.date).getTime()
+                        )
+                        .slice(0, 6)
+                        .map((exam) => (
+                          <div
+                            key={exam.id}
+                            className="group rounded-lg border bg-background/50 p-4 transition-colors hover:bg-accent"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <span className="font-medium leading-tight">
+                                {exam.name || exam.subject}
+                              </span>
+                              <Badge variant="outline" className="text-xs">
+                                {new Date(exam.date).toLocaleDateString()}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground mb-2">
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {exam.time}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {exam.location || "No location"}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              <Badge variant="secondary" className="text-xs">{exam.year} Year</Badge>
+                              <Badge variant="secondary" className="text-xs">Sem. {exam.semester}</Badge>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {exam.time}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {exam.location || "No location"}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            <Badge variant="secondary" className="text-xs">
-                              {exam.year} Year
-                            </Badge>
-                            <Badge variant="secondary" className="text-xs">
-                              Sem. {exam.semester}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-
-                  {exams.length > 6 && (
-                    <div className="flex justify-center">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => updateSettings({ viewMode: "list" })}
-                        className="mt-2"
-                      >
-                        View All {exams.length} Exams
-                      </Button>
+                        ))}
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
-                  <Calendar className="h-12 w-12 mb-4 opacity-20" />
-                  {!hasMeaningfulFilters() ? (
-                    <>
-                      <p>Select your exam criteria to view the calendar</p>
-                      <p className="text-sm mt-2">
-                        Choose your year, semester, or specific subjects to see your exam schedule.
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p>No exams found for the selected filters.</p>
-                      <p className="text-sm mt-2">
-                        Try adjusting your filter criteria to see exams.
-                      </p>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
+
+                    {exams.length > 6 && (
+                      <div className="flex justify-center">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateSettings({ viewMode: "list" })}
+                          className="mt-2"
+                        >
+                          Ver los {exams.length} exámenes
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                    <Calendar className="h-12 w-12 mb-4 opacity-20" />
+                    {!hasMeaningfulFilters() ? (
+                      <>
+                        <p>Selecciona tus criterios para ver el calendario</p>
+                        <p className="text-sm mt-2">
+                          Elige tu curso, cuatrimestre o asignaturas para ver tus exámenes.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p>No se han encontrado exámenes con los filtros seleccionados.</p>
+                        <p className="text-sm mt-2">Prueba a ajustar los filtros.</p>
+                      </>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </motion.div>
         ) : (
           <motion.div
