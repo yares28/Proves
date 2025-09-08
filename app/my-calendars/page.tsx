@@ -385,13 +385,26 @@ export default function MyCalendarsPage() {
           process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
       }
 
-      // Construct iCal calendar feed URL using webcal protocol for better calendar app integration
-      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
+      // Use the working /api/ical endpoint with calendar filters instead of calendar-specific route
+      // Build URL parameters from the calendar's saved filters
+      const params = new URLSearchParams();
+      params.set("name", calendar.name);
+      
+      // Add all the calendar's filters as URL parameters
+      Object.entries(calendar.filters).forEach(([key, values]) => {
+        if (Array.isArray(values)) {
+          values.forEach(value => params.append(key, value));
+        }
+      });
+
+      // Construct iCal calendar feed URL using the working /api/ical endpoint
+      const icalUrl = `${baseUrl}/api/ical?${params.toString()}`;
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
 
       console.log("📅 Generated iCal URLs:", {
         icalUrl,
-        calendarFeed
+        calendarFeed,
+        filters: calendar.filters
       });
 
       // Test the iCal URL first to make sure it's working
@@ -404,11 +417,21 @@ export default function MyCalendarsPage() {
           statusText: testResponse.statusText,
           headers: Object.fromEntries(testResponse.headers.entries())
         });
+        
+        if (!testResponse.ok) {
+          console.error("❌ iCal URL returned error status:", testResponse.status);
+          toast({
+            title: "Error de Calendario",
+            description: `El feed del calendario devolvió un error: ${testResponse.status}`,
+            variant: "destructive",
+          });
+          return;
+        }
       } catch (testError) {
         console.error("❌ iCal URL test failed:", testError);
         toast({
           title: "Error de Calendario",
-          description: "No se pudo acceder al feed del calendario. Verifica que el calendario existe.",
+          description: "No se pudo acceder al feed del calendario. Verifica tu conexión a internet.",
           variant: "destructive",
         });
         return;
@@ -473,8 +496,24 @@ export default function MyCalendarsPage() {
 
   const handleAppleCalendarExport = async (calendar: SavedCalendar) => {
     try {
-      const baseUrl = window.location.origin;
-      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
+      let baseUrl = window.location.origin;
+
+      // If we're in development or localhost, use a production URL
+      if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")) {
+        baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
+      }
+
+      // Build URL parameters from the calendar's saved filters
+      const params = new URLSearchParams();
+      params.set("name", calendar.name);
+      
+      Object.entries(calendar.filters).forEach(([key, values]) => {
+        if (Array.isArray(values)) {
+          values.forEach(value => params.append(key, value));
+        }
+      });
+
+      const icalUrl = `${baseUrl}/api/ical?${params.toString()}`;
       // Convert http/https to webcal protocol for Apple Calendar
       const webcalUrl = icalUrl.replace(/^https?:/, "webcal:");
 
@@ -483,8 +522,7 @@ export default function MyCalendarsPage() {
 
       toast({
         title: "Abriendo Apple Calendar",
-        description:
-          "Se intentará abrir Apple Calendar con el enlace de suscripción.",
+        description: `Se intentará abrir Apple Calendar con el calendario "${calendar.name}".`,
       });
     } catch (error) {
       console.error("❌ Error opening Apple Calendar:", error);
@@ -503,14 +541,14 @@ export default function MyCalendarsPage() {
         calendar.name
       );
 
-      // Fetch exams for this calendar
+      // Fetch exams for this calendar using its filters
       const exams = await getExams(calendar.filters);
 
       if (exams.length === 0) {
         toast({
           title: "Sin exámenes",
           description:
-            "No hay exámenes para exportar con los filtros actuales.",
+            "No hay exámenes para exportar con los filtros de este calendario.",
           variant: "destructive",
         });
         return;
@@ -624,8 +662,18 @@ export default function MyCalendarsPage() {
           process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
       }
 
-      // Generate the iCal subscription URL using the calendar ID to get the specific calendar with its filters
-      const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
+      // Build URL parameters from the calendar's saved filters
+      const params = new URLSearchParams();
+      params.set("name", calendar.name);
+      
+      Object.entries(calendar.filters).forEach(([key, values]) => {
+        if (Array.isArray(values)) {
+          values.forEach(value => params.append(key, value));
+        }
+      });
+
+      // Generate the iCal subscription URL using the working /api/ical endpoint
+      const icalUrl = `${baseUrl}/api/ical?${params.toString()}`;
 
       console.log("🔗 [DEBUG] Generated iCal URL:", icalUrl);
 
@@ -635,7 +683,7 @@ export default function MyCalendarsPage() {
       toast({
         title: "¡URL copiada!",
         description:
-          "El enlace de suscripción se ha copiado al portapapeles. Pégalo en Google Calendar para añadir la suscripción.",
+          `El enlace de suscripción del calendario "${calendar.name}" se ha copiado al portapapeles.`,
       });
     } catch (error) {
       console.error("❌ Error copying URL:", error);
