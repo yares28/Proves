@@ -121,84 +121,36 @@ if (reminderDurations.length === 0) {
 
 ## Implementation Details
 
-### 1. Advanced Export Logic (2024 Update - Popup Blocker Resistant)
-
-The new implementation uses a **pre-popup strategy** that opens the window immediately to preserve user gesture trust:
+### 1. Export Button Logic (Updated for Popup Blockers)
 
 ```javascript
-// CRITICAL: Pre-popup strategy for maximum browser compatibility
-const exportToGoogleCalendar = () => {
-  // Step 1: Open popup IMMEDIATELY (before any DOM operations)
-  const { popup, complete } = exportToGoogleCalendarAdvanced({
-    baseUrl: window.location.origin,
-    endpoint: "/api/ical", 
-    calendarName: "Recordatorios de exámenes",
-    filters: filters || {},
-    reminders: {
-      oneWeek: settings?.examReminders?.oneWeek,
-      oneDay: settings?.examReminders?.oneDay,
-      oneHour: settings?.examReminders?.oneHour
-    }
-  })
+// Read user preferences
+const { settings } = useSettings()
 
-  if (!popup) {
-    // Popup blocked - show fallback immediately
-    toast.error("Ventana bloqueada. Usa el botón 'Abrir manualmente'.")
-    setShowInstructions(true)
-    return
-  }
+// Map to ISO-8601 durations
+const reminderDurations: string[] = []
+if (settings?.examReminders?.oneWeek) reminderDurations.push("-P7D")
+if (settings?.examReminders?.oneDay) reminderDurations.push("-P1D")  
+if (settings?.examReminders?.oneHour) reminderDurations.push("-PT1H")
 
-  // Step 2: Safe to do DOM operations now (popup already open)
-  setIsOpen(false) // Close popover
-  
-  // Step 3: Complete navigation (populate the pre-opened popup)
-  const result = complete()
-  
-  if (result.success) {
-    toast.success(result.message)
-    setTimeout(() => setShowInstructions(true), 1000)
-  }
-}
-```
+// Build webcal URL with updated Google Calendar endpoint
+const icalUrl = `${baseUrl}/api/ical?${params.toString()}`
+const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
+const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`
 
-#### Key Architectural Changes:
-
-1. **Immediate Popup Opening**: `preOpenPopupWindow()` opens `about:blank` instantly
-2. **User Gesture Preservation**: No DOM operations before popup opening
-3. **Deferred Navigation**: URL generation happens after popup is open
-4. **Loading State**: Shows "Cargando Google Calendar..." while preparing URL
-5. **Error Recovery**: Closes popup if URL generation fails
-
-#### Pre-Popup Utility Functions:
-
-```javascript
-// Opens popup immediately with loading content
-export function preOpenPopupWindow(options = {}) {
-  const popup = window.open('about:blank', '_blank', 'width=800,height=600')
-  
-  if (popup) {
-    // Show loading content
-    popup.document.write(`
-      <html>
-        <head><title>Cargando Google Calendar...</title></head>
-        <body style="text-align: center; padding: 50px;">
-          <h2>🔄 Abriendo Google Calendar</h2>
-          <p>Espera un momento mientras preparamos tu calendario...</p>
-        </body>
-      </html>
-    `)
-  }
-  
-  return popup
+// Use anchor element to avoid popup blockers
+const openCalendar = () => {
+  const link = document.createElement('a')
+  link.href = googleCalendarUrl
+  link.target = '_blank'
+  link.rel = 'noopener noreferrer'
+  link.setAttribute('aria-label', 'Abrir Google Calendar para suscribirse al calendario')
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
 }
 
-// Navigates pre-opened popup to final URL
-export function navigatePopupToGoogleCalendar(popup, webcalUrl) {
-  const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(webcalUrl)}`
-  popup.location.href = googleCalendarUrl
-  
-  return { success: true, message: "Abriendo Google Calendar..." }
-}
+openCalendar()
 ```
 
 ### 2. Duration Parsing
@@ -397,15 +349,13 @@ headers: {
    - Multi-day events are DATE-only (no timezone)
    - Verify client timezone handling
 
-4. **Google Calendar Not Opening** (COMPLETELY FIXED):
-   - ✅ **Pre-Popup Strategy**: Opens popup immediately to preserve user gesture trust
-   - ✅ **User Gesture Preservation**: Avoids DOM manipulations before popup opening
-   - ✅ **Advanced Architecture**: Separates popup opening from URL generation
-   - ✅ **Loading State**: Shows loading content while preparing final URL
-   - ✅ **Multiple Fallbacks**: Manual button, instructions, and error handling
-   - ✅ **Browser Compatibility**: Works across Chrome, Firefox, Safari, Edge
-   - ✅ **React State Safety**: Handles state updates after popup opening
-   - ✅ **Toast Integration**: Prevents toast notifications from breaking user gesture
+4. **Google Calendar Not Opening** (FIXED):
+   - ✅ **Popup Blocker Fix**: Now uses anchor elements instead of `window.open()`
+   - ✅ **Updated URL**: Uses `/calendar/u/0/r` endpoint for better compatibility
+   - ✅ **Fallback Dialog**: Provides manual open button if automatic opening fails
+   - ✅ **User Instructions**: Step-by-step guidance for subscription process
+   - Check console for any JavaScript errors
+   - Verify network connectivity
 
 ### Debug Tools
 

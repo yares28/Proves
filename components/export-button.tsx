@@ -16,7 +16,6 @@ import {
 import Image from "next/image"
 import { toast } from "sonner"
 import { useSettings } from "@/context/settings-context"
-import { exportToGoogleCalendarAdvanced } from "@/lib/google-calendar-export"
 
 interface ExportButtonProps {
   exams: any[]
@@ -47,44 +46,65 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
       return
     }
 
-    // CRITICAL: Use advanced pre-popup strategy to preserve user gesture
-    // Open popup IMMEDIATELY before any DOM manipulations
-    const { popup, complete } = exportToGoogleCalendarAdvanced({
-      baseUrl: window.location.origin,
-      endpoint: "/api/ical",
-      calendarName: "Recordatorios de exámenes",
-      filters: filters || {},
-      reminders: {
-        oneWeek: settings?.examReminders?.oneWeek,
-        oneDay: settings?.examReminders?.oneDay,
-        oneHour: settings?.examReminders?.oneHour
+    try {
+      const baseUrl = window.location.origin
+      const params = new URLSearchParams()
+      // Calendar name for the subscription
+      params.set("name", "Recordatorios de exámenes")
+
+      // Map filters into query params (arrays supported)
+      const keys = ["school", "degree", "year", "semester", "subject"] as const
+      keys.forEach((key) => {
+        const value = (filters && (filters as any)[key]) as string[] | undefined
+        if (Array.isArray(value)) {
+          value.forEach((v) => v && params.append(key, v))
+        }
+      })
+
+      // Map reminder settings to ISO-8601 negative durations
+      const reminderDurations: string[] = []
+      if (settings?.examReminders?.oneWeek) reminderDurations.push("-P7D")
+      if (settings?.examReminders?.oneDay) reminderDurations.push("-P1D")
+      if (settings?.examReminders?.oneHour) reminderDurations.push("-PT1H")
+      
+      // If no reminders are enabled, use defaults (1 day and 1 hour)
+      if (reminderDurations.length === 0) {
+        reminderDurations.push("-P1D", "-PT1H")
       }
-    })
+      
+      reminderDurations.forEach((r) => params.append("reminder", r))
 
-    if (!popup) {
-      // Popup was blocked immediately
-      toast.error("Ventana bloqueada. Usa el botón 'Abrir manualmente' en las instrucciones.")
-      setShowInstructions(true)
-      setIsOpen(false)
-      return
-    }
-
-    // Popup opened successfully, now we can safely do DOM operations
-    setIsOpen(false) // Close popover
-    
-    // Complete the navigation (this won't be blocked since popup is already open)
-    const result = complete()
-    
-    if (result.success) {
-      toast.success(result.message)
-      // Show instructions dialog after popup opens
-      setTimeout(() => {
+      const icalUrl = `${baseUrl}/api/ical?${params.toString()}`
+      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
+      
+      // Use the correct Google Calendar subscription URL format
+      // This should trigger the "Add this calendar?" popup with Add/Cancel buttons
+      const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeed)}`
+      
+      console.log("🔗 Opening Google Calendar with URL:", googleCalendarUrl)
+      console.log("📱 Calendar feed URL:", calendarFeed)
+      
+      // Open the calendar subscription page
+      const newWindow = window.open(googleCalendarUrl, '_blank', 'noopener,noreferrer,width=800,height=600')
+      
+      if (newWindow) {
+        console.log("✅ Google Calendar window opened successfully")
+        // Show instructions dialog after a short delay
+        setTimeout(() => {
+          setShowInstructions(true)
+        }, 500)
+      } else {
+        console.log("⚠️ Popup blocked, showing fallback instructions")
+        // Popup was blocked, show instructions immediately with manual link
         setShowInstructions(true)
-      }, 1000)
-    } else {
-      toast.error(result.message)
-      // Show instructions as fallback
-      setShowInstructions(true)
+      }
+      
+      // Close the export popover after successful action
+      setIsOpen(false)
+      
+    } catch (e) {
+      console.error('Google Calendar export error:', e)
+      toast.error("No se pudo abrir Google Calendar")
     }
   }
 
@@ -277,12 +297,13 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
               <p>Se ha abierto Google Calendar en una nueva ventana.</p>
               
               <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                <p className="font-medium text-blue-900 mb-2">Pasos a seguir:</p>
+                <p className="font-medium text-blue-900 mb-2">¿Qué verás en Google Calendar?</p>
                 <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
-                  <li>Busca la ventana de Google Calendar que se acaba de abrir</li>
-                  <li>Verás un diálogo para suscribirte al calendario</li>
-                  <li>Haz clic en "Añadir" o "Suscribirse" para confirmar</li>
-                  <li>El calendario se actualizará automáticamente con nuevos exámenes</li>
+                  <li>Una ventana emergente con el título "¿Agregar este calendario?"</li>
+                  <li>El nombre del calendario: "Recordatorios de exámenes"</li>
+                  <li>Botones de "Agregar calendario" y "Cancelar"</li>
+                  <li>Haz clic en <strong>"Agregar calendario"</strong> para confirmar</li>
+                  <li>El calendario aparecerá en tu lista de calendarios y se sincronizará automáticamente</li>
                 </ol>
               </div>
 
@@ -295,30 +316,28 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      // Use the same advanced pre-popup strategy
-                      const { popup, complete } = exportToGoogleCalendarAdvanced({
-                        baseUrl: window.location.origin,
-                        endpoint: "/api/ical",
-                        calendarName: "Recordatorios de exámenes",
-                        filters: filters || {},
-                        reminders: {
-                          oneWeek: settings?.examReminders?.oneWeek,
-                          oneDay: settings?.examReminders?.oneDay,
-                          oneHour: settings?.examReminders?.oneHour
+                      const baseUrl = window.location.origin
+                      const params = new URLSearchParams()
+                      params.set("name", "Recordatorios de exámenes")
+                      const keys = ["school", "degree", "year", "semester", "subject"] as const
+                      keys.forEach((key) => {
+                        const value = (filters && (filters as any)[key]) as string[] | undefined
+                        if (Array.isArray(value)) {
+                          value.forEach((v) => v && params.append(key, v))
                         }
                       })
-
-                      if (!popup) {
-                        toast.error("No se pudo abrir la ventana. Verifica la configuración del navegador.")
-                        return
+                      const reminderDurations: string[] = []
+                      if (settings?.examReminders?.oneWeek) reminderDurations.push("-P7D")
+                      if (settings?.examReminders?.oneDay) reminderDurations.push("-P1D")
+                      if (settings?.examReminders?.oneHour) reminderDurations.push("-PT1H")
+                      if (reminderDurations.length === 0) {
+                        reminderDurations.push("-P1D", "-PT1H")
                       }
-
-                      const result = complete()
-                      if (result.success) {
-                        toast.success("Google Calendar abierto exitosamente")
-                      } else {
-                        toast.error("Error al abrir Google Calendar")
-                      }
+                      reminderDurations.forEach((r) => params.append("reminder", r))
+                      const icalUrl = `${baseUrl}/api/ical?${params.toString()}`
+                      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
+                      const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeed)}`
+                      window.open(googleCalendarUrl, '_blank', 'noopener,noreferrer,width=800,height=600')
                     }}
                     className="mt-1"
                   >
