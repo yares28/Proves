@@ -7,6 +7,7 @@ export function mapExamData(exam: any) {
     date: exam.exam_date,
     time: exam.exam_time || '',
     duration_minutes: exam.duration_minutes || 120,
+    duration_day: exam.duration_day || '', // P1D, P2D, etc. for multi-day exams
     subject: exam.subject,
     code: exam.code?.toString() || '',
     location: exam.place || '', 

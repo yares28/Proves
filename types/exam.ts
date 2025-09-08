@@ -5,6 +5,7 @@ export interface Exam {
   date: string
   time: string
   duration_minutes: number
+  duration_day?: string // P1D, P2D, etc. for multi-day exams
   location: string
   comment?: string
   school: string

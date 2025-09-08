@@ -26,7 +26,7 @@ This document provides a comprehensive overview of the current Supabase database
 | `semester`         | `character`               | No       |                                                   | Semester            |
 | `place`            | `text`                    | Yes      |                                                   | Exam location       |
 | `comment`          | `text`                    | Yes      |                                                   | Additional comments |
-| `school`           | `text`                    | No       | `'ETSINF'::text`                                  | School identifier   |
+| `school`           | `text`                    | No       |                                                   | School identifier   |
 | `duration_day`     | `text`                    | Yes      |                                                   |                     |
 
 #### Primary Key
