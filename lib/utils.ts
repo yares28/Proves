@@ -476,7 +476,7 @@ export function generateICalContent(
     }
   }
 
-  return foldedLines.join("\r\n");
+  return foldedLines.join("\r\n") + "\r\n";
 }
 
 export function downloadICalFile(
