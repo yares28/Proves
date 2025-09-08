@@ -47,6 +47,28 @@ interface SavedCalendar {
   createdAt: string;
 }
 
+// Normalize saved filters (plural keys) to the singular keys expected by the API/DB
+function normalizeSavedFilters(saved: Record<string, string[]>): Record<string, string[]> {
+  const keyMap: Record<string, string> = {
+    schools: "school",
+    degrees: "degree",
+    years: "year",
+    subjects: "subject",
+    semesters: "semester",
+    acronyms: "acronym",
+  };
+
+  const normalized: Record<string, string[]> = {};
+  Object.entries(saved || {}).forEach(([key, values]) => {
+    const targetKey = keyMap[key] || key; // pass-through unknown keys
+    if (Array.isArray(values) && values.length > 0) {
+      if (!normalized[targetKey]) normalized[targetKey] = [];
+      normalized[targetKey].push(...values.filter(Boolean));
+    }
+  });
+  return normalized;
+}
+
 export default function MyCalendarsPage() {
   const { user } = useAuth();
   const { settings, updateSettings } = useSettings();
@@ -171,8 +193,8 @@ export default function MyCalendarsPage() {
         filtersStringified: JSON.stringify(calendar.filters),
       });
 
-      // Ensure filters are in the correct format
-      let processedFilters = calendar.filters || {};
+      // Ensure filters are in the correct format (map plural -> singular)
+      let processedFilters = normalizeSavedFilters(calendar.filters || {});
 
       // Validate and clean up filters if needed
       if (typeof processedFilters === "object" && processedFilters !== null) {
@@ -386,12 +408,13 @@ export default function MyCalendarsPage() {
       }
 
       // Use the working /api/ical endpoint with calendar filters instead of calendar-specific route
-      // Build URL parameters from the calendar's saved filters
+      // Build URL parameters from the calendar's saved filters (normalized)
       const params = new URLSearchParams();
       params.set("name", calendar.name);
       
-      // Add all the calendar's filters as URL parameters
-      Object.entries(calendar.filters).forEach(([key, values]) => {
+      const normalizedFilters = normalizeSavedFilters(calendar.filters);
+      // Add all the calendar's normalized filters as URL parameters
+      Object.entries(normalizedFilters).forEach(([key, values]) => {
         if (Array.isArray(values)) {
           values.forEach(value => params.append(key, value));
         }
@@ -503,11 +526,12 @@ export default function MyCalendarsPage() {
         baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
       }
 
-      // Build URL parameters from the calendar's saved filters
+      // Build URL parameters from the calendar's saved filters (normalized)
       const params = new URLSearchParams();
       params.set("name", calendar.name);
       
-      Object.entries(calendar.filters).forEach(([key, values]) => {
+      const normalizedFilters = normalizeSavedFilters(calendar.filters);
+      Object.entries(normalizedFilters).forEach(([key, values]) => {
         if (Array.isArray(values)) {
           values.forEach(value => params.append(key, value));
         }
@@ -541,8 +565,8 @@ export default function MyCalendarsPage() {
         calendar.name
       );
 
-      // Fetch exams for this calendar using its filters
-      const exams = await getExams(calendar.filters);
+      // Fetch exams for this calendar using normalized filters
+      const exams = await getExams(normalizeSavedFilters(calendar.filters));
 
       if (exams.length === 0) {
         toast({
@@ -598,8 +622,8 @@ export default function MyCalendarsPage() {
         calendar.name
       );
 
-      // Fetch exams for this calendar
-      const exams = await getExams(calendar.filters);
+      // Fetch exams for this calendar using normalized filters
+      const exams = await getExams(normalizeSavedFilters(calendar.filters));
 
       if (exams.length === 0) {
         toast({
@@ -662,11 +686,12 @@ export default function MyCalendarsPage() {
           process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
       }
 
-      // Build URL parameters from the calendar's saved filters
+      // Build URL parameters from the calendar's saved filters (normalized)
       const params = new URLSearchParams();
       params.set("name", calendar.name);
       
-      Object.entries(calendar.filters).forEach(([key, values]) => {
+      const normalizedFilters = normalizeSavedFilters(calendar.filters);
+      Object.entries(normalizedFilters).forEach(([key, values]) => {
         if (Array.isArray(values)) {
           values.forEach(value => params.append(key, value));
         }

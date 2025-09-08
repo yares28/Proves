@@ -28,7 +28,7 @@ function escapeICalLocation(text: string): string {
   return text
     .replace(/\\/g, "\\\\") // Escape backslashes first
     .replace(/;/g, "\\;") // Escape semicolons
-    // Note: We don't escape commas in location as they're commonly used for room lists
+    .replace(/,/g, "\\,") // Escape commas per RFC 5545 TEXT
     .replace(/\n/g, "\\n") // Escape newlines
     .replace(/\r/g, ""); // Remove carriage returns
 }
@@ -231,49 +231,14 @@ export function generateICalContent(
     }
 
     // Format dates for iCal - LOCAL TIME FORMAT (no Z suffix when using TZID)
-    const formatICalLocalDate = (date: Date, isEndTime: boolean = false) => {
-      // For Madrid timezone, use the original exam time directly to avoid browser timezone interference
-      if (timeZone === "Europe/Madrid") {
-        // Parse the original exam date and time to avoid any Date object timezone conversion
-        const [examHours, examMinutes] = exam.time.split(":").map(Number);
-        const examDate = new Date(exam.date);
-        const year = examDate.getFullYear();
-        const month = String(examDate.getMonth() + 1).padStart(2, "0");
-        const day = String(examDate.getDate()).padStart(2, "0");
-
-        let hour: number, minute: number;
-        if (isEndTime) {
-          // Calculate end time by adding duration to original exam time
-          const totalMinutes =
-            examHours * 60 + examMinutes + exam.duration_minutes;
-          hour = Math.floor(totalMinutes / 60);
-          minute = totalMinutes % 60;
-
-          // Handle day overflow (if exam goes past midnight)
-          if (hour >= 24) {
-            hour = hour % 24;
-            // Note: For simplicity, we're not handling day increment here
-            // Most exams won't span midnight, but this could be enhanced if needed
-          }
-        } else {
-          hour = examHours;
-          minute = examMinutes;
-        }
-
-        const hourStr = String(hour).padStart(2, "0");
-        const minuteStr = String(minute).padStart(2, "0");
-        const second = "00";
-        return `${year}${month}${day}T${hourStr}${minuteStr}${second}`;
-      } else {
-        // For other timezones, use the date object
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, "0");
-        const day = String(date.getDate()).padStart(2, "0");
-        const hour = String(date.getHours()).padStart(2, "0");
-        const minute = String(date.getMinutes()).padStart(2, "0");
-        const second = String(date.getSeconds()).padStart(2, "0");
-        return `${year}${month}${day}T${hour}${minute}${second}`;
-      }
+    const formatICalLocalDate = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hour = String(date.getHours()).padStart(2, "0");
+      const minute = String(date.getMinutes()).padStart(2, "0");
+      const second = String(date.getSeconds()).padStart(2, "0");
+      return `${year}${month}${day}T${hour}${minute}${second}`;
     };
 
     // Format UTC dates for CREATED/LAST-MODIFIED (these should be UTC per RFC 5545)
@@ -314,8 +279,8 @@ export function generateICalContent(
         "BEGIN:VEVENT",
         `UID:exam-${exam.id}-${exam.date}-${exam.time}@upv-exam-calendar.com`,
         `DTSTAMP:${formatICalUtcDate(now)}`,
-        `DTSTART;TZID=${timeZone}:${formatICalLocalDate(startTime!, false)}`,
-        `DTEND;TZID=${timeZone}:${formatICalLocalDate(endTime!, true)}`,
+        `DTSTART;TZID=${timeZone}:${formatICalLocalDate(startTime!)}`,
+        `DTEND;TZID=${timeZone}:${formatICalLocalDate(endTime!)}`,
         foldLine(`SUMMARY:${escapeICalText(exam.subject + " - Exam")}`),
         foldLine(`DESCRIPTION:${description}`),
         foldLine(`LOCATION:${escapeICalLocation(exam.location || "")}`),
@@ -451,7 +416,9 @@ export function generateICalContent(
 
     for (const ch of line) {
       const chBytes = encoder.encode(ch).length;
-      const limit = isFirst ? 75 : 74; // continuation lines include a leading space
+      // Use slightly stricter byte limits (73/72) to accommodate validators that
+      // incorrectly count CRLF in the 75-octet budget
+      const limit = isFirst ? 73 : 72; // continuation lines include a leading space later
       if (currentBytes + chBytes > limit) {
         segments.push(current);
         current = ch;
@@ -468,12 +435,23 @@ export function generateICalContent(
     return segments[0] + "\r\n" + segments.slice(1).map((s) => " " + s).join("\r\n");
   };
 
-  const foldedLines: string[] = [];
+  // Reconstruct logical lines by joining any existing folded continuations, then refold once
+  const logicalLines: string[] = [];
   for (const l of icalLines) {
     const segments = l.split("\r\n");
     for (const seg of segments) {
-      foldedLines.push(foldLongLine(seg));
+      if (seg.startsWith(" ") && logicalLines.length > 0) {
+        // Continuation: append without the leading space
+        logicalLines[logicalLines.length - 1] += seg.slice(1);
+      } else {
+        logicalLines.push(seg);
+      }
     }
+  }
+
+  const foldedLines: string[] = [];
+  for (const line of logicalLines) {
+    foldedLines.push(foldLongLine(line));
   }
 
   return foldedLines.join("\r\n") + "\r\n";
