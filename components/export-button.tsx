@@ -40,70 +40,75 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
     }
   }
 
-  const exportToGoogleCalendar = async () => {
+  const exportToGoogleCalendar = () => {
     if (exams.length === 0) {
       toast.error("No hay exámenes para exportar")
       return
     }
 
     try {
-      // Use production domain for reliable access
-      const baseUrl = window.location.origin.includes('localhost') 
-        ? 'https://upv-cal.vercel.app' 
-        : window.location.origin
-
+      const baseUrl = window.location.origin
       const params = new URLSearchParams()
+      // Calendar name for the subscription
       params.set("name", "Recordatorios de exámenes")
 
-      // Map filters - simplified to prevent URL length issues
-      const keys = ["school", "degree", "year", "semester"] as const
+      // Map filters into query params (arrays supported)
+      const keys = ["school", "degree", "year", "semester", "subject"] as const
       keys.forEach((key) => {
         const value = (filters && (filters as any)[key]) as string[] | undefined
-        if (Array.isArray(value) && value.length <= 2) {
-          value.slice(0, 2).forEach((v) => v && params.append(key, v))
+        if (Array.isArray(value)) {
+          value.forEach((v) => v && params.append(key, v))
         }
       })
 
-      // Add essential reminders only
+      // Map reminder settings to ISO-8601 negative durations
       const reminderDurations: string[] = []
+      if (settings?.examReminders?.oneWeek) reminderDurations.push("-P7D")
       if (settings?.examReminders?.oneDay) reminderDurations.push("-P1D")
       if (settings?.examReminders?.oneHour) reminderDurations.push("-PT1H")
       
+      // If no reminders are enabled, use defaults (1 day and 1 hour)
       if (reminderDurations.length === 0) {
-        reminderDurations.push("-P1D") // Just one default
+        reminderDurations.push("-P1D", "-PT1H")
       }
       
       reminderDurations.forEach((r) => params.append("reminder", r))
 
       const icalUrl = `${baseUrl}/api/ical?${params.toString()}`
+      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
       
-      console.log("🔗 Generated iCal URL:", icalUrl)
-      console.log("📏 URL length:", icalUrl.length)
+      // Multiple approaches for better browser compatibility
+      // Using the subscription URL format that works best with modern browsers
+      const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`
       
-      // Verify feed accessibility
-      try {
-        const testResponse = await fetch(icalUrl, { method: 'HEAD' })
-        if (!testResponse.ok) {
-          throw new Error(`iCal feed not accessible: ${testResponse.status}`)
-        }
-        console.log("✅ iCal feed is accessible")
-      } catch (feedError) {
-        console.warn("⚠️ Could not verify iCal feed:", feedError)
+      // First, try the programmatic approach (avoids popup blockers)
+      const openCalendar = () => {
+        // Create a temporary anchor element to avoid popup blockers
+        const link = document.createElement('a')
+        link.href = googleCalendarUrl
+        link.target = '_blank'
+        link.rel = 'noopener noreferrer'
+        // Add some accessibility
+        link.setAttribute('aria-label', 'Abrir Google Calendar para suscribirse al calendario')
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
       }
-
-      // CRITICAL: Based on 2024 Google Calendar API research
-      // Google Calendar does NOT support direct webcal subscription via /r?cid= anymore
-      // Instead, we need to provide manual subscription instructions
       
-      console.log("📋 Google Calendar requires manual subscription - showing instructions")
+      // Try to open the calendar
+      openCalendar()
       
-      // Always show instructions for manual subscription since automatic subscription is deprecated
-      setShowInstructions(true)
+      // Show instructions dialog after a short delay to let the popup open
+      setTimeout(() => {
+        setShowInstructions(true)
+      }, 500)
+      
+      // Close the export popover after successful action
       setIsOpen(false)
       
     } catch (e) {
-      console.error('❌ Google Calendar export error:', e)
-      toast.error("Error al generar el enlace de calendario")
+      console.error('Google Calendar export error:', e)
+      toast.error("No se pudo abrir Google Calendar")
     }
   }
 
@@ -286,112 +291,63 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
       </Popover>
 
       <Dialog open={showInstructions} onOpenChange={setShowInstructions}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-blue-600" />
-              Agregar calendario a Google Calendar
+              Suscripción a Google Calendar
             </DialogTitle>
-            <DialogDescription className="text-left space-y-4">
-              <p>Sigue estos pasos para agregar el calendario de exámenes a tu Google Calendar:</p>
+            <DialogDescription className="text-left space-y-3">
+              <p>Se ha abierto Google Calendar en una nueva ventana.</p>
               
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <p className="font-medium text-blue-900 mb-3">📋 Pasos para agregar el calendario:</p>
-                <ol className="list-decimal list-inside space-y-2 text-sm text-blue-800">
-                  <li>Ve a <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">calendar.google.com</a></li>
-                  <li>En el lado izquierdo, busca "Otros calendarios" y haz clic en el <strong>+</strong></li>
-                  <li>Selecciona <strong>"Desde URL"</strong></li>
-                  <li>Copia y pega la URL del calendario (botón de abajo)</li>
-                  <li>Haz clic en <strong>"Agregar calendario"</strong></li>
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                <p className="font-medium text-blue-900 mb-2">Pasos a seguir:</p>
+                <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
+                  <li>Busca la ventana de Google Calendar que se acaba de abrir</li>
+                  <li>Verás un diálogo para suscribirte al calendario</li>
+                  <li>Haz clic en "Añadir" o "Suscribirse" para confirmar</li>
+                  <li>El calendario se actualizará automáticamente con nuevos exámenes</li>
                 </ol>
               </div>
 
-              <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                <p className="font-medium text-green-900 mb-2">🔄 URL del calendario:</p>
-                <div className="space-y-2">
-                  {(() => {
-                    const baseUrl = window.location.origin.includes('localhost') 
-                      ? 'https://upv-cal.vercel.app' 
-                      : window.location.origin
-                      
-                    const params = new URLSearchParams()
-                    params.set("name", "Recordatorios de exámenes")
-                    
-                    const keys = ["school", "degree", "year", "semester"] as const
-                    keys.forEach((key) => {
-                      const value = (filters && (filters as any)[key]) as string[] | undefined
-                      if (Array.isArray(value) && value.length <= 2) {
-                        value.slice(0, 2).forEach((v) => v && params.append(key, v))
+              <div className="flex items-start gap-2 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-amber-900">¿No se abrió la ventana?</p>
+                  <p className="text-amber-800 mb-2">Verifica que tu navegador no esté bloqueando ventanas emergentes para este sitio.</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const baseUrl = window.location.origin
+                      const params = new URLSearchParams()
+                      params.set("name", "Recordatorios de exámenes")
+                      const keys = ["school", "degree", "year", "semester", "subject"] as const
+                      keys.forEach((key) => {
+                        const value = (filters && (filters as any)[key]) as string[] | undefined
+                        if (Array.isArray(value)) {
+                          value.forEach((v) => v && params.append(key, v))
+                        }
+                      })
+                      const reminderDurations: string[] = []
+                      if (settings?.examReminders?.oneWeek) reminderDurations.push("-P7D")
+                      if (settings?.examReminders?.oneDay) reminderDurations.push("-P1D")
+                      if (settings?.examReminders?.oneHour) reminderDurations.push("-PT1H")
+                      if (reminderDurations.length === 0) {
+                        reminderDurations.push("-P1D", "-PT1H")
                       }
-                    })
-                    
-                    const reminderDurations: string[] = []
-                    if (settings?.examReminders?.oneDay) reminderDurations.push("-P1D")
-                    if (settings?.examReminders?.oneHour) reminderDurations.push("-PT1H")
-                    if (reminderDurations.length === 0) {
-                      reminderDurations.push("-P1D")
-                    }
-                    reminderDurations.forEach((r) => params.append("reminder", r))
-                    
-                    const icalUrl = `${baseUrl}/api/ical?${params.toString()}`
-                    
-                    return (
-                      <>
-                        <div className="p-2 bg-white border rounded text-xs font-mono break-all">
-                          {icalUrl}
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={async () => {
-                              try {
-                                await navigator.clipboard.writeText(icalUrl)
-                                toast.success("URL copiada al portapapeles")
-                              } catch (error) {
-                                toast.error("Error al copiar URL")
-                              }
-                            }}
-                            className="flex-1"
-                          >
-                            <Copy className="h-3 w-3 mr-1" />
-                            Copiar URL
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => window.open('https://calendar.google.com', '_blank', 'noopener,noreferrer')}
-                            className="flex-1"
-                          >
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            Abrir Google Calendar
-                          </Button>
-                        </div>
-                      </>
-                    )
-                  })()}
+                      reminderDurations.forEach((r) => params.append("reminder", r))
+                      const icalUrl = `${baseUrl}/api/ical?${params.toString()}`
+                      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
+                      const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`
+                      window.open(googleCalendarUrl, '_blank', 'noopener,noreferrer')
+                    }}
+                    className="mt-1"
+                  >
+                    <ExternalLink className="h-3 w-3 mr-1" />
+                    Abrir manualmente
+                  </Button>
                 </div>
-              </div>
-
-              <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm">
-                    <p className="font-medium text-amber-900">💡 ¿Por qué es manual?</p>
-                    <p className="text-amber-800">
-                      Google Calendar ya no permite suscripciones automáticas desde sitios externos por motivos de seguridad. 
-                      Este método manual garantiza que el calendario se agregue correctamente y se mantenga sincronizado.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                <p className="font-medium text-gray-900 mb-1">✨ Después de agregar:</p>
-                <ul className="text-sm text-gray-700 space-y-1">
-                  <li>• El calendario aparecerá en tu lista de calendarios</li>
-                  <li>• Se actualizará automáticamente con nuevos exámenes</li>
-                  <li>• Recibirás recordatorios según tu configuración</li>
-                </ul>
               </div>
             </DialogDescription>
           </DialogHeader>
