@@ -4,6 +4,20 @@ import { generateICalContent } from "@/lib/utils";
 
 // Build filters object from query params
 function buildFilters(searchParams: URLSearchParams): Record<string, string[]> {
+  // 1) Packed filters take precedence if provided
+  const packed = searchParams.get("p");
+  if (packed) {
+    try {
+      const json = decodePackedFilters(packed);
+      if (json && typeof json === "object") {
+        // Normalize keys to singular expected by DB
+        return normalizeFilterKeys(json as Record<string, string[]>);
+      }
+    } catch {
+      // Fall through to regular params if decoding fails
+    }
+  }
+
   const multiParams = ["school", "degree", "year", "semester", "subject", "acronym"] as const;
   const filters: Record<string, string[]> = {};
   for (const key of multiParams) {
@@ -41,6 +55,41 @@ function parseReminderDurations(searchParams: URLSearchParams): number[] | undef
   }
   // Deduplicate and sort descending so larger lead times appear first
   return Array.from(new Set(minutes)).sort((a, b) => b - a);
+}
+
+// Base64url decode helper for packed filter JSON
+function decodePackedFilters(packed: string): unknown | null {
+  try {
+    // Convert base64url -> base64
+    const b64 = packed.replace(/-/g, "+").replace(/_/g, "/");
+    // Pad if needed
+    const padLen = (4 - (b64.length % 4)) % 4;
+    const padded = b64 + "=".repeat(padLen);
+    const jsonStr = Buffer.from(padded, "base64").toString("utf-8");
+    return JSON.parse(jsonStr);
+  } catch {
+    return null;
+  }
+}
+
+// Normalize plural keys to singular (and pass-through unknowns)
+function normalizeFilterKeys(saved: Record<string, string[]>): Record<string, string[]> {
+  const keyMap: Record<string, string> = {
+    schools: "school",
+    degrees: "degree",
+    years: "year",
+    subjects: "subject",
+    semesters: "semester",
+    acronyms: "acronym",
+  };
+  const normalized: Record<string, string[]> = {};
+  Object.entries(saved || {}).forEach(([key, values]) => {
+    const targetKey = keyMap[key] || key;
+    if (Array.isArray(values) && values.length > 0) {
+      normalized[targetKey] = values.filter(Boolean);
+    }
+  });
+  return normalized;
 }
 
 export async function GET(req: NextRequest) {

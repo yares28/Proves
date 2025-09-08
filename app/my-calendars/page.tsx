@@ -69,6 +69,20 @@ function normalizeSavedFilters(saved: Record<string, string[]>): Record<string, 
   return normalized;
 }
 
+// Pack filters object into base64url JSON for compact URLs
+function packFilters(filters: Record<string, string[]>): string | null {
+  try {
+    const json = JSON.stringify(filters);
+    // base64url encode
+    const b64 = typeof window === 'undefined'
+      ? Buffer.from(json, 'utf-8').toString('base64')
+      : btoa(unescape(encodeURIComponent(json)));
+    return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  } catch {
+    return null;
+  }
+}
+
 export default function MyCalendarsPage() {
   const { user } = useAuth();
   const { settings, updateSettings } = useSettings();
@@ -408,17 +422,12 @@ export default function MyCalendarsPage() {
       }
 
       // Use the working /api/ical endpoint with calendar filters instead of calendar-specific route
-      // Build URL parameters from the calendar's saved filters (normalized)
+      // Build compact packed filters parameter
       const params = new URLSearchParams();
       params.set("name", calendar.name);
-      
       const normalizedFilters = normalizeSavedFilters(calendar.filters);
-      // Add all the calendar's normalized filters as URL parameters
-      Object.entries(normalizedFilters).forEach(([key, values]) => {
-        if (Array.isArray(values)) {
-          values.forEach(value => params.append(key, value));
-        }
-      });
+      const packed = packFilters(normalizedFilters);
+      if (packed) params.set("p", packed);
 
       // Construct iCal calendar feed URL using the working /api/ical endpoint
       const icalUrl = `${baseUrl}/api/ical?${params.toString()}`;
@@ -526,16 +535,12 @@ export default function MyCalendarsPage() {
         baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
       }
 
-      // Build URL parameters from the calendar's saved filters (normalized)
+      // Build compact packed filters parameter
       const params = new URLSearchParams();
       params.set("name", calendar.name);
-      
       const normalizedFilters = normalizeSavedFilters(calendar.filters);
-      Object.entries(normalizedFilters).forEach(([key, values]) => {
-        if (Array.isArray(values)) {
-          values.forEach(value => params.append(key, value));
-        }
-      });
+      const packed = packFilters(normalizedFilters);
+      if (packed) params.set("p", packed);
 
       const icalUrl = `${baseUrl}/api/ical?${params.toString()}`;
       // Convert http/https to webcal protocol for Apple Calendar
@@ -686,16 +691,12 @@ export default function MyCalendarsPage() {
           process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
       }
 
-      // Build URL parameters from the calendar's saved filters (normalized)
+      // Build compact packed filters parameter
       const params = new URLSearchParams();
       params.set("name", calendar.name);
-      
       const normalizedFilters = normalizeSavedFilters(calendar.filters);
-      Object.entries(normalizedFilters).forEach(([key, values]) => {
-        if (Array.isArray(values)) {
-          values.forEach(value => params.append(key, value));
-        }
-      });
+      const packed = packFilters(normalizedFilters);
+      if (packed) params.set("p", packed);
 
       // Generate the iCal subscription URL using the working /api/ical endpoint
       const icalUrl = `${baseUrl}/api/ical?${params.toString()}`;
