@@ -4,11 +4,11 @@ This document provides a comprehensive overview of the current Supabase database
 
 ---
 
-## Table: `ETSINF`
+## Table: `25-26`
 
 - **Purpose:** Stores exam information for the ETSINF school.
 - **Row Level Security (RLS):** Enabled
-- **Estimated Rows:** 1003
+- **Estimated Rows:** 1479
 - **Size:** 1264 kB
 
 ### Columns
@@ -16,9 +16,9 @@ This document provides a comprehensive overview of the current Supabase database
 |--------------------|---------------------------|----------|---------------------------------------------------|---------------------|
 | `exam_instance_id` | `bigint`                  | No       | `nextval('etsinf_exam_instance_id_seq'::regclass)` | Primary key         |
 | `exam_date`        | `date`                    | No       |                                                   | Exam date           |
-| `exam_time`        | `time without time zone`  | No       |                                                   | Exam start time     |
-| `duration_minutes` | `integer`                 | No       |                                                   | Duration in minutes |
-| `code`             | `integer`                 | No       |                                                   | Exam code           |
+| `exam_time`        | `time without time zone`  | Yes      |                                                   | Exam start time     |
+| `duration_minutes` | `integer`                 | Yes      |                                                   | Duration in minutes |
+| `code`             | `integer`                 | Yes      |                                                   | Exam code           |
 | `subject`          | `text`                    | No       |                                                   | Subject name        |
 | `acronym`          | `character varying`       | No       |                                                   | Subject acronym     |
 | `degree`           | `text`                    | No       |                                                   | Degree name         |
@@ -27,12 +27,13 @@ This document provides a comprehensive overview of the current Supabase database
 | `place`            | `text`                    | Yes      |                                                   | Exam location       |
 | `comment`          | `text`                    | Yes      |                                                   | Additional comments |
 | `school`           | `text`                    | No       | `'ETSINF'::text`                                  | School identifier   |
+| `duration_day`     | `text`                    | Yes      |                                                   |                     |
 
 #### Primary Key
 - `exam_instance_id`
 
 #### Notes
-- All fields except `place` and `comment` are required.
+- Nullable fields: `exam_time`, `duration_minutes`, `code`, `place`, `comment`, `duration_day`.
 - The `school` field is always set to `'ETSINF'` for this table.
 
 ---
@@ -58,6 +59,7 @@ This document provides a comprehensive overview of the current Supabase database
 
 #### Relationships
 - `user_id` references `auth.users(id)` (foreign key)
+- Referenced by `public.calendar_tokens(user_calendar_id)`
 
 #### Notes
 - The `filters` column stores JSON data for user-specific calendar filters.
@@ -65,35 +67,34 @@ This document provides a comprehensive overview of the current Supabase database
 
 ---
 
-## Table: `user_google_tokens`
+## Table: `calendar_tokens`
 
-- **Purpose:** Stores OAuth tokens for users' Google accounts (for calendar sync, etc.).
+- **Purpose:** Secure tokens for calendar access via webcal/ICS feeds.
 - **Row Level Security (RLS):** Enabled
-- **Estimated Rows:** 0
+- **Estimated Rows:** 1
 - **Size:** 32 kB
 
 ### Columns
-| Name         | Type                      | Nullable | Default Value      | Description                        |
-|--------------|---------------------------|----------|--------------------|------------------------------------|
-| `id`         | `uuid`                    | No       | `gen_random_uuid()`| Primary key                        |
-| `user_id`    | `uuid`                    | No       |                    | References `auth.users(id)`        |
-| `access_token`| `text`                   | No       |                    | Google access token                 |
-| `refresh_token`| `text`                  | Yes      |                    | Google refresh token                |
-| `expires_at` | `bigint`                  | No       |                    | Expiry timestamp (epoch seconds)    |
-| `scope`      | `text`                    | Yes      |                    | OAuth scopes                        |
-| `token_type` | `text`                    | Yes      | `'Bearer'::text`   | Token type (usually 'Bearer')       |
-| `created_at` | `timestamp with time zone`| Yes      | `now()`            | Creation timestamp                  |
-| `updated_at` | `timestamp with time zone`| Yes      | `now()`            | Last update timestamp               |
+| Name         | Type                      | Nullable | Default Value                         | Description                                    |
+|--------------|---------------------------|----------|---------------------------------------|------------------------------------------------|
+| `id`         | `uuid`                    | No       | `gen_random_uuid()`                   | Primary key                                    |
+| `token`      | `text`                    | No       |                                       | 40-character hexadecimal token (unique)        |
+| `user_id`    | `uuid`                    | No       |                                       | References `auth.users(id)`                    |
+| `user_calendar_id` | `uuid`               | No       |                                       | References `public.user_calendars(id)`         |
+| `filters`    | `jsonb`                   | Yes      | `'{}'::jsonb`                         | Optional additional filters for calendar events |
+| `expires_at` | `timestamp with time zone`| Yes      | `(now() + '30 days'::interval)`       | Token expiration (defaults to 30 days)         |
+| `created_at` | `timestamp with time zone`| Yes      | `now()`                                | Creation timestamp                             |
+| `updated_at` | `timestamp with time zone`| Yes      | `now()`                                | Last update timestamp                          |
 
 #### Primary Key
 - `id`
 
 #### Relationships
-- `user_id` references `auth.users(id)` (foreign key, unique)
+- `user_id` references `auth.users(id)` (foreign key)
+- `user_calendar_id` references `public.user_calendars(id)` (foreign key)
 
 #### Notes
-- Each user can have only one set of Google tokens (enforced by unique `user_id`).
-- `created_at` and `updated_at` are set automatically if not provided.
+- `token` is unique.
 
 ---
 
@@ -121,7 +122,8 @@ The following PostgreSQL extensions are available in this Supabase project. Exte
 
 | Name                        | Installed Version | Default Version | Description                                                        |
 |-----------------------------|------------------|-----------------|--------------------------------------------------------------------|
-| hypopg                     | 1.4.1            | 1.4.1           | Hypothetical indexes for PostgreSQL                                |
+| plpgsql                     | 1.0              | 1.0             | PL/pgSQL procedural language                                       |
+| hypopg                      | 1.4.1            | 1.4.1           | Hypothetical indexes for PostgreSQL                                |
 | supabase_vault              | 0.3.1            | 0.3.1           | Supabase Vault Extension                                           |
 | pg_graphql                  | 1.5.11           | 1.5.11          | GraphQL support for PostgreSQL                                     |
 | uuid-ossp                   | 1.1              | 1.1             | Generate universally unique identifiers (UUIDs)                    |
@@ -129,7 +131,6 @@ The following PostgreSQL extensions are available in this Supabase project. Exte
 | pg_stat_statements          | 1.10             | 1.10            | Track planning and execution statistics of all SQL statements      |
 | pgcrypto                    | 1.3              | 1.3             | Cryptographic functions                                            |
 | index_advisor               | 0.2.0            | 0.2.0           | Query index advisor                                                |
-| ...                         | ...              | ...             | (Many more available, see Supabase dashboard for full list)        |
 
 **Note:** Only a subset of all available extensions are installed by default. Some are enabled for advanced use cases (e.g., PostGIS for spatial data, TimescaleDB for time-series, etc.).
 
@@ -152,7 +153,7 @@ _No Edge Functions are currently deployed in this project. Edge Functions allow 
 Supabase provides automated security checks for your database. Below are the current findings:
 
 - **Function Search Path Mutable (WARN):**
-  - Functions `public.update_updated_at_column`, `public.store_google_tokens`, `public.get_google_tokens`, and `public.delete_google_tokens` have a mutable `search_path`. This can be a security risk. [Remediation Guide](https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable)
+  - Functions `public.update_updated_at_column`, `public.store_google_tokens`, `public.get_google_tokens`, `public.delete_google_tokens`, `public.generate_calendar_token`, and `public.cleanup_expired_tokens` have a mutable `search_path`. This can be a security risk. [Remediation Guide](https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable)
 - **Leaked Password Protection Disabled (WARN):**
   - Leaked password protection is currently disabled. Enable this feature to prevent users from using compromised passwords. [Remediation Guide](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)
 
@@ -165,11 +166,11 @@ Supabase also checks for performance issues. Below are the current findings:
 - **Unindexed Foreign Keys (INFO):**
   - Table `public.user_calendars` has a foreign key `user_calendars_user_id_fkey` without a covering index. This can impact performance. [Remediation Guide](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys)
 - **RLS Policy Performance (WARN):**
-  - Several RLS policies on `user_calendars` and `user_google_tokens` re-evaluate `current_setting()` or `auth.<function>()` for each row, which can be slow at scale. Use `(select auth.<function>())` instead. [Remediation Guide](https://supabase.com/docs/guides/database/postgres/row-level-security#call-functions-with-select)
+  - Several RLS policies on `user_calendars` and `calendar_tokens` re-evaluate `current_setting()` or `auth.<function>()` for each row, which can be slow at scale. Use `(select auth.<function>())` instead. [Remediation Guide](https://supabase.com/docs/guides/database/postgres/row-level-security#call-functions-with-select)
 - **Unused Indexes (INFO):**
-  - Several indexes on `ETSINF` and `user_google_tokens` have not been used. Consider removing them if not needed. [Remediation Guide](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index)
+  - Unused indexes detected on `public.25-26` (e.g., `idx_etsinf_date_time`, `idx_etsinf_subject_gin`, `idx_etsinf_year_semester_date`, `idx_etsinf_subject_lower`, `idx_etsinf_place`) and on `public.calendar_tokens` (e.g., `idx_calendar_tokens_token`, `idx_calendar_tokens_user_id`, `idx_calendar_tokens_expires_at`). Consider removing them if not needed. [Remediation Guide](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index)
 - **Duplicate Index (WARN):**
-  - Table `ETSINF` has duplicate indexes: `idx_etsinf_date` and `idx_etsinf_exam_date`. Remove duplicates to optimize performance. [Remediation Guide](https://supabase.com/docs/guides/database/database-linter?lint=0009_duplicate_index)
+  - Table `public.25-26` has duplicate indexes: `idx_etsinf_date` and `idx_etsinf_exam_date`. Remove duplicates to optimize performance. [Remediation Guide](https://supabase.com/docs/guides/database/database-linter?lint=0009_duplicate_index)
 
 ---
 
