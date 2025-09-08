@@ -16,33 +16,37 @@ The Google Calendar export feature allows users to subscribe to a live calendar 
 
 ## How It Works
 
-### 1. User Interaction Flow
+### 1. User Interaction Flow (Updated 2024)
 
 ```
 User clicks "Google Calendar" button
 ↓
 Export button reads user's reminder preferences
 ↓
-Builds webcal URL with filters + reminder settings
+Builds iCal URL with filters + reminder settings
 ↓
-Opens Google Calendar subscription dialog
+Shows manual subscription instructions dialog
 ↓
-User confirms subscription
+User copies iCal URL and follows manual steps
+↓
+User adds calendar via Google Calendar's "Add by URL" feature
 ↓
 Google Calendar periodically fetches the live ICS feed
 ```
 
-### 2. URL Generation
+### 2. URL Generation (Updated 2024)
 
-The export button constructs a webcal URL like:
+The export button constructs an HTTPS iCal URL like:
 ```
-webcal://your-domain.com/api/ical?name=Recordatorios+de+exámenes&school=ETSINF&reminder=-P1D&reminder=-PT1H
+https://your-domain.com/api/ical?name=Recordatorios+de+exámenes&school=ETSINF&reminder=-P1D&reminder=-PT1H
 ```
 
 Parameters:
 - `name`: Calendar name for the subscription
-- `school`, `degree`, `year`, `semester`, `subject`: Filter parameters (can be multiple)
+- `school`, `degree`, `year`, `semester`: Filter parameters (limited for URL length)
 - `reminder`: ISO-8601 negative durations for VALARM generation
+
+Note: Uses HTTPS (not webcal) for better compatibility with Google Calendar's manual subscription process.
 
 ### 3. ICS Feed Generation
 
@@ -349,13 +353,13 @@ headers: {
    - Multi-day events are DATE-only (no timezone)
    - Verify client timezone handling
 
-4. **Google Calendar Not Opening** (FIXED):
-   - ✅ **Popup Blocker Fix**: Now uses anchor elements instead of `window.open()`
-   - ✅ **Updated URL**: Uses `/calendar/u/0/r` endpoint for better compatibility
-   - ✅ **Fallback Dialog**: Provides manual open button if automatic opening fails
-   - ✅ **User Instructions**: Step-by-step guidance for subscription process
-   - Check console for any JavaScript errors
-   - Verify network connectivity
+4. **Google Calendar Subscription Process** (UPDATED 2024):
+   - ✅ **Manual Subscription Required**: Google Calendar no longer supports automatic external calendar subscriptions for security reasons
+   - ✅ **Clear Instructions**: Provides step-by-step manual subscription process
+   - ✅ **URL Generation**: Generates valid iCal URLs with proper CORS headers
+   - ✅ **Copy-Paste Integration**: Users can easily copy the calendar URL and add it manually
+   - ✅ **Direct Google Calendar Link**: Provides quick access to calendar.google.com
+   - Check that iCal feed is accessible and properly formatted
 
 ### Debug Tools
 
