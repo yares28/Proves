@@ -3,12 +3,15 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { 
   Share2, 
   Copy, 
   Download, 
   ExternalLink, 
-  Check
+  Check,
+  Calendar,
+  AlertCircle
 } from "lucide-react"
 import Image from "next/image"
 import { toast } from "sonner"
@@ -22,6 +25,7 @@ interface ExportButtonProps {
 export function ExportButton({ exams, filters }: ExportButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showInstructions, setShowInstructions] = useState(false)
   const { settings } = useSettings()
 
   const copyUrl = async () => {
@@ -72,11 +76,38 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
 
       const icalUrl = `${baseUrl}/api/ical?${params.toString()}`
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
-      const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(calendarFeed)}`
-
-      window.open(googleCalendarUrl, '_blank')
-      toast.success("Abriendo Google Calendar")
+      
+      // Multiple approaches for better browser compatibility
+      // Using the subscription URL format that works best with modern browsers
+      const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`
+      
+      // First, try the programmatic approach (avoids popup blockers)
+      const openCalendar = () => {
+        // Create a temporary anchor element to avoid popup blockers
+        const link = document.createElement('a')
+        link.href = googleCalendarUrl
+        link.target = '_blank'
+        link.rel = 'noopener noreferrer'
+        // Add some accessibility
+        link.setAttribute('aria-label', 'Abrir Google Calendar para suscribirse al calendario')
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
+      
+      // Try to open the calendar
+      openCalendar()
+      
+      // Show instructions dialog after a short delay to let the popup open
+      setTimeout(() => {
+        setShowInstructions(true)
+      }, 500)
+      
+      // Close the export popover after successful action
+      setIsOpen(false)
+      
     } catch (e) {
+      console.error('Google Calendar export error:', e)
       toast.error("No se pudo abrir Google Calendar")
     }
   }
@@ -183,53 +214,54 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
   }
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <Button 
-          variant="outline" 
-          size="sm"
-          className="flex items-center gap-2"
-        >
-          <Share2 className="h-4 w-4" />
-          Exportar
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-64 p-2" align="end">
-        <div className="space-y-1">
-          <Button
-            variant="ghost"
+    <>
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
+          <Button 
+            variant="outline" 
             size="sm"
-            className="w-full justify-start"
-            onClick={copyUrl}
+            className="flex items-center gap-2"
           >
-            <Copy className="h-4 w-4 mr-2" />
-            {copied ? (
-              <>
-                <Check className="h-4 w-4 mr-2 text-green-500" />
-                URL Copiada
-              </>
-            ) : (
-              "Copiar URL"
-            )}
+            <Share2 className="h-4 w-4" />
+            Exportar
           </Button>
-          
-                     <Button
-             variant="ghost"
-             size="sm"
-             className="w-full justify-start"
-             onClick={exportToGoogleCalendar}
-           >
-             <Image 
-               src="/google-cal.png" 
-               alt="Google Calendar" 
-               width={20} 
-               height={20} 
-               className="mr-2 -ml-1"
-             />
-             Google Calendar
-           </Button>
-          
-                                 <Button
+        </PopoverTrigger>
+        <PopoverContent className="w-64 p-2" align="end">
+          <div className="space-y-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start"
+              onClick={copyUrl}
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4 mr-2 text-green-500" />
+                  URL Copiada
+                </>
+              ) : (
+                "Copiar URL"
+              )}
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start"
+              onClick={exportToGoogleCalendar}
+            >
+              <Image 
+                src="/google-cal.png" 
+                alt="Google Calendar" 
+                width={20} 
+                height={20} 
+                className="mr-2 -ml-1"
+              />
+              Google Calendar
+            </Button>
+            
+            <Button
               variant="ghost"
               size="sm"
               className="w-full justify-start"
@@ -244,18 +276,88 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
               />
               Apple Calendar
             </Button>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            onClick={downloadICS}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Descargar .ics
-          </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start"
+              onClick={downloadICS}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Descargar .ics
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <Dialog open={showInstructions} onOpenChange={setShowInstructions}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-blue-600" />
+              Suscripción a Google Calendar
+            </DialogTitle>
+            <DialogDescription className="text-left space-y-3">
+              <p>Se ha abierto Google Calendar en una nueva ventana.</p>
+              
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                <p className="font-medium text-blue-900 mb-2">Pasos a seguir:</p>
+                <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
+                  <li>Busca la ventana de Google Calendar que se acaba de abrir</li>
+                  <li>Verás un diálogo para suscribirte al calendario</li>
+                  <li>Haz clic en "Añadir" o "Suscribirse" para confirmar</li>
+                  <li>El calendario se actualizará automáticamente con nuevos exámenes</li>
+                </ol>
+              </div>
+
+              <div className="flex items-start gap-2 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-amber-900">¿No se abrió la ventana?</p>
+                  <p className="text-amber-800 mb-2">Verifica que tu navegador no esté bloqueando ventanas emergentes para este sitio.</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const baseUrl = window.location.origin
+                      const params = new URLSearchParams()
+                      params.set("name", "Recordatorios de exámenes")
+                      const keys = ["school", "degree", "year", "semester", "subject"] as const
+                      keys.forEach((key) => {
+                        const value = (filters && (filters as any)[key]) as string[] | undefined
+                        if (Array.isArray(value)) {
+                          value.forEach((v) => v && params.append(key, v))
+                        }
+                      })
+                      const reminderDurations: string[] = []
+                      if (settings?.examReminders?.oneWeek) reminderDurations.push("-P7D")
+                      if (settings?.examReminders?.oneDay) reminderDurations.push("-P1D")
+                      if (settings?.examReminders?.oneHour) reminderDurations.push("-PT1H")
+                      if (reminderDurations.length === 0) {
+                        reminderDurations.push("-P1D", "-PT1H")
+                      }
+                      reminderDurations.forEach((r) => params.append("reminder", r))
+                      const icalUrl = `${baseUrl}/api/ical?${params.toString()}`
+                      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
+                      const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`
+                      window.open(googleCalendarUrl, '_blank', 'noopener,noreferrer')
+                    }}
+                    className="mt-1"
+                  >
+                    <ExternalLink className="h-3 w-3 mr-1" />
+                    Abrir manualmente
+                  </Button>
+                </div>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end">
+            <Button onClick={() => setShowInstructions(false)}>
+              Entendido
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 } 
