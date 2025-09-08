@@ -18,7 +18,8 @@ export default function TestCalendarExportPage() {
     
     // Test with a sample calendar ID (this will fail but show us the error)
     const testId = "test-calendar-id";
-    const apiUrl = `/api/calendars/${testId}/ical`;
+    const baseUrl = "https://upv-cal.vercel.app";
+    const apiUrl = `${baseUrl}/api/calendars/${testId}/ical`;
     
     try {
       const response = await fetch(apiUrl);
@@ -40,8 +41,9 @@ export default function TestCalendarExportPage() {
   const testGoogleCalendarURLs = () => {
     addResult("🔗 Testing Google Calendar URL patterns...");
     
-    const testIcalUrl = "https://example.com/test.ics";
-    const testWebcalUrl = "webcal://example.com/test.ics";
+    const baseUrl = "https://upv-cal.vercel.app";
+    const testIcalUrl = `${baseUrl}/api/ical?name=Test&school=ETSINF`;
+    const testWebcalUrl = testIcalUrl.replace(/^https?:/, "webcal:");
     
     const googleCalendarUrls = [
       `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(testWebcalUrl)}`,
@@ -75,7 +77,7 @@ export default function TestCalendarExportPage() {
   const testICalGeneration = async () => {
     addResult("📅 Testing iCal generation...");
     
-    // Test with existing ical route
+    // Test with existing ical route on production
     try {
       const testFilters = {
         school: ["ETSINF"],
@@ -89,7 +91,8 @@ export default function TestCalendarExportPage() {
         values.forEach(value => params.append(key, value));
       });
       
-      const icalUrl = `/api/ical?${params.toString()}`;
+      const baseUrl = "https://upv-cal.vercel.app";
+      const icalUrl = `${baseUrl}/api/ical?${params.toString()}`;
       addResult(`🔗 Testing iCal URL: ${icalUrl}`);
       
       const response = await fetch(icalUrl);
@@ -184,29 +187,51 @@ export default function TestCalendarExportPage() {
             <CardHeader>
               <CardTitle className="text-lg">Manual Testing Steps</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div>
-                <strong>1. Test iCal URL directly:</strong>
-                <br />
-                <code className="bg-muted px-2 py-1 rounded">
-                  http://localhost:3000/api/ical?name=Test&school=ETSINF
-                </code>
-              </div>
-              <div>
-                <strong>2. Test calendar-specific API route:</strong>
-                <br />
-                <code className="bg-muted px-2 py-1 rounded">
-                  http://localhost:3000/api/calendars/[calendar-id]/ical
-                </code>
-              </div>
-              <div>
-                <strong>3. Test Google Calendar URL:</strong>
-                <br />
-                <code className="bg-muted px-2 py-1 rounded text-xs">
-                  https://calendar.google.com/calendar/u/0/r?cid=webcal://localhost:3000/api/ical?name=Test
-                </code>
-              </div>
-            </CardContent>
+             <CardContent className="space-y-2 text-sm">
+               <div>
+                 <strong>1. Test iCal URL directly:</strong>
+                 <br />
+                 <a 
+                   href="https://upv-cal.vercel.app/api/ical?name=Test&school=ETSINF"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   className="bg-muted px-2 py-1 rounded text-blue-600 hover:underline inline-block"
+                 >
+                   https://upv-cal.vercel.app/api/ical?name=Test&school=ETSINF
+                 </a>
+               </div>
+               <div>
+                 <strong>2. Test calendar-specific API route:</strong>
+                 <br />
+                 <code className="bg-muted px-2 py-1 rounded">
+                   https://upv-cal.vercel.app/api/calendars/[calendar-id]/ical
+                 </code>
+               </div>
+               <div>
+                 <strong>3. Test Google Calendar URL:</strong>
+                 <br />
+                 <a 
+                   href="https://calendar.google.com/calendar/u/0/r?cid=webcal%3A%2F%2Fupv-cal.vercel.app%2Fapi%2Fical%3Fname%3DTest%26school%3DETSINF"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   className="bg-muted px-2 py-1 rounded text-blue-600 hover:underline inline-block text-xs break-all"
+                 >
+                   Test Google Calendar Subscription
+                 </a>
+               </div>
+               <div>
+                 <strong>4. Alternative Google Calendar URL:</strong>
+                 <br />
+                 <a 
+                   href="https://calendar.google.com/calendar/render?cid=webcal%3A%2F%2Fupv-cal.vercel.app%2Fapi%2Fical%3Fname%3DTest%26school%3DETSINF"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   className="bg-muted px-2 py-1 rounded text-blue-600 hover:underline inline-block text-xs break-all"
+                 >
+                   Test Google Calendar (Alternative)
+                 </a>
+               </div>
+             </CardContent>
           </Card>
         </CardContent>
       </Card>
