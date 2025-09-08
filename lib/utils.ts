@@ -438,21 +438,34 @@ export function generateICalContent(
 
   icalLines.push("END:VCALENDAR");
 
-  // Final fold pass: ensure every line complies with RFC 5545 (75 octets) and CRLF endings
+  // Final fold pass: ensure every line complies with RFC 5545 (75 octets, UTF-8) and CRLF endings
   const foldLongLine = (line: string) => {
-    if (line.length <= 75) return line;
-    const folded: string[] = [];
-    let start = 0;
-    while (start < line.length) {
-      if (start === 0) {
-        folded.push(line.substring(0, 75));
-        start = 75;
+    // Fast path for short ASCII lines
+    if (line.length <= 75 && /^[\x00-\x7F]*$/.test(line)) return line;
+
+    const encoder = new TextEncoder();
+    const segments: string[] = [];
+    let current = "";
+    let currentBytes = 0;
+    let isFirst = true;
+
+    for (const ch of line) {
+      const chBytes = encoder.encode(ch).length;
+      const limit = isFirst ? 75 : 74; // continuation lines include a leading space
+      if (currentBytes + chBytes > limit) {
+        segments.push(current);
+        current = ch;
+        currentBytes = chBytes;
+        isFirst = false;
       } else {
-        folded.push(" " + line.substring(start, start + 74));
-        start += 74;
+        current += ch;
+        currentBytes += chBytes;
       }
     }
-    return folded.join("\r\n");
+    if (current) segments.push(current);
+
+    if (segments.length === 1) return segments[0];
+    return segments[0] + "\r\n" + segments.slice(1).map((s) => " " + s).join("\r\n");
   };
 
   const foldedLines: string[] = [];
