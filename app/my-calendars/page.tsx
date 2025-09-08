@@ -387,19 +387,26 @@ export default function MyCalendarsPage() {
       const icalUrl = `${baseUrl}/api/calendars/${calendar.id}/ical`;
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
 
-      // Use Google Calendar's modern subscription URL with /r?cid= pattern
-      // This opens the "Add this calendar?" dialog with Add/Cancel options
-      const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(
+      // Use consistent Google Calendar URL pattern with /u/0/r
+      const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(
         calendarFeed
       )}`;
 
-      // Open Google Calendar in a new tab with proper security attributes
-      window.open(googleCalendarUrl, "_blank", "noopener,noreferrer");
-
-      toast({
-        title: "Redirigiendo a Google Calendar",
-        description: "Se abrirá Google Calendar con el enlace de suscripción.",
-      });
+      // CRITICAL: Use consistent popup approach with user gesture preservation
+      const popup = window.open(googleCalendarUrl, "_blank", "noopener,noreferrer,width=800,height=600");
+      
+      if (popup) {
+        toast({
+          title: "Abriendo Google Calendar",
+          description: "Se abrirá Google Calendar con el enlace de suscripción.",
+        });
+      } else {
+        toast({
+          title: "Ventana bloqueada",
+          description: "Por favor permite ventanas emergentes para este sitio y vuelve a intentar.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error("❌ Error opening Google Calendar:", error);
       toast({
