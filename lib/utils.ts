@@ -210,13 +210,24 @@ export function generateICalContent(
 
   validExams.forEach((exam) => {
     const hasTime = Boolean(exam.time && exam.time.trim().length);
+    const hasDurationDays = Boolean(exam.duration_day && exam.duration_day.trim().length);
     let startTime: Date | undefined;
     let endTime: Date | undefined;
+    let isMultiDay = false;
+    let dayCount = 1;
+
     if (hasTime) {
       const parseResult = parseExamDateTime(exam.date, exam.time, timeZone);
       startTime = parseResult.start;
       endTime = new Date(startTime);
       endTime.setMinutes(startTime.getMinutes() + exam.duration_minutes);
+    } else if (hasDurationDays) {
+      // Parse duration_day format (P1D, P2D, etc.)
+      const dayMatch = exam.duration_day.match(/^P(\d+)D$/i);
+      if (dayMatch) {
+        dayCount = parseInt(dayMatch[1], 10);
+        isMultiDay = dayCount > 1;
+      }
     }
 
     // Format dates for iCal - LOCAL TIME FORMAT (no Z suffix when using TZID)
@@ -314,21 +325,22 @@ export function generateICalContent(
         "CATEGORIES:EXAM,UNIVERSITY"
       );
     } else {
-      // --- new code for all-day exams when hour is unknown ---
+      // --- Handle all-day and multi-day exams ---
       const startDate = exam.date.replace(/-/g, ""); // e.g. 20251031
-      const endObj = new Date(exam.date); // +1 day
-      endObj.setDate(endObj.getDate() + 1);
+      const endObj = new Date(exam.date);
+      endObj.setDate(endObj.getDate() + dayCount); // Add the number of days
       const endDate = endObj.toISOString().slice(0, 10).replace(/-/g, "");
+      
+      const summaryText = isMultiDay 
+        ? `${exam.subject} - Exam (${dayCount} días)`
+        : `${exam.subject} - Exam (hora por confirmar)`;
+      
       icalLines.push(
         "BEGIN:VEVENT",
-        `UID:exam-${exam.id}-${exam.date}-allday@upv-exam-calendar.com`,
+        `UID:exam-${exam.id}-${exam.date}-${isMultiDay ? 'multiday' : 'allday'}@upv-exam-calendar.com`,
         `DTSTART;VALUE=DATE:${startDate}`,
         `DTEND;VALUE=DATE:${endDate}`,
-        foldLine(
-          `SUMMARY:${escapeICalText(
-            exam.subject + " - Exam (hora por confirmar)"
-          )}`
-        ),
+        foldLine(`SUMMARY:${escapeICalText(summaryText)}`),
         foldLine(`DESCRIPTION:${description}`),
         foldLine(`LOCATION:${escapeICalLocation(exam.location || "")}`),
         `CREATED:${formatICalUtcDate(now)}`,
@@ -336,7 +348,6 @@ export function generateICalContent(
         "STATUS:CONFIRMED",
         "TRANSP:OPAQUE",
         "CATEGORIES:EXAM,UNIVERSITY"
-        // Google expects end = next day
       );
     }
 
@@ -613,8 +624,11 @@ function generateUPVCompatibleICalContent(
   // Step 3: Process each valid exam
   validExams.forEach((exam) => {
     const hasTime = Boolean(exam.time && exam.time.trim().length);
+    const hasDurationDays = Boolean(exam.duration_day && exam.duration_day.trim().length);
     let startTime: Date | undefined;
     let endTime: Date | undefined;
+    let isMultiDay = false;
+    let dayCount = 1;
 
     if (hasTime) {
       const [examHours, examMinutes] = exam.time.split(":").map(Number);
@@ -641,6 +655,13 @@ function generateUPVCompatibleICalContent(
         endMinute,
         0
       );
+    } else if (hasDurationDays) {
+      // Parse duration_day format (P1D, P2D, etc.)
+      const dayMatch = exam.duration_day.match(/^P(\d+)D$/i);
+      if (dayMatch) {
+        dayCount = parseInt(dayMatch[1], 10);
+        isMultiDay = dayCount > 1;
+      }
     }
 
     // Get colors for this subject
@@ -700,11 +721,16 @@ function generateUPVCompatibleICalContent(
         "END:VEVENT"
       );
     } else {
-      // --- new code for all-day exams when hour is unknown ---
+      // --- Handle all-day and multi-day exams ---
       const startDate = exam.date.replace(/-/g, ""); // e.g. 20251031
-      const endObj = new Date(exam.date); // +1 day
-      endObj.setDate(endObj.getDate() + 1);
+      const endObj = new Date(exam.date);
+      endObj.setDate(endObj.getDate() + dayCount); // Add the number of days
       const endDate = endObj.toISOString().slice(0, 10).replace(/-/g, "");
+      
+      const summaryText = isMultiDay 
+        ? `Examen ${exam.subject} (${dayCount} días)`
+        : `Examen ${exam.subject} (hora por confirmar)`;
+      
       icalLines.push(
         "BEGIN:VEVENT",
         `DTSTART;VALUE=DATE:${startDate}`,
@@ -717,12 +743,11 @@ function generateUPVCompatibleICalContent(
         foldLine(`LOCATION:${escapeICalLocation(location)}`),
         "SEQUENCE:0",
         "STATUS:CONFIRMED",
-        foldLine(`SUMMARY:Examen ${exam.subject} (hora por confirmar)`),
+        foldLine(`SUMMARY:${summaryText}`),
         "TRANSP:OPAQUE",
         `UPV_BGCOLOR:${colors.bg}`,
         `UPV_FGCOLOR:${colors.fg}`,
         "END:VEVENT"
-        // Google expects end = next day
       );
     }
   });

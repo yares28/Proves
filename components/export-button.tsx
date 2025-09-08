@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import { toast } from "sonner"
+import { useSettings } from "@/context/settings-context"
 
 interface ExportButtonProps {
   exams: any[]
@@ -21,6 +22,7 @@ interface ExportButtonProps {
 export function ExportButton({ exams, filters }: ExportButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const { settings } = useSettings()
 
   const copyUrl = async () => {
     try {
@@ -40,16 +42,43 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
       return
     }
 
-    const events = exams.map(exam => ({
-      text: `${exam.subject} (${exam.code})`,
-      dates: exam.date,
-      details: `${exam.time} - ${exam.location}\n${exam.school} - ${exam.degree}\n${exam.year} - ${exam.semester}`
-    }))
+    try {
+      const baseUrl = window.location.origin
+      const params = new URLSearchParams()
+      // Calendar name for the subscription
+      params.set("name", "Recordatorios de exámenes")
 
-    const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(events[0].text)}&dates=${encodeURIComponent(events[0].dates)}&details=${encodeURIComponent(events[0].details)}`
-    
-    window.open(googleUrl, '_blank')
-    toast.success("Abriendo Google Calendar")
+      // Map filters into query params (arrays supported)
+      const keys = ["school", "degree", "year", "semester", "subject"] as const
+      keys.forEach((key) => {
+        const value = (filters && (filters as any)[key]) as string[] | undefined
+        if (Array.isArray(value)) {
+          value.forEach((v) => v && params.append(key, v))
+        }
+      })
+
+      // Map reminder settings to ISO-8601 negative durations
+      const reminderDurations: string[] = []
+      if (settings?.examReminders?.oneWeek) reminderDurations.push("-P7D")
+      if (settings?.examReminders?.oneDay) reminderDurations.push("-P1D")
+      if (settings?.examReminders?.oneHour) reminderDurations.push("-PT1H")
+      
+      // If no reminders are enabled, use defaults (1 day and 1 hour)
+      if (reminderDurations.length === 0) {
+        reminderDurations.push("-P1D", "-PT1H")
+      }
+      
+      reminderDurations.forEach((r) => params.append("reminder", r))
+
+      const icalUrl = `${baseUrl}/api/ical?${params.toString()}`
+      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
+      const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(calendarFeed)}`
+
+      window.open(googleCalendarUrl, '_blank')
+      toast.success("Abriendo Google Calendar")
+    } catch (e) {
+      toast.error("No se pudo abrir Google Calendar")
+    }
   }
 
   const exportToAppleCalendar = () => {
