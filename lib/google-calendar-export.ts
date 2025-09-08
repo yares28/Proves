@@ -18,7 +18,105 @@ export interface GoogleCalendarExportResult {
 }
 
 /**
+ * Pre-opens a popup window immediately to preserve user gesture, then navigates to final URL
+ * This is the most reliable approach for modern browsers with strict popup policies
+ * 
+ * @param options - Popup window configuration
+ * @returns Popup window object or null if blocked
+ */
+export function preOpenPopupWindow(options: {
+  windowFeatures?: string;
+  loadingUrl?: string;
+} = {}): Window | null {
+  const windowFeatures = options.windowFeatures || 'noopener,noreferrer,width=800,height=600';
+  const loadingUrl = options.loadingUrl || 'about:blank';
+  
+  console.log('🚀 Pre-opening popup window to preserve user gesture');
+  
+  // CRITICAL: Open popup immediately while user gesture is still active
+  const popup = window.open(loadingUrl, '_blank', windowFeatures);
+  
+  if (popup) {
+    console.log('✅ Popup pre-opened successfully');
+    
+    // Optional: Show loading content
+    if (loadingUrl === 'about:blank') {
+      popup.document.write(`
+        <html>
+          <head><title>Cargando Google Calendar...</title></head>
+          <body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding: 50px;">
+            <div>
+              <h2>🔄 Abriendo Google Calendar</h2>
+              <p>Espera un momento mientras preparamos tu calendario...</p>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+  } else {
+    console.warn('⚠️ Popup was blocked during pre-opening');
+  }
+  
+  return popup;
+}
+
+/**
+ * Navigates a pre-opened popup to the Google Calendar subscription URL
+ * 
+ * @param popup - The pre-opened popup window
+ * @param webcalUrl - The webcal:// URL for the calendar subscription
+ * @returns Success status
+ */
+export function navigatePopupToGoogleCalendar(
+  popup: Window | null, 
+  webcalUrl: string
+): GoogleCalendarExportResult {
+  try {
+    if (!popup || popup.closed) {
+      return {
+        success: false,
+        message: "Ventana cerrada antes de completar la navegación",
+        popupBlocked: true
+      };
+    }
+
+    // Validate webcal URL format
+    if (!webcalUrl.startsWith('webcal://')) {
+      throw new Error('Invalid webcal URL format');
+    }
+
+    // Use consistent Google Calendar URL pattern
+    const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(webcalUrl)}`;
+    
+    console.log(`🔗 Navigating popup to Google Calendar: ${googleCalendarUrl}`);
+    
+    // Navigate the pre-opened popup to the final URL
+    popup.location.href = googleCalendarUrl;
+    
+    return {
+      success: true,
+      message: "Abriendo Google Calendar...",
+      popupBlocked: false
+    };
+  } catch (error) {
+    console.error('❌ Error navigating popup to Google Calendar:', error);
+    
+    // Try to close the popup if there was an error
+    if (popup && !popup.closed) {
+      popup.close();
+    }
+    
+    return {
+      success: false,
+      message: "Error al abrir Google Calendar",
+      popupBlocked: false
+    };
+  }
+}
+
+/**
  * Opens Google Calendar with the provided webcal subscription URL
+ * Uses pre-popup strategy for maximum browser compatibility
  * 
  * @param webcalUrl - The webcal:// URL for the calendar subscription
  * @param options - Additional options for the popup window
@@ -31,47 +129,22 @@ export function openGoogleCalendarSubscription(
     fallbackMessage?: string;
   } = {}
 ): GoogleCalendarExportResult {
-  try {
-    // Validate webcal URL format
-    if (!webcalUrl.startsWith('webcal://')) {
-      throw new Error('Invalid webcal URL format');
-    }
-
-    // Use consistent Google Calendar URL pattern
-    // /u/0/r is more reliable than /r for multi-account scenarios
-    const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(webcalUrl)}`;
-    
-    // Default window features for optimal user experience
-    const windowFeatures = options.windowFeatures || 'noopener,noreferrer,width=800,height=600';
-    
-    console.log(`🔗 Opening Google Calendar: ${googleCalendarUrl}`);
-    
-    // CRITICAL: Use direct window.open() to preserve user gesture
-    const popup = window.open(googleCalendarUrl, '_blank', windowFeatures);
-    
-    if (popup) {
-      console.log('✅ Google Calendar popup opened successfully');
-      return {
-        success: true,
-        message: "Abriendo Google Calendar...",
-        popupBlocked: false
-      };
-    } else {
-      console.warn('⚠️ Popup was blocked by browser');
-      return {
-        success: false,
-        message: options.fallbackMessage || "Ventana bloqueada. Por favor permite ventanas emergentes para este sitio.",
-        popupBlocked: true
-      };
-    }
-  } catch (error) {
-    console.error('❌ Error opening Google Calendar:', error);
+  // Immediate popup opening to preserve user gesture
+  const popup = preOpenPopupWindow({
+    windowFeatures: options.windowFeatures
+  });
+  
+  if (!popup) {
+    console.warn('⚠️ Popup was blocked by browser');
     return {
       success: false,
-      message: "Error al abrir Google Calendar",
-      popupBlocked: false
+      message: options.fallbackMessage || "Ventana bloqueada. Por favor permite ventanas emergentes para este sitio.",
+      popupBlocked: true
     };
   }
+  
+  // Navigate to final URL (can be done after DOM operations)
+  return navigatePopupToGoogleCalendar(popup, webcalUrl);
 }
 
 /**
@@ -117,7 +190,84 @@ export function buildReminderParams(reminders: {
 }
 
 /**
- * Complete Google Calendar export workflow
+ * Advanced Google Calendar export with pre-popup strategy
+ * Opens popup immediately to preserve user gesture, then handles URL generation
+ * 
+ * @param config - Export configuration  
+ * @returns Object with popup window and completion promise
+ */
+export function exportToGoogleCalendarAdvanced(config: {
+  baseUrl: string;
+  endpoint: string;
+  calendarName: string;
+  filters: Record<string, string[]>;
+  reminders: { oneWeek?: boolean; oneDay?: boolean; oneHour?: boolean; };
+  windowFeatures?: string;
+}): {
+  popup: Window | null;
+  complete: () => GoogleCalendarExportResult;
+} {
+  // CRITICAL: Open popup IMMEDIATELY before any other operations
+  const popup = preOpenPopupWindow({
+    windowFeatures: config.windowFeatures
+  });
+  
+  if (!popup) {
+    return {
+      popup: null,
+      complete: () => ({
+        success: false,
+        message: "Ventana bloqueada. Por favor permite ventanas emergentes para este sitio.",
+        popupBlocked: true
+      })
+    };
+  }
+  
+  // Return completion function that can be called after DOM operations
+  const complete = (): GoogleCalendarExportResult => {
+    try {
+      // Build query parameters
+      const params = new URLSearchParams();
+      params.set("name", config.calendarName);
+      
+      // Add filter parameters
+      const filterKeys = ["school", "degree", "year", "semester", "subject"] as const;
+      filterKeys.forEach((key) => {
+        const values = config.filters[key];
+        if (Array.isArray(values)) {
+          values.forEach((value) => value && params.append(key, value));
+        }
+      });
+      
+      // Add reminder parameters
+      const reminderDurations = buildReminderParams(config.reminders);
+      reminderDurations.forEach((duration) => params.append("reminder", duration));
+      
+      // Generate webcal URL
+      const webcalUrl = generateWebcalUrl(config.baseUrl, config.endpoint, params);
+      
+      // Navigate the pre-opened popup
+      return navigatePopupToGoogleCalendar(popup, webcalUrl);
+    } catch (error) {
+      console.error('❌ Error completing Google Calendar export:', error);
+      
+      // Close popup on error
+      if (popup && !popup.closed) {
+        popup.close();
+      }
+      
+      return {
+        success: false,
+        message: "Error al procesar la exportación a Google Calendar"
+      };
+    }
+  };
+  
+  return { popup, complete };
+}
+
+/**
+ * Complete Google Calendar export workflow (legacy version for backward compatibility)
  * 
  * @param config - Export configuration
  * @returns Export result with success status and user message

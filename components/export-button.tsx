@@ -16,7 +16,7 @@ import {
 import Image from "next/image"
 import { toast } from "sonner"
 import { useSettings } from "@/context/settings-context"
-import { exportToGoogleCalendar as exportToGoogleCalendarUtil } from "@/lib/google-calendar-export"
+import { exportToGoogleCalendarAdvanced } from "@/lib/google-calendar-export"
 
 interface ExportButtonProps {
   exams: any[]
@@ -47,8 +47,9 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
       return
     }
 
-    // Use centralized utility for consistent behavior
-    const result = exportToGoogleCalendarUtil({
+    // CRITICAL: Use advanced pre-popup strategy to preserve user gesture
+    // Open popup IMMEDIATELY before any DOM manipulations
+    const { popup, complete } = exportToGoogleCalendarAdvanced({
       baseUrl: window.location.origin,
       endpoint: "/api/ical",
       calendarName: "Recordatorios de exámenes",
@@ -60,22 +61,30 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
       }
     })
 
+    if (!popup) {
+      // Popup was blocked immediately
+      toast.error("Ventana bloqueada. Usa el botón 'Abrir manualmente' en las instrucciones.")
+      setShowInstructions(true)
+      setIsOpen(false)
+      return
+    }
+
+    // Popup opened successfully, now we can safely do DOM operations
+    setIsOpen(false) // Close popover
+    
+    // Complete the navigation (this won't be blocked since popup is already open)
+    const result = complete()
+    
     if (result.success) {
       toast.success(result.message)
       // Show instructions dialog after popup opens
       setTimeout(() => {
         setShowInstructions(true)
       }, 1000)
-      setIsOpen(false)
     } else {
-      if (result.popupBlocked) {
-        toast.error("Ventana bloqueada. Usa el botón 'Abrir manualmente' en las instrucciones.")
-      } else {
-        toast.error(result.message)
-      }
+      toast.error(result.message)
       // Show instructions as fallback
       setShowInstructions(true)
-      setIsOpen(false)
     }
   }
 
@@ -286,8 +295,8 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      // Use centralized utility for consistency
-                      const result = exportToGoogleCalendarUtil({
+                      // Use the same advanced pre-popup strategy
+                      const { popup, complete } = exportToGoogleCalendarAdvanced({
                         baseUrl: window.location.origin,
                         endpoint: "/api/ical",
                         calendarName: "Recordatorios de exámenes",
@@ -299,10 +308,16 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
                         }
                       })
 
+                      if (!popup) {
+                        toast.error("No se pudo abrir la ventana. Verifica la configuración del navegador.")
+                        return
+                      }
+
+                      const result = complete()
                       if (result.success) {
                         toast.success("Google Calendar abierto exitosamente")
                       } else {
-                        toast.error("No se pudo abrir la ventana. Verifica la configuración del navegador.")
+                        toast.error("Error al abrir Google Calendar")
                       }
                     }}
                     className="mt-1"
