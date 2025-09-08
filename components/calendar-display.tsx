@@ -443,13 +443,13 @@ export function CalendarDisplay({
 
       // Use Google Calendar's subscription URL that triggers the "Add this calendar?" popup
       // This opens the subscription dialog with Add/Cancel buttons
-      const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(
+      const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(
         calendarFeed
       )}`;
       console.log("🔗 Final Google Calendar URL:", googleCalendarUrl);
 
-      // Open Google Calendar in a new tab with proper popup dimensions
-      const newWindow = window.open(googleCalendarUrl, "_blank", "noopener,noreferrer,width=800,height=600");
+      // Open Google Calendar in a new tab
+      const newWindow = window.open(googleCalendarUrl, "_blank", "noopener,noreferrer");
       
       if (!newWindow) {
         throw new Error("La ventana emergente fue bloqueada. Por favor, permite las ventanas emergentes para este sitio.");
