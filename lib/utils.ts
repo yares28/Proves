@@ -313,6 +313,7 @@ export function generateICalContent(
       icalLines.push(
         "BEGIN:VEVENT",
         `UID:exam-${exam.id}-${exam.date}-${exam.time}@upv-exam-calendar.com`,
+        `DTSTAMP:${formatICalUtcDate(now)}`,
         `DTSTART;TZID=${timeZone}:${formatICalLocalDate(startTime!, false)}`,
         `DTEND;TZID=${timeZone}:${formatICalLocalDate(endTime!, true)}`,
         foldLine(`SUMMARY:${escapeICalText(exam.subject + " - Exam")}`),
@@ -338,6 +339,7 @@ export function generateICalContent(
       icalLines.push(
         "BEGIN:VEVENT",
         `UID:exam-${exam.id}-${exam.date}-${isMultiDay ? 'multiday' : 'allday'}@upv-exam-calendar.com`,
+        `DTSTAMP:${formatICalUtcDate(now)}`,
         `DTSTART;VALUE=DATE:${startDate}`,
         `DTEND;VALUE=DATE:${endDate}`,
         foldLine(`SUMMARY:${escapeICalText(summaryText)}`),
@@ -435,7 +437,33 @@ export function generateICalContent(
   }
 
   icalLines.push("END:VCALENDAR");
-  return icalLines.join("\r\n");
+
+  // Final fold pass: ensure every line complies with RFC 5545 (75 octets) and CRLF endings
+  const foldLongLine = (line: string) => {
+    if (line.length <= 75) return line;
+    const folded: string[] = [];
+    let start = 0;
+    while (start < line.length) {
+      if (start === 0) {
+        folded.push(line.substring(0, 75));
+        start = 75;
+      } else {
+        folded.push(" " + line.substring(start, start + 74));
+        start += 74;
+      }
+    }
+    return folded.join("\r\n");
+  };
+
+  const foldedLines: string[] = [];
+  for (const l of icalLines) {
+    const segments = l.split("\r\n");
+    for (const seg of segments) {
+      foldedLines.push(foldLongLine(seg));
+    }
+  }
+
+  return foldedLines.join("\r\n");
 }
 
 export function downloadICalFile(
