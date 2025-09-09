@@ -441,9 +441,9 @@ export function CalendarDisplay({
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
       console.log("📱 Calendar feed URL:", calendarFeed);
 
-      // Use Google Calendar's modern subscription URL with /r?cid= pattern
+      // Use Google Calendar's modern subscription URL with /u/0/r?cid= pattern
       // This opens the "Add this calendar?" dialog with Add/Cancel options
-      const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(
+      const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(
         calendarFeed
       )}`;
       console.log("🔗 Final Google Calendar URL:", googleCalendarUrl);
