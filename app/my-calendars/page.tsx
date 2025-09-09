@@ -421,6 +421,17 @@ export default function MyCalendarsPage() {
       const packed = packFilters(normalizedFilters);
       if (packed) params.set("p", packed);
 
+      // Map user reminder settings to ISO-8601 negative durations
+      const reminderDurations: string[] = [];
+      if (settings?.examReminders?.oneWeek) reminderDurations.push("-P7D");
+      if (settings?.examReminders?.oneDay) reminderDurations.push("-P1D");
+      if (settings?.examReminders?.oneHour) reminderDurations.push("-PT1H");
+      // Default reminders if none selected
+      if (reminderDurations.length === 0) {
+        reminderDurations.push("-P1D", "-PT1H");
+      }
+      reminderDurations.forEach((r) => params.append("reminder", r));
+
       const icalUrl = `${baseUrl}/api/ical?${params.toString()}`;
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
       const primaryGoogleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`;
