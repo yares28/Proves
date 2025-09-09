@@ -454,18 +454,16 @@ export default function MyCalendarsPage() {
         icalUrl = url.toString();
       }
 
-      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
-      // Use the correct addbyurl endpoint for calendar subscriptions
-      const primaryGoogleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/addbyurl?cid=${encodeURIComponent(calendarFeed)}`;
+      // For Google Calendar subscription, use the HTTP URL directly (not webcal)
+      // Use the correct settings/addbyurl endpoint for calendar subscriptions
+      const primaryGoogleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`;
 
       // Log debug info
       console.log("🔍 [My Calendars Export] Debug Info:");
       console.log("📊 Calendar:", calendar.name);
       console.log("🔗 iCal URL:", icalUrl);
-      console.log("📱 Calendar Feed:", calendarFeed);
       console.log("🌐 Google Calendar URL:", primaryGoogleCalendarUrl);
-      console.log("🔍 cid length:", encodeURIComponent(calendarFeed).length);
-      console.log("🔍 Double encoding check:", calendarFeed.includes("%253A") ? "❌ DOUBLE ENCODED" : "✅ OK");
+      console.log("🔍 URL parameter length:", encodeURIComponent(icalUrl).length);
 
       const link = document.createElement('a');
       link.href = primaryGoogleCalendarUrl;
