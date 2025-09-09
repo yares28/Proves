@@ -455,8 +455,8 @@ export default function MyCalendarsPage() {
       }
 
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
-      // Use account-agnostic endpoint
-      const primaryGoogleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeed)}`;
+      // Use the correct addbyurl endpoint for calendar subscriptions
+      const primaryGoogleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/addbyurl?cid=${encodeURIComponent(calendarFeed)}`;
 
       // Log debug info
       console.log("🔍 [My Calendars Export] Debug Info:");
