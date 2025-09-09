@@ -40,7 +40,7 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
     }
   }
 
-  const exportToGoogleCalendar = () => {
+  const exportToGoogleCalendar = async () => {
     if (exams.length === 0) {
       toast.error("No hay exámenes para exportar")
       return
@@ -48,16 +48,14 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
 
     try {
       const baseUrl = window.location.origin
-      const params = new URLSearchParams()
-      // Calendar name for the subscription
-      params.set("name", "Recordatorios de exámenes")
-
-      // Map filters into query params (arrays supported)
+      
+      // Build filters object for token generation
+      const filterObj: Record<string, string[]> = {}
       const keys = ["school", "degree", "year", "semester", "subject"] as const
       keys.forEach((key) => {
         const value = (filters && (filters as any)[key]) as string[] | undefined
-        if (Array.isArray(value)) {
-          value.forEach((v) => v && params.append(key, v))
+        if (Array.isArray(value) && value.length > 0) {
+          filterObj[key] = value.filter(Boolean)
         }
       })
 
@@ -71,39 +69,77 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
       if (reminderDurations.length === 0) {
         reminderDurations.push("-P1D", "-PT1H")
       }
-      
-      reminderDurations.forEach((r) => params.append("reminder", r))
 
-      const icalUrl = `${baseUrl}/api/ical?${params.toString()}`
+      // Try to use short token approach first
+      let icalUrl: string
+      try {
+        const { generateUPVTokenUrl } = await import("@/lib/utils")
+        const tokenPath = await generateUPVTokenUrl(filterObj, "Recordatorios de exámenes")
+        icalUrl = `${baseUrl}${tokenPath}`
+        
+        // Add reminder parameters to token URL
+        if (reminderDurations.length > 0) {
+          const url = new URL(icalUrl)
+          reminderDurations.forEach((r) => url.searchParams.append("reminder", r))
+          icalUrl = url.toString()
+        }
+      } catch (error) {
+        console.warn("Token approach failed, falling back to direct URL:", error)
+        // Fallback to direct URL approach
+        const { generateDirectUrl } = await import("@/lib/utils")
+        const directPath = generateDirectUrl(filterObj, "Recordatorios de exámenes")
+        icalUrl = `${baseUrl}${directPath}`
+        
+        // Add reminder parameters
+        const url = new URL(icalUrl)
+        reminderDurations.forEach((r) => url.searchParams.append("reminder", r))
+        icalUrl = url.toString()
+      }
+
+      // Convert to webcal protocol
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
       
-      // Multiple approaches for better browser compatibility
-      // Using the subscription URL format that works best with modern browsers
-      const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`
+      // Use account-agnostic endpoint (avoid /u/0/ which can redirect and drop params)
+      const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeed)}`
       
-      // First, try the programmatic approach (avoids popup blockers)
+      // Log the exact URL for debugging
+      console.log("🔍 [Google Calendar Export] Debug Info:")
+      console.log("📊 Base URL:", baseUrl)
+      console.log("🔗 iCal URL:", icalUrl)
+      console.log("📱 Calendar Feed:", calendarFeed)
+      console.log("🌐 Google Calendar URL:", googleCalendarUrl)
+      console.log("🔍 cid parameter:", encodeURIComponent(calendarFeed))
+      console.log("🔍 cid length:", encodeURIComponent(calendarFeed).length)
+      console.log("🔍 Double encoding check:", calendarFeed.includes("%253A") ? "❌ DOUBLE ENCODED" : "✅ OK")
+      
+      // Validate URL length (Google Calendar has limits)
+      const cidLength = encodeURIComponent(calendarFeed).length
+      if (cidLength > 2000) {
+        console.warn("⚠️ cid parameter is very long:", cidLength, "characters")
+        toast.error("Los filtros seleccionados generan una URL muy larga. Intenta con menos filtros.")
+        return
+      }
+      
+      // Open Google Calendar
       const openCalendar = () => {
-        // Create a temporary anchor element to avoid popup blockers
         const link = document.createElement('a')
         link.href = googleCalendarUrl
         link.target = '_blank'
         link.rel = 'noopener noreferrer'
-        // Add some accessibility
         link.setAttribute('aria-label', 'Abrir Google Calendar para suscribirse al calendario')
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
       }
       
-      // Try to open the calendar
       openCalendar()
       
-      // Show instructions dialog after a short delay to let the popup open
+      // Show instructions dialog after a short delay
       setTimeout(() => {
         setShowInstructions(true)
       }, 500)
       
-      // Close the export popover after successful action
+      // Close the export popover
       setIsOpen(false)
       
     } catch (e) {
@@ -318,29 +354,60 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      const baseUrl = window.location.origin
-                      const params = new URLSearchParams()
-                      params.set("name", "Recordatorios de exámenes")
-                      const keys = ["school", "degree", "year", "semester", "subject"] as const
-                      keys.forEach((key) => {
-                        const value = (filters && (filters as any)[key]) as string[] | undefined
-                        if (Array.isArray(value)) {
-                          value.forEach((v) => v && params.append(key, v))
+                    onClick={async () => {
+                      try {
+                        const baseUrl = window.location.origin
+                        
+                        // Build filters object
+                        const filterObj: Record<string, string[]> = {}
+                        const keys = ["school", "degree", "year", "semester", "subject"] as const
+                        keys.forEach((key) => {
+                          const value = (filters && (filters as any)[key]) as string[] | undefined
+                          if (Array.isArray(value) && value.length > 0) {
+                            filterObj[key] = value.filter(Boolean)
+                          }
+                        })
+
+                        // Map reminder settings
+                        const reminderDurations: string[] = []
+                        if (settings?.examReminders?.oneWeek) reminderDurations.push("-P7D")
+                        if (settings?.examReminders?.oneDay) reminderDurations.push("-P1D")
+                        if (settings?.examReminders?.oneHour) reminderDurations.push("-PT1H")
+                        if (reminderDurations.length === 0) {
+                          reminderDurations.push("-P1D", "-PT1H")
                         }
-                      })
-                      const reminderDurations: string[] = []
-                      if (settings?.examReminders?.oneWeek) reminderDurations.push("-P7D")
-                      if (settings?.examReminders?.oneDay) reminderDurations.push("-P1D")
-                      if (settings?.examReminders?.oneHour) reminderDurations.push("-PT1H")
-                      if (reminderDurations.length === 0) {
-                        reminderDurations.push("-P1D", "-PT1H")
+
+                        // Generate URL using same approach as main function
+                        let icalUrl: string
+                        try {
+                          const { generateUPVTokenUrl } = await import("@/lib/utils")
+                          const tokenPath = await generateUPVTokenUrl(filterObj, "Recordatorios de exámenes")
+                          icalUrl = `${baseUrl}${tokenPath}`
+                          
+                          if (reminderDurations.length > 0) {
+                            const url = new URL(icalUrl)
+                            reminderDurations.forEach((r) => url.searchParams.append("reminder", r))
+                            icalUrl = url.toString()
+                          }
+                        } catch (error) {
+                          const { generateDirectUrl } = await import("@/lib/utils")
+                          const directPath = generateDirectUrl(filterObj, "Recordatorios de exámenes")
+                          icalUrl = `${baseUrl}${directPath}`
+                          
+                          const url = new URL(icalUrl)
+                          reminderDurations.forEach((r) => url.searchParams.append("reminder", r))
+                          icalUrl = url.toString()
+                        }
+
+                        const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
+                        const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeed)}`
+                        
+                        console.log("🔍 [Manual Fallback] Google Calendar URL:", googleCalendarUrl)
+                        window.open(googleCalendarUrl, '_blank', 'noopener,noreferrer')
+                      } catch (error) {
+                        console.error("Manual fallback error:", error)
+                        toast.error("Error al abrir Google Calendar manualmente")
                       }
-                      reminderDurations.forEach((r) => params.append("reminder", r))
-                      const icalUrl = `${baseUrl}/api/ical?${params.toString()}`
-                      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
-                      const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`
-                      window.open(googleCalendarUrl, '_blank', 'noopener,noreferrer')
                     }}
                     className="mt-1"
                   >

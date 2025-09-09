@@ -1,10 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getExams } from "@/actions/exam-actions";
 import { generateICalContent } from "@/lib/utils";
+import { createHash } from "crypto";
 
 // Build filters object from query params
 function buildFilters(searchParams: URLSearchParams): Record<string, string[]> {
-  // 1) Packed filters take precedence if provided
+  // 1) Short token takes precedence if provided
+  const token = searchParams.get("t");
+  if (token) {
+    try {
+      const tokenData = decodeShortToken(token);
+      if (tokenData && tokenData.filters) {
+        return tokenData.filters;
+      }
+    } catch (error) {
+      console.error("Failed to decode short token:", error);
+      // Fall through to other methods
+    }
+  }
+
+  // 2) Packed filters take precedence if provided
   const packed = searchParams.get("p");
   if (packed) {
     try {
@@ -25,6 +40,35 @@ function buildFilters(searchParams: URLSearchParams): Record<string, string[]> {
     if (values && values.length > 0) filters[key] = values.filter(Boolean);
   }
   return filters;
+}
+
+// Decode short token to get filters and calendar name
+function decodeShortToken(token: string): { name: string; filters: Record<string, string[]> } | null {
+  try {
+    // Check if token exists in global store (server-side)
+    if (typeof global !== 'undefined' && (global as any).tokenStore) {
+      const tokenData = (global as any).tokenStore.get(token);
+      if (tokenData) {
+        return tokenData;
+      }
+    }
+    
+    // Fallback: decode from base64url
+    const tokenString = Buffer.from(token, 'base64url').toString('utf-8');
+    const tokenData = JSON.parse(tokenString);
+    
+    // Validate token is not too old (24 hours)
+    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+    if (Date.now() - tokenData.timestamp > maxAge) {
+      console.warn("Token expired:", token);
+      return null;
+    }
+    
+    return tokenData;
+  } catch (error) {
+    console.error("Failed to decode token:", error);
+    return null;
+  }
 }
 
 // Parse reminder durations like -P7D, -P1D, -PT2H, -PT30M
@@ -111,20 +155,107 @@ export async function GET(req: NextRequest) {
       // Fall back to defaults if none provided
       reminderMinutes: reminderMinutes ?? undefined,
       useUPVFormat: false,
+      calendarDescription:
+        "Suscripción automática con recordatorios de exámenes (UPV)",
+      calendarUrl: url.toString(),
     });
+
+    // Compute ETag as weak validator from content length + sha1
+    const contentLength = Buffer.byteLength(ics, "utf-8");
+    const hash = createHash("sha1").update(ics).digest("base64");
+    const etag = `W/"${contentLength}-${hash}"`;
+    const lastModified = new Date().toUTCString();
+
+    const ifNoneMatch = req.headers.get("if-none-match");
+    const ifModifiedSince = req.headers.get("if-modified-since");
+
+    const headers: Record<string, string> = {
+      "Content-Type": "text/calendar; charset=utf-8",
+      "Content-Disposition": `inline; filename=upv-exams.ics`,
+      "Cache-Control": "public, max-age=300",
+      ETag: etag,
+      "Last-Modified": lastModified,
+    };
+
+    // Conditional request handling
+    if (ifNoneMatch && ifNoneMatch === etag) {
+      return new NextResponse(null, { status: 304, headers });
+    }
+    if (ifModifiedSince) {
+      const ims = Date.parse(ifModifiedSince);
+      const lm = Date.parse(lastModified);
+      if (!Number.isNaN(ims) && !Number.isNaN(lm) && lm <= ims) {
+        return new NextResponse(null, { status: 304, headers });
+      }
+    }
 
     return new NextResponse(ics, {
       status: 200,
-      headers: {
-        "Content-Type": "text/calendar; charset=utf-8",
-        "Content-Disposition": `inline; filename=upv-exams.ics`,
-        "Cache-Control": "no-store, must-revalidate",
-        Pragma: "no-cache",
-      },
+      headers,
     });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to generate ICS" },
+      { status: 500 }
+    );
+  }
+}
+
+
+export async function HEAD(req: NextRequest) {
+  try {
+    const url = new URL(req.url);
+    const params = url.searchParams;
+
+    const calendarName = params.get("name") || "Recordatorios de exámenes";
+    const filters = buildFilters(params);
+    const reminderMinutes = parseReminderDurations(params);
+
+    // Fetch exams matching filters
+    const exams = await getExams(filters as any);
+
+    // Generate ICS to derive validators (keeps logic consistent with GET)
+    const ics = generateICalContent(exams as any, {
+      calendarName,
+      timeZone: "Europe/Madrid",
+      reminderMinutes: reminderMinutes ?? undefined,
+      useUPVFormat: false,
+      calendarDescription:
+        "Suscripción automática con recordatorios de exámenes (UPV)",
+      calendarUrl: url.toString(),
+    });
+
+    const contentLength = Buffer.byteLength(ics, "utf-8");
+    const hash = createHash("sha1").update(ics).digest("base64");
+    const etag = `W/"${contentLength}-${hash}"`;
+    const lastModified = new Date().toUTCString();
+
+    const headers: Record<string, string> = {
+      "Content-Type": "text/calendar; charset=utf-8",
+      "Content-Disposition": `inline; filename=upv-exams.ics`,
+      "Cache-Control": "public, max-age=300",
+      ETag: etag,
+      "Last-Modified": lastModified,
+    };
+
+    const ifNoneMatch = req.headers.get("if-none-match");
+    const ifModifiedSince = req.headers.get("if-modified-since");
+
+    if (ifNoneMatch && ifNoneMatch === etag) {
+      return new NextResponse(null, { status: 304, headers });
+    }
+    if (ifModifiedSince) {
+      const ims = Date.parse(ifModifiedSince);
+      const lm = Date.parse(lastModified);
+      if (!Number.isNaN(ims) && !Number.isNaN(lm) && lm <= ims) {
+        return new NextResponse(null, { status: 304, headers });
+      }
+    }
+
+    return new NextResponse(null, { status: 200, headers });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to generate headers" },
       { status: 500 }
     );
   }

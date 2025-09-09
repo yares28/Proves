@@ -407,7 +407,7 @@ export default function MyCalendarsPage() {
     }
   };
 
-  const exportExamsToGoogleCalendar = (calendar: SavedCalendar) => {
+  const exportExamsToGoogleCalendar = async (calendar: SavedCalendar) => {
     try {
       // Compute URLs synchronously to preserve the user gesture
       let baseUrl = window.location.origin;
@@ -415,12 +415,9 @@ export default function MyCalendarsPage() {
         baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
       }
 
-      const params = new URLSearchParams();
-      params.set("name", calendar.name);
+      // Normalize filters for token generation
       const normalizedFilters = normalizeSavedFilters(calendar.filters);
-      const packed = packFilters(normalizedFilters);
-      if (packed) params.set("p", packed);
-
+      
       // Map user reminder settings to ISO-8601 negative durations
       const reminderDurations: string[] = [];
       if (settings?.examReminders?.oneWeek) reminderDurations.push("-P7D");
@@ -430,11 +427,45 @@ export default function MyCalendarsPage() {
       if (reminderDurations.length === 0) {
         reminderDurations.push("-P1D", "-PT1H");
       }
-      reminderDurations.forEach((r) => params.append("reminder", r));
 
-      const icalUrl = `${baseUrl}/api/ical?${params.toString()}`;
+      // Try to use short token approach first
+      let icalUrl: string;
+      try {
+        const { generateUPVTokenUrl } = await import("@/lib/utils");
+        const tokenPath = await generateUPVTokenUrl(normalizedFilters, calendar.name);
+        icalUrl = `${baseUrl}${tokenPath}`;
+        
+        // Add reminder parameters to token URL
+        if (reminderDurations.length > 0) {
+          const url = new URL(icalUrl);
+          reminderDurations.forEach((r) => url.searchParams.append("reminder", r));
+          icalUrl = url.toString();
+        }
+      } catch (error) {
+        console.warn("Token approach failed, falling back to direct URL:", error);
+        // Fallback to direct URL approach
+        const { generateDirectUrl } = await import("@/lib/utils");
+        const directPath = generateDirectUrl(normalizedFilters, calendar.name);
+        icalUrl = `${baseUrl}${directPath}`;
+        
+        // Add reminder parameters
+        const url = new URL(icalUrl);
+        reminderDurations.forEach((r) => url.searchParams.append("reminder", r));
+        icalUrl = url.toString();
+      }
+
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
-      const primaryGoogleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(calendarFeed)}`;
+      // Use account-agnostic endpoint
+      const primaryGoogleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeed)}`;
+
+      // Log debug info
+      console.log("🔍 [My Calendars Export] Debug Info:");
+      console.log("📊 Calendar:", calendar.name);
+      console.log("🔗 iCal URL:", icalUrl);
+      console.log("📱 Calendar Feed:", calendarFeed);
+      console.log("🌐 Google Calendar URL:", primaryGoogleCalendarUrl);
+      console.log("🔍 cid length:", encodeURIComponent(calendarFeed).length);
+      console.log("🔍 Double encoding check:", calendarFeed.includes("%253A") ? "❌ DOUBLE ENCODED" : "✅ OK");
 
       const link = document.createElement('a');
       link.href = primaryGoogleCalendarUrl;
