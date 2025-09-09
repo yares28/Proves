@@ -96,21 +96,26 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
         icalUrl = url.toString()
       }
 
-      // For Google Calendar subscription, use the HTTP URL directly (not webcal)
-      // Use the correct settings/addbyurl endpoint for calendar subscriptions
-      const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`
+      // Convert to webcal protocol
+      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
+      
+      // Use the correct Google Calendar URL format for subscription popup
+      const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`
       
       // Log the exact URL for debugging
       console.log("🔍 [Google Calendar Export] Debug Info:")
       console.log("📊 Base URL:", baseUrl)
       console.log("🔗 iCal URL:", icalUrl)
+      console.log("📱 Calendar Feed:", calendarFeed)
       console.log("🌐 Google Calendar URL:", googleCalendarUrl)
-      console.log("🔍 URL parameter length:", encodeURIComponent(icalUrl).length)
+      console.log("🔍 cid parameter:", encodeURIComponent(calendarFeed))
+      console.log("🔍 cid length:", encodeURIComponent(calendarFeed).length)
+      console.log("🔍 Double encoding check:", calendarFeed.includes("%253A") ? "❌ DOUBLE ENCODED" : "✅ OK")
       
       // Validate URL length (Google Calendar has limits)
-      const urlLength = encodeURIComponent(icalUrl).length
-      if (urlLength > 2000) {
-        console.warn("⚠️ URL parameter is very long:", urlLength, "characters")
+      const cidLength = encodeURIComponent(calendarFeed).length
+      if (cidLength > 2000) {
+        console.warn("⚠️ cid parameter is very long:", cidLength, "characters")
         toast.error("Los filtros seleccionados generan una URL muy larga. Intenta con menos filtros.")
         return
       }
@@ -394,7 +399,8 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
                           icalUrl = url.toString()
                         }
 
-                        const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/settings/addbyurl?url=${encodeURIComponent(icalUrl)}`
+                        const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
+                        const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`
                         
                         console.log("🔍 [Manual Fallback] Google Calendar URL:", googleCalendarUrl)
                         window.open(googleCalendarUrl, '_blank', 'noopener,noreferrer')
