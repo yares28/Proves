@@ -99,8 +99,8 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
       // Convert to webcal protocol
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
       
-      // Use account-agnostic endpoint (avoid /u/0/ which can redirect and drop params)
-      const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeed)}`
+      // Use the correct addbyurl endpoint for calendar subscriptions
+      const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/addbyurl?cid=${encodeURIComponent(calendarFeed)}`
       
       // Log the exact URL for debugging
       console.log("🔍 [Google Calendar Export] Debug Info:")
@@ -400,7 +400,7 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
                         }
 
                         const calendarFeed = icalUrl.replace(/^https?:/, "webcal:")
-                        const googleCalendarUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeed)}`
+                        const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r/addbyurl?cid=${encodeURIComponent(calendarFeed)}`
                         
                         console.log("🔍 [Manual Fallback] Google Calendar URL:", googleCalendarUrl)
                         window.open(googleCalendarUrl, '_blank', 'noopener,noreferrer')
