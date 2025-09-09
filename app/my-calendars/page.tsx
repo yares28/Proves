@@ -407,110 +407,32 @@ export default function MyCalendarsPage() {
     }
   };
 
-  const exportExamsToGoogleCalendar = async (calendar: SavedCalendar) => {
+  const exportExamsToGoogleCalendar = (calendar: SavedCalendar) => {
     try {
-      console.log("🔄 Starting Google Calendar export for calendar:", calendar.name);
-
-      // Use production domain instead of localhost to prevent Google Calendar refresh loops
+      // Compute URLs synchronously to preserve the user gesture
       let baseUrl = window.location.origin;
-
-      // If we're in development or localhost, use a production URL
       if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")) {
-        // Try to get production URL from environment or use a default
-        baseUrl =
-          process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
+        baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
       }
 
-      // Use the working /api/ical endpoint with calendar filters instead of calendar-specific route
-      // Build compact packed filters parameter
       const params = new URLSearchParams();
       params.set("name", calendar.name);
       const normalizedFilters = normalizeSavedFilters(calendar.filters);
       const packed = packFilters(normalizedFilters);
       if (packed) params.set("p", packed);
 
-      // Construct iCal calendar feed URL using the working /api/ical endpoint
       const icalUrl = `${baseUrl}/api/ical?${params.toString()}`;
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
+      const primaryGoogleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`;
 
-      console.log("📅 Generated iCal URLs:", {
-        icalUrl,
-        calendarFeed,
-        filters: calendar.filters
-      });
-
-      // Test the iCal URL first to make sure it's working
-      console.log("🧪 Testing iCal URL accessibility:", icalUrl);
-      
-      try {
-        const testResponse = await fetch(icalUrl, { method: 'HEAD' });
-        console.log("📊 iCal URL test result:", {
-          status: testResponse.status,
-          statusText: testResponse.statusText,
-          headers: Object.fromEntries(testResponse.headers.entries())
-        });
-        
-        if (!testResponse.ok) {
-          console.error("❌ iCal URL returned error status:", testResponse.status);
-          toast({
-            title: "Error de Calendario",
-            description: `El feed del calendario devolvió un error: ${testResponse.status}`,
-            variant: "destructive",
-          });
-          return;
-        }
-      } catch (testError) {
-        console.error("❌ iCal URL test failed:", testError);
-        toast({
-          title: "Error de Calendario",
-          description: "No se pudo acceder al feed del calendario. Verifica tu conexión a internet.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Multiple Google Calendar URL patterns for compatibility
-      const googleCalendarUrls = [
-        // Modern pattern (current primary)
-        `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`,
-        // Alternative modern pattern
-        `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeed)}`,
-        // Direct ICS import pattern
-        `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(icalUrl)}`,
-      ];
-
-      console.log("🔗 Testing Google Calendar URL patterns:", googleCalendarUrls);
-
-      // Try the primary URL first
-      const primaryGoogleCalendarUrl = googleCalendarUrls[0];
-      console.log("🔗 Using primary Google Calendar URL:", primaryGoogleCalendarUrl);
-
-      // Use anchor element approach to avoid popup blockers (same as export-button.tsx)
-      const openCalendar = () => {
-        const link = document.createElement('a');
-        link.href = primaryGoogleCalendarUrl;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.setAttribute('aria-label', `Abrir Google Calendar para suscribirse al calendario ${calendar.name}`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Fallback: if the primary doesn't work, provide manual options
-        setTimeout(() => {
-          if (confirm("¿No se abrió Google Calendar? Haz clic en OK para probar un método alternativo.")) {
-            const fallbackLink = document.createElement('a');
-            fallbackLink.href = googleCalendarUrls[1];
-            fallbackLink.target = '_blank';
-            fallbackLink.rel = 'noopener noreferrer';
-            document.body.appendChild(fallbackLink);
-            fallbackLink.click();
-            document.body.removeChild(fallbackLink);
-          }
-        }, 3000);
-      };
-
-      openCalendar();
+      const link = document.createElement('a');
+      link.href = primaryGoogleCalendarUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.setAttribute('aria-label', `Abrir Google Calendar para suscribirse al calendario ${calendar.name}`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
       toast({
         title: "Redirigiendo a Google Calendar",
