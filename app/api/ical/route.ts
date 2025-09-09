@@ -53,8 +53,20 @@ function decodeShortToken(token: string): { name: string; filters: Record<string
       }
     }
     
-    // Fallback: decode from base64url
-    const tokenString = Buffer.from(token, 'base64url').toString('utf-8');
+    // Fallback: decode from base64url with compatibility
+    let tokenString: string;
+    try {
+      // Try native base64url decoding if available (Node.js 16+)
+      tokenString = Buffer.from(token, 'base64url').toString('utf-8');
+    } catch (error) {
+      // Manual base64url decoding for older Node.js versions
+      // Convert base64url back to base64
+      const base64 = token.replace(/-/g, '+').replace(/_/g, '/');
+      // Add padding if necessary
+      const padLen = (4 - (base64.length % 4)) % 4;
+      const paddedBase64 = base64 + '='.repeat(padLen);
+      tokenString = Buffer.from(paddedBase64, 'base64').toString('utf-8');
+    }
     const tokenData = JSON.parse(tokenString);
     
     // Validate token is not too old (24 hours)
