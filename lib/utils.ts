@@ -11,6 +11,8 @@ export interface ICalExportOptions {
   reminderMinutes?: number[];
   timeZone?: string;
   useUPVFormat?: boolean;
+  calendarDescription?: string;
+  calendarUrl?: string;
 }
 
 // Helper function to escape iCalendar text fields
@@ -156,10 +158,17 @@ export function generateICalContent(
     reminderMinutes = [24 * 60, 60], // 1 day and 1 hour before
     timeZone = "Europe/Madrid",
     useUPVFormat = true, // New option to use UPV-compatible format
+    calendarDescription,
+    calendarUrl,
   } = options;
 
   if (useUPVFormat) {
-    return generateUPVCompatibleICalContent(exams, calendarName);
+    return generateUPVCompatibleICalContent(
+      exams,
+      calendarName,
+      calendarDescription,
+      calendarUrl
+    );
   }
 
   const icalLines = [
@@ -171,6 +180,14 @@ export function generateICalContent(
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
   ];
+
+  // Optional calendar description and canonical URL
+  if (calendarDescription && calendarDescription.trim().length > 0) {
+    icalLines.push(`X-WR-CALDESC:${escapeICalText(calendarDescription)}`);
+  }
+  if (calendarUrl && calendarUrl.trim().length > 0) {
+    icalLines.push(`URL:${calendarUrl}`);
+  }
 
   // Add dynamic timezone component for better compatibility
   const timezoneLines = generateTimezoneComponent(timeZone);
@@ -223,7 +240,7 @@ export function generateICalContent(
       endTime.setMinutes(startTime.getMinutes() + exam.duration_minutes);
     } else if (hasDurationDays) {
       // Parse duration_day format (P1D, P2D, etc.)
-      const dayMatch = exam.duration_day.match(/^P(\d+)D$/i);
+      const dayMatch = (exam.duration_day as string).match(/^P(\d+)D$/i);
       if (dayMatch) {
         dayCount = parseInt(dayMatch[1], 10);
         isMultiDay = dayCount > 1;
@@ -532,7 +549,9 @@ export function generateGoogleCalendarUrl(exam: Exam): string {
 // UPV-compatible iCal generator following official UPV format
 function generateUPVCompatibleICalContent(
   exams: Exam[],
-  calendarName: string
+  calendarName: string,
+  calendarDescription?: string,
+  calendarUrl?: string
 ): string {
   // Step 1: Use UTC timezone strategy (no VTIMEZONE block)
   const icalLines = [
@@ -545,6 +564,13 @@ function generateUPVCompatibleICalContent(
     "X-APPLE-CALENDAR-COLOR:#0252D4",
     "X-WR-TIMEZONE:Europe/Madrid",
   ];
+
+  if (calendarDescription && calendarDescription.trim().length > 0) {
+    icalLines.push(`X-WR-CALDESC:${escapeICalText(calendarDescription)}`);
+  }
+  if (calendarUrl && calendarUrl.trim().length > 0) {
+    icalLines.push(`URL:${calendarUrl}`);
+  }
 
   // Step 2: Generate events in UPV format
   const now = new Date();
@@ -625,19 +651,29 @@ function generateUPVCompatibleICalContent(
 
   // Fold long lines (RFC 5545 compliance)
   const foldLine = (line: string) => {
-    if (line.length <= 75) return line;
-    const folded = [];
-    let start = 0;
-    while (start < line.length) {
-      if (start === 0) {
-        folded.push(line.substring(0, 75));
-        start = 75;
+    // Byte-accurate folding (75 octets per RFC 5545)
+    if (line.length <= 75 && /^[\x00-\x7F]*$/.test(line)) return line;
+    const encoder = new TextEncoder();
+    const segments: string[] = [];
+    let current = "";
+    let currentBytes = 0;
+    let isFirst = true;
+    for (const ch of line) {
+      const chBytes = encoder.encode(ch).length;
+      const limit = isFirst ? 75 : 74; // continuation lines get a leading space later
+      if (currentBytes + chBytes > limit) {
+        segments.push(current);
+        current = ch;
+        currentBytes = chBytes;
+        isFirst = false;
       } else {
-        folded.push(" " + line.substring(start, start + 74));
-        start += 74;
+        current += ch;
+        currentBytes += chBytes;
       }
     }
-    return folded.join("\r\n");
+    if (current) segments.push(current);
+    if (segments.length === 1) return segments[0];
+    return segments[0] + "\r\n" + segments.slice(1).map((s) => " " + s).join("\r\n");
   };
 
   // Step 3: Process each valid exam
@@ -676,7 +712,7 @@ function generateUPVCompatibleICalContent(
       );
     } else if (hasDurationDays) {
       // Parse duration_day format (P1D, P2D, etc.)
-      const dayMatch = exam.duration_day.match(/^P(\d+)D$/i);
+      const dayMatch = (exam.duration_day as string).match(/^P(\d+)D$/i);
       if (dayMatch) {
         dayCount = parseInt(dayMatch[1], 10);
         isMultiDay = dayCount > 1;
@@ -862,7 +898,31 @@ function generateStableId(exam: Exam): string {
   return Math.abs(hash).toString(16).toUpperCase().padStart(8, "0");
 }
 
-// Generate UPV-style token URL with direct parameter encoding (more reliable than token storage)
+// Generate short token for calendar URLs to avoid long cid parameters
+function generateShortToken(filters: Record<string, string[]>, calendarName: string): string {
+  const tokenData = {
+    name: calendarName,
+    filters: filters,
+    timestamp: Date.now()
+  };
+  
+  // Create a short, URL-safe token
+  const tokenString = JSON.stringify(tokenData);
+  const token = Buffer.from(tokenString).toString('base64url');
+  
+  // Store token temporarily (in production, use Redis or database)
+  if (typeof window === 'undefined') {
+    // Server-side: store in a simple Map (for demo - use proper storage in production)
+    if (!(global as any).tokenStore) {
+      (global as any).tokenStore = new Map();
+    }
+    (global as any).tokenStore.set(token, tokenData);
+  }
+  
+  return token;
+}
+
+// Generate UPV-style token URL with short token approach
 export async function generateUPVTokenUrl(
   filters: Record<string, string[]>,
   calendarName: string = "UPV Exams"
@@ -870,14 +930,26 @@ export async function generateUPVTokenUrl(
   console.log("🔧 [generateUPVTokenUrl] Starting with filters:", filters);
   console.log("🔧 [generateUPVTokenUrl] Calendar name:", calendarName);
 
-  // Use direct API route with parameters instead of token-based approach
-  // This is more reliable for serverless environments
-  const params = new URLSearchParams();
+  // Generate short token instead of long query string
+  const token = generateShortToken(filters, calendarName);
+  console.log("🔧 [generateUPVTokenUrl] Generated short token:", token);
   
-  // URLSearchParams automatically handles encoding, so we don't need to double-encode
+  // Use short token URL
+  const shortUrl = `/api/ical?t=${token}`;
+  console.log("🔧 [generateUPVTokenUrl] Short API URL:", shortUrl);
+  
+  return shortUrl;
+}
+
+// Fallback function for direct parameter encoding (when token approach fails)
+export function generateDirectUrl(
+  filters: Record<string, string[]>,
+  calendarName: string = "UPV Exams"
+): string {
+  const params = new URLSearchParams();
   params.set("name", calendarName);
 
-  // Add individual filter parameters - URLSearchParams handles encoding automatically
+  // Add individual filter parameters
   if (filters.school && filters.school.length > 0) {
     filters.school.forEach((school) => params.append("school", school));
   }
@@ -894,20 +966,5 @@ export async function generateUPVTokenUrl(
     filters.subject.forEach((subject) => params.append("subject", subject));
   }
 
-  const queryString = params.toString();
-  console.log("🔧 [generateUPVTokenUrl] Generated query string:", queryString);
-  console.log("🔧 [generateUPVTokenUrl] Total filter categories:", Object.keys(filters).length);
-  console.log("🔧 [generateUPVTokenUrl] Filter details:", {
-    schools: filters.school?.length || 0,
-    degrees: filters.degree?.length || 0,
-    years: filters.year?.length || 0,
-    semesters: filters.semester?.length || 0,
-    subjects: filters.subject?.length || 0
-  });
-
-  // Use direct API route instead of token-based approach for better reliability
-  const directUrl = `/api/ical?${queryString}`;
-  console.log("🔧 [generateUPVTokenUrl] Direct API URL:", directUrl);
-  
-  return directUrl;
+  return `/api/ical?${params.toString()}`;
 }
