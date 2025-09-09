@@ -434,7 +434,7 @@ export default function MyCalendarsPage() {
 
       const icalUrl = `${baseUrl}/api/ical?${params.toString()}`;
       const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
-      const primaryGoogleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`;
+      const primaryGoogleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(calendarFeed)}`;
 
       const link = document.createElement('a');
       link.href = primaryGoogleCalendarUrl;
