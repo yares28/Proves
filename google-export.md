@@ -268,6 +268,7 @@ Benefits:
 
 4. **Multi-Day Events**:
    - Test with exams that have `duration_day` set (P2D, P3D)
+   - All day event spanning various days
    - Verify events span correct number of days
    - Check event titles include day count
 
@@ -349,23 +350,4 @@ headers: {
    - Multi-day events are DATE-only (no timezone)
    - Verify client timezone handling
 
-4. **Google Calendar Not Opening** (FIXED):
-   - ✅ **Popup Blocker Fix**: Now uses anchor elements instead of `window.open()`
-   - ✅ **Updated URL**: Uses `/calendar/u/0/r` endpoint for better compatibility
-   - ✅ **Fallback Dialog**: Provides manual open button if automatic opening fails
-   - ✅ **User Instructions**: Step-by-step guidance for subscription process
-   - Check console for any JavaScript errors
-   - Verify network connectivity
 
-### Debug Tools
-
-- Browser Network tab for API requests
-- ICS validators for calendar format
-- Calendar import tools for testing
-- Supabase logs for database queries
-
-## Conclusion
-
-The Google Calendar export feature provides a modern, user-friendly way to sync exam schedules with external calendars. The implementation leverages web standards (webcal, RFC 5545) and provides extensive customization through user preferences and filter options.
-
-The architecture is designed for scalability and maintainability, with clear separation of concerns and comprehensive error handling. Future enhancements can be added incrementally without breaking existing functionality.
