@@ -168,6 +168,48 @@ export default function TestCalendarExportPage() {
       const webcalUrl = testIcalUrl.replace(/^https?:/, "webcal:");
       const googleUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(webcalUrl)}`;
       addResult(`🔗 Generated Google Calendar URL: ${googleUrl}`);
+
+      // Verify URL contains required parameters and expected encoding
+      const hasGoogleHost = googleUrl.includes("calendar.google.com");
+      const hasCidParam = googleUrl.includes("cid=");
+      const expectedCid = encodeURIComponent(webcalUrl);
+      const cidMatches = googleUrl.includes(`cid=${expectedCid}`);
+
+      addResult(hasGoogleHost ? "✅ URL points to Google Calendar" : "❌ URL does not point to Google Calendar");
+      addResult(hasCidParam ? "✅ URL contains 'cid' parameter" : "❌ URL missing 'cid' parameter");
+      addResult(cidMatches ? "✅ 'cid' matches encoded webcal URL" : "❌ 'cid' does not match expected encoded webcal URL");
+
+      // Attempt to open Google Calendar add-by-URL popup/tab
+      try {
+        const popup = typeof window !== "undefined"
+          ? window.open(googleUrl, "_blank", "noopener,noreferrer,width=900,height=700")
+          : null;
+
+        if (popup) {
+          addResult("✅ Attempted to open Google Calendar add-by-URL popup/tab");
+          // Best-effort verification (cannot inspect cross-origin content)
+          setTimeout(() => {
+            if (popup && !popup.closed) {
+              addResult("✅ Popup/tab appears open (verification limited by browser security)");
+            } else {
+              addResult("⚠️ Popup/tab was closed or could not be verified");
+            }
+          }, 1500);
+        } else {
+          // Fallback: trigger a new tab via ephemeral anchor click (helps with popup blockers)
+          const anchor = document.createElement("a");
+          anchor.href = googleUrl;
+          anchor.target = "_blank";
+          anchor.rel = "noopener noreferrer";
+          anchor.style.display = "none";
+          document.body.appendChild(anchor);
+          anchor.click();
+          document.body.removeChild(anchor);
+          addResult("⚠️ Popup likely blocked; attempted fallback open via anchor click");
+        }
+      } catch (err) {
+        addResult(`⚠️ Could not automatically open Google Calendar: ${err}`);
+      }
       
     } catch (error) {
       addResult(`❌ Google Calendar export test failed: ${error}`);
