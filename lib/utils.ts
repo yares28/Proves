@@ -906,9 +906,18 @@ function generateShortToken(filters: Record<string, string[]>, calendarName: str
     timestamp: Date.now()
   };
   
-  // Create a short, URL-safe token
+  // Create a short, URL-safe token with manual base64url encoding
   const tokenString = JSON.stringify(tokenData);
-  const token = Buffer.from(tokenString).toString('base64url');
+  let token: string;
+  
+  try {
+    // Try native base64url if available (Node.js 16+)
+    token = Buffer.from(tokenString).toString('base64url');
+  } catch (error) {
+    // Fallback: manual base64url encoding for older Node.js versions
+    const base64 = Buffer.from(tokenString).toString('base64');
+    token = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  }
   
   // Store token temporarily (in production, use Redis or database)
   if (typeof window === 'undefined') {
