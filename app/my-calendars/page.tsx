@@ -460,25 +460,59 @@ export default function MyCalendarsPage() {
         icalUrl = url.toString();
       }
 
-      // Use HTTPS for Google Calendar (not webcal://) - Google expects public HTTPS iCal feeds
-      const googleCid = encodeURIComponent(icalUrl); // Keep HTTPS scheme for Google
-      // Use Add-by-URL page to force subscription dialog
-      const primaryGoogleCalendarUrl = `https://calendar.google.com/calendar/r/settings/addbyurl?cid=${googleCid}`;
+      // Multiple approaches for Google Calendar subscription (try primary, fallback to alternatives)
+      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
+      
+      // Define multiple URL formats to try in order of preference
+      const googleCalendarUrls = [
+        // Primary: Standard webcal approach without /u/0 (most compatible)
+        `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(calendarFeed)}`,
+        // Fallback 1: Direct HTTPS URL (works when webcal doesn't)
+        `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(icalUrl)}`,
+        // Fallback 2: With user specification
+        `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`,
+        // Fallback 3: Add by URL page
+        `https://calendar.google.com/calendar/r/settings/addbyurl?cid=${encodeURIComponent(icalUrl)}`,
+      ];
 
       // Log debug info
       console.log("🔍 [My Calendars Export] Debug Info:");
       console.log("📊 Calendar:", calendar.name);
       console.log("🔗 iCal URL:", icalUrl);
-      console.log("🌐 Google Calendar URL:", primaryGoogleCalendarUrl);
-      console.log("🔍 cid length:", googleCid.length);
+      console.log("📱 Calendar Feed:", calendarFeed);
+      console.log("🌐 Primary Google Calendar URL:", googleCalendarUrls[0]);
+      console.log("🔍 cid length:", encodeURIComponent(calendarFeed).length);
+      console.log("🔍 Double encoding check:", calendarFeed.includes("%253A") ? "❌ DOUBLE ENCODED" : "✅ OK");
+      console.log("🔄 All alternative URLs:", googleCalendarUrls);
 
       // Navigate the already-opened tab to Google Calendar
-      newTab.location.href = primaryGoogleCalendarUrl;
-
-      toast({
-        title: "Redirigiendo a Google Calendar",
-        description: "Se abrirá Google Calendar con el enlace de suscripción para " + calendar.name,
-      });
+      try {
+        newTab.location.href = googleCalendarUrls[0];
+        
+        toast({
+          title: "Redirigiendo a Google Calendar",
+          description: "Se abrirá Google Calendar con el enlace de suscripción para " + calendar.name,
+        });
+      } catch (navigationError) {
+        console.error("❌ Error navigating to Google Calendar:", navigationError);
+        console.log("🔄 Trying first fallback URL...");
+        
+        // Try the first fallback (direct HTTPS)
+        try {
+          newTab.location.href = googleCalendarUrls[1];
+          toast({
+            title: "Redirigiendo a Google Calendar (método alternativo)",
+            description: "Se abrirá Google Calendar para " + calendar.name,
+          });
+        } catch (secondError) {
+          console.error("❌ Second attempt failed, trying final fallback:", secondError);
+          newTab.location.href = googleCalendarUrls[3]; // Add by URL page
+          toast({
+            title: "Redirigiendo a Google Calendar (configuración manual)",
+            description: "Se abrirá la página de configuración de Google Calendar",
+          });
+        }
+      }
     } catch (error) {
       console.error("❌ Error opening Google Calendar:", error);
       toast({

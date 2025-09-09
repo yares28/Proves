@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Calendar Export Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        .test-section {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #3a3a3a;
+        }
+        button {
+            background: #22c55e;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #16a34a;
+        }
+        .log-output {
+            background: #111;
+            border: 1px solid #333;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .url-display {
+            background: #0f172a;
+            border: 1px solid #1e293b;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Google Calendar Export Test</h1>
+    
+    <div class="test-section">
+        <h2>Test Current Implementation</h2>
+        <p>This test will generate Google Calendar URLs using the current implementation approach.</p>
+        
+        <button onclick="testCurrentImplementation()">Test Current Implementation</button>
+        <button onclick="testAlternativeApproaches()">Test Alternative Approaches</button>
+        <button onclick="clearLog()">Clear Log</button>
+        
+        <div id="output" class="log-output"></div>
+    </div>
+
+    <script>
+        function log(message) {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.textContent += `[${timestamp}] ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('output').textContent = '';
+        }
+
+        function testCurrentImplementation() {
+            log('=== Testing Current Implementation ===');
+            
+            try {
+                // Simulate the current implementation
+                const baseUrl = window.location.origin;
+                const calendarName = "Test Calendar";
+                
+                // Build iCal URL
+                const params = new URLSearchParams();
+                params.set("name", calendarName);
+                params.append("school", "ETSINF");
+                params.append("reminder", "-P1D");
+                params.append("reminder", "-PT1H");
+                
+                const icalUrl = `${baseUrl}/api/ical?${params.toString()}`;
+                log(`✅ iCal URL: ${icalUrl}`);
+                
+                // Convert to webcal
+                const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
+                log(`✅ Calendar Feed: ${calendarFeed}`);
+                
+                // Generate Google Calendar URL
+                const googleUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`;
+                log(`✅ Google Calendar URL: ${googleUrl}`);
+                
+                // Test the URL
+                log(`✅ URL Length: ${googleUrl.length}`);
+                log(`✅ CID Length: ${encodeURIComponent(calendarFeed).length}`);
+                
+                // Check for double encoding
+                const doubleEncoded = calendarFeed.includes("%253A");
+                log(`✅ Double Encoding Check: ${doubleEncoded ? "❌ DOUBLE ENCODED" : "✅ OK"}`);
+                
+                // Display clickable URL
+                const urlDiv = document.createElement('div');
+                urlDiv.className = 'url-display';
+                urlDiv.innerHTML = `<strong>Generated URL:</strong><br><a href="${googleUrl}" target="_blank" style="color: #60a5fa;">${googleUrl}</a>`;
+                document.getElementById('output').appendChild(urlDiv);
+                
+                // Try to open the URL
+                log('🔗 Attempting to open Google Calendar...');
+                const newTab = window.open('about:blank', '_blank', 'noopener,noreferrer');
+                if (newTab) {
+                    newTab.location.href = googleUrl;
+                    log('✅ Tab opened successfully');
+                } else {
+                    log('❌ Popup blocked - please allow popups');
+                }
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`);
+            }
+        }
+
+        function testAlternativeApproaches() {
+            log('=== Testing Alternative Approaches ===');
+            
+            const baseUrl = window.location.origin;
+            const calendarName = "Test Calendar Alternative";
+            
+            const params = new URLSearchParams();
+            params.set("name", calendarName);
+            params.append("school", "ETSINF");
+            
+            const icalUrl = `${baseUrl}/api/ical?${params.toString()}`;
+            
+            const alternatives = [
+                {
+                    name: "Standard with webcal://",
+                    url: `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(icalUrl.replace(/^https?:/, "webcal:"))}`
+                },
+                {
+                    name: "Direct HTTPS (no webcal)",
+                    url: `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(icalUrl)}`
+                },
+                {
+                    name: "Add by URL page",
+                    url: `https://calendar.google.com/calendar/r/settings/addbyurl?cid=${encodeURIComponent(icalUrl)}`
+                },
+                {
+                    name: "Without u/0 parameter",
+                    url: `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(icalUrl.replace(/^https?:/, "webcal:"))}`
+                }
+            ];
+            
+            alternatives.forEach((alt, i) => {
+                log(`\n--- Alternative ${i + 1}: ${alt.name} ---`);
+                log(`URL: ${alt.url}`);
+                
+                const urlDiv = document.createElement('div');
+                urlDiv.className = 'url-display';
+                urlDiv.innerHTML = `<strong>${alt.name}:</strong><br><a href="${alt.url}" target="_blank" style="color: #60a5fa;">${alt.url}</a>`;
+                document.getElementById('output').appendChild(urlDiv);
+            });
+        }
+
+        // Initialize
+        log('Google Calendar Export Test initialized');
+        log('Click "Test Current Implementation" to test the approach.');
+    </script>
+</body>
+</html>
