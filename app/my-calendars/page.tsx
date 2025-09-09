@@ -409,7 +409,13 @@ export default function MyCalendarsPage() {
 
   const exportExamsToGoogleCalendar = async (calendar: SavedCalendar) => {
     try {
-      // Compute URLs synchronously to preserve the user gesture
+      // Open tab synchronously to preserve user gesture - fixes popup blocking
+      const newTab = window.open('about:blank', '_blank', 'noopener,noreferrer');
+      if (!newTab) {
+        throw new Error('Popup blocked - please allow popups for this site');
+      }
+
+      // Compute URLs after opening tab to avoid losing user gesture
       let baseUrl = window.location.origin;
       if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")) {
         baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://upv-cal.vercel.app";
@@ -443,9 +449,9 @@ export default function MyCalendarsPage() {
         }
       } catch (error) {
         console.warn("Token approach failed, falling back to direct URL:", error);
-        // Fallback to direct URL approach
-        const { generateDirectUrl } = await import("@/lib/utils");
-        const directPath = generateDirectUrl(normalizedFilters, calendar.name);
+        // Fallback to direct URL approach using the same function
+        const { generateUPVTokenUrl } = await import("@/lib/utils");
+        const directPath = await generateUPVTokenUrl(normalizedFilters, calendar.name);
         icalUrl = `${baseUrl}${directPath}`;
         
         // Add reminder parameters
@@ -454,27 +460,20 @@ export default function MyCalendarsPage() {
         icalUrl = url.toString();
       }
 
-      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
-      // Use the correct Google Calendar URL format for subscription popup
-      const primaryGoogleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarFeed)}`;
+      // Use HTTPS for Google Calendar (not webcal://) - Google expects public HTTPS iCal feeds
+      const googleCid = encodeURIComponent(icalUrl); // Keep HTTPS scheme for Google
+      // Use Add-by-URL page to force subscription dialog
+      const primaryGoogleCalendarUrl = `https://calendar.google.com/calendar/r/settings/addbyurl?cid=${googleCid}`;
 
       // Log debug info
       console.log("🔍 [My Calendars Export] Debug Info:");
       console.log("📊 Calendar:", calendar.name);
       console.log("🔗 iCal URL:", icalUrl);
-      console.log("📱 Calendar Feed:", calendarFeed);
       console.log("🌐 Google Calendar URL:", primaryGoogleCalendarUrl);
-      console.log("🔍 cid length:", encodeURIComponent(calendarFeed).length);
-      console.log("🔍 Double encoding check:", calendarFeed.includes("%253A") ? "❌ DOUBLE ENCODED" : "✅ OK");
+      console.log("🔍 cid length:", googleCid.length);
 
-      const link = document.createElement('a');
-      link.href = primaryGoogleCalendarUrl;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.setAttribute('aria-label', `Abrir Google Calendar para suscribirse al calendario ${calendar.name}`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Navigate the already-opened tab to Google Calendar
+      newTab.location.href = primaryGoogleCalendarUrl;
 
       toast({
         title: "Redirigiendo a Google Calendar",
@@ -484,7 +483,7 @@ export default function MyCalendarsPage() {
       console.error("❌ Error opening Google Calendar:", error);
       toast({
         title: "Error",
-        description: "No se pudo abrir Google Calendar.",
+        description: "No se pudo abrir Google Calendar. " + (error instanceof Error ? error.message : ""),
         variant: "destructive",
       });
     }

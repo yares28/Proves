@@ -11,8 +11,6 @@ export interface ICalExportOptions {
   reminderMinutes?: number[];
   timeZone?: string;
   useUPVFormat?: boolean;
-  calendarDescription?: string;
-  calendarUrl?: string;
 }
 
 // Helper function to escape iCalendar text fields
@@ -30,7 +28,7 @@ function escapeICalLocation(text: string): string {
   return text
     .replace(/\\/g, "\\\\") // Escape backslashes first
     .replace(/;/g, "\\;") // Escape semicolons
-    .replace(/,/g, "\\,") // Escape commas per RFC 5545 TEXT
+    // Note: We don't escape commas in location as they're commonly used for room lists
     .replace(/\n/g, "\\n") // Escape newlines
     .replace(/\r/g, ""); // Remove carriage returns
 }
@@ -158,17 +156,10 @@ export function generateICalContent(
     reminderMinutes = [24 * 60, 60], // 1 day and 1 hour before
     timeZone = "Europe/Madrid",
     useUPVFormat = true, // New option to use UPV-compatible format
-    calendarDescription,
-    calendarUrl,
   } = options;
 
   if (useUPVFormat) {
-    return generateUPVCompatibleICalContent(
-      exams,
-      calendarName,
-      calendarDescription,
-      calendarUrl
-    );
+    return generateUPVCompatibleICalContent(exams, calendarName);
   }
 
   const icalLines = [
@@ -180,14 +171,6 @@ export function generateICalContent(
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
   ];
-
-  // Optional calendar description and canonical URL
-  if (calendarDescription && calendarDescription.trim().length > 0) {
-    icalLines.push(`X-WR-CALDESC:${escapeICalText(calendarDescription)}`);
-  }
-  if (calendarUrl && calendarUrl.trim().length > 0) {
-    icalLines.push(`URL:${calendarUrl}`);
-  }
 
   // Add dynamic timezone component for better compatibility
   const timezoneLines = generateTimezoneComponent(timeZone);
@@ -227,35 +210,59 @@ export function generateICalContent(
 
   validExams.forEach((exam) => {
     const hasTime = Boolean(exam.time && exam.time.trim().length);
-    const hasDurationDays = Boolean(exam.duration_day && exam.duration_day.trim().length);
     let startTime: Date | undefined;
     let endTime: Date | undefined;
-    let isMultiDay = false;
-    let dayCount = 1;
-
     if (hasTime) {
       const parseResult = parseExamDateTime(exam.date, exam.time, timeZone);
       startTime = parseResult.start;
       endTime = new Date(startTime);
       endTime.setMinutes(startTime.getMinutes() + exam.duration_minutes);
-    } else if (hasDurationDays) {
-      // Parse duration_day format (P1D, P2D, etc.)
-      const dayMatch = (exam.duration_day as string).match(/^P(\d+)D$/i);
-      if (dayMatch) {
-        dayCount = parseInt(dayMatch[1], 10);
-        isMultiDay = dayCount > 1;
-      }
     }
 
     // Format dates for iCal - LOCAL TIME FORMAT (no Z suffix when using TZID)
-    const formatICalLocalDate = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const hour = String(date.getHours()).padStart(2, "0");
-      const minute = String(date.getMinutes()).padStart(2, "0");
-      const second = String(date.getSeconds()).padStart(2, "0");
-      return `${year}${month}${day}T${hour}${minute}${second}`;
+    const formatICalLocalDate = (date: Date, isEndTime: boolean = false) => {
+      // For Madrid timezone, use the original exam time directly to avoid browser timezone interference
+      if (timeZone === "Europe/Madrid") {
+        // Parse the original exam date and time to avoid any Date object timezone conversion
+        const [examHours, examMinutes] = exam.time.split(":").map(Number);
+        const examDate = new Date(exam.date);
+        const year = examDate.getFullYear();
+        const month = String(examDate.getMonth() + 1).padStart(2, "0");
+        const day = String(examDate.getDate()).padStart(2, "0");
+
+        let hour: number, minute: number;
+        if (isEndTime) {
+          // Calculate end time by adding duration to original exam time
+          const totalMinutes =
+            examHours * 60 + examMinutes + exam.duration_minutes;
+          hour = Math.floor(totalMinutes / 60);
+          minute = totalMinutes % 60;
+
+          // Handle day overflow (if exam goes past midnight)
+          if (hour >= 24) {
+            hour = hour % 24;
+            // Note: For simplicity, we're not handling day increment here
+            // Most exams won't span midnight, but this could be enhanced if needed
+          }
+        } else {
+          hour = examHours;
+          minute = examMinutes;
+        }
+
+        const hourStr = String(hour).padStart(2, "0");
+        const minuteStr = String(minute).padStart(2, "0");
+        const second = "00";
+        return `${year}${month}${day}T${hourStr}${minuteStr}${second}`;
+      } else {
+        // For other timezones, use the date object
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        const hour = String(date.getHours()).padStart(2, "0");
+        const minute = String(date.getMinutes()).padStart(2, "0");
+        const second = String(date.getSeconds()).padStart(2, "0");
+        return `${year}${month}${day}T${hour}${minute}${second}`;
+      }
     };
 
     // Format UTC dates for CREATED/LAST-MODIFIED (these should be UTC per RFC 5545)
@@ -295,9 +302,8 @@ export function generateICalContent(
       icalLines.push(
         "BEGIN:VEVENT",
         `UID:exam-${exam.id}-${exam.date}-${exam.time}@upv-exam-calendar.com`,
-        `DTSTAMP:${formatICalUtcDate(now)}`,
-        `DTSTART;TZID=${timeZone}:${formatICalLocalDate(startTime!)}`,
-        `DTEND;TZID=${timeZone}:${formatICalLocalDate(endTime!)}`,
+        `DTSTART;TZID=${timeZone}:${formatICalLocalDate(startTime!, false)}`,
+        `DTEND;TZID=${timeZone}:${formatICalLocalDate(endTime!, true)}`,
         foldLine(`SUMMARY:${escapeICalText(exam.subject + " - Exam")}`),
         foldLine(`DESCRIPTION:${description}`),
         foldLine(`LOCATION:${escapeICalLocation(exam.location || "")}`),
@@ -308,23 +314,21 @@ export function generateICalContent(
         "CATEGORIES:EXAM,UNIVERSITY"
       );
     } else {
-      // --- Handle all-day and multi-day exams ---
+      // --- new code for all-day exams when hour is unknown ---
       const startDate = exam.date.replace(/-/g, ""); // e.g. 20251031
-      const endObj = new Date(exam.date);
-      endObj.setDate(endObj.getDate() + dayCount); // Add the number of days
+      const endObj = new Date(exam.date); // +1 day
+      endObj.setDate(endObj.getDate() + 1);
       const endDate = endObj.toISOString().slice(0, 10).replace(/-/g, "");
-      
-      const summaryText = isMultiDay 
-        ? `${exam.subject} - Exam (${dayCount} días)`
-        : `${exam.subject} - Exam (hora por confirmar)`;
-      
       icalLines.push(
         "BEGIN:VEVENT",
-        `UID:exam-${exam.id}-${exam.date}-${isMultiDay ? 'multiday' : 'allday'}@upv-exam-calendar.com`,
-        `DTSTAMP:${formatICalUtcDate(now)}`,
+        `UID:exam-${exam.id}-${exam.date}-allday@upv-exam-calendar.com`,
         `DTSTART;VALUE=DATE:${startDate}`,
         `DTEND;VALUE=DATE:${endDate}`,
-        foldLine(`SUMMARY:${escapeICalText(summaryText)}`),
+        foldLine(
+          `SUMMARY:${escapeICalText(
+            exam.subject + " - Exam (hora por confirmar)"
+          )}`
+        ),
         foldLine(`DESCRIPTION:${description}`),
         foldLine(`LOCATION:${escapeICalLocation(exam.location || "")}`),
         `CREATED:${formatICalUtcDate(now)}`,
@@ -332,6 +336,7 @@ export function generateICalContent(
         "STATUS:CONFIRMED",
         "TRANSP:OPAQUE",
         "CATEGORIES:EXAM,UNIVERSITY"
+        // Google expects end = next day
       );
     }
 
@@ -419,59 +424,7 @@ export function generateICalContent(
   }
 
   icalLines.push("END:VCALENDAR");
-
-  // Final fold pass: ensure every line complies with RFC 5545 (75 octets, UTF-8) and CRLF endings
-  const foldLongLine = (line: string) => {
-    // Fast path for short ASCII lines
-    if (line.length <= 75 && /^[\x00-\x7F]*$/.test(line)) return line;
-
-    const encoder = new TextEncoder();
-    const segments: string[] = [];
-    let current = "";
-    let currentBytes = 0;
-    let isFirst = true;
-
-    for (const ch of line) {
-      const chBytes = encoder.encode(ch).length;
-      // Use slightly stricter byte limits (73/72) to accommodate validators that
-      // incorrectly count CRLF in the 75-octet budget
-      const limit = isFirst ? 73 : 72; // continuation lines include a leading space later
-      if (currentBytes + chBytes > limit) {
-        segments.push(current);
-        current = ch;
-        currentBytes = chBytes;
-        isFirst = false;
-      } else {
-        current += ch;
-        currentBytes += chBytes;
-      }
-    }
-    if (current) segments.push(current);
-
-    if (segments.length === 1) return segments[0];
-    return segments[0] + "\r\n" + segments.slice(1).map((s) => " " + s).join("\r\n");
-  };
-
-  // Reconstruct logical lines by joining any existing folded continuations, then refold once
-  const logicalLines: string[] = [];
-  for (const l of icalLines) {
-    const segments = l.split("\r\n");
-    for (const seg of segments) {
-      if (seg.startsWith(" ") && logicalLines.length > 0) {
-        // Continuation: append without the leading space
-        logicalLines[logicalLines.length - 1] += seg.slice(1);
-      } else {
-        logicalLines.push(seg);
-      }
-    }
-  }
-
-  const foldedLines: string[] = [];
-  for (const line of logicalLines) {
-    foldedLines.push(foldLongLine(line));
-  }
-
-  return foldedLines.join("\r\n") + "\r\n";
+  return icalLines.join("\r\n");
 }
 
 export function downloadICalFile(
@@ -549,9 +502,7 @@ export function generateGoogleCalendarUrl(exam: Exam): string {
 // UPV-compatible iCal generator following official UPV format
 function generateUPVCompatibleICalContent(
   exams: Exam[],
-  calendarName: string,
-  calendarDescription?: string,
-  calendarUrl?: string
+  calendarName: string
 ): string {
   // Step 1: Use UTC timezone strategy (no VTIMEZONE block)
   const icalLines = [
@@ -564,13 +515,6 @@ function generateUPVCompatibleICalContent(
     "X-APPLE-CALENDAR-COLOR:#0252D4",
     "X-WR-TIMEZONE:Europe/Madrid",
   ];
-
-  if (calendarDescription && calendarDescription.trim().length > 0) {
-    icalLines.push(`X-WR-CALDESC:${escapeICalText(calendarDescription)}`);
-  }
-  if (calendarUrl && calendarUrl.trim().length > 0) {
-    icalLines.push(`URL:${calendarUrl}`);
-  }
 
   // Step 2: Generate events in UPV format
   const now = new Date();
@@ -651,39 +595,26 @@ function generateUPVCompatibleICalContent(
 
   // Fold long lines (RFC 5545 compliance)
   const foldLine = (line: string) => {
-    // Byte-accurate folding (75 octets per RFC 5545)
-    if (line.length <= 75 && /^[\x00-\x7F]*$/.test(line)) return line;
-    const encoder = new TextEncoder();
-    const segments: string[] = [];
-    let current = "";
-    let currentBytes = 0;
-    let isFirst = true;
-    for (const ch of line) {
-      const chBytes = encoder.encode(ch).length;
-      const limit = isFirst ? 75 : 74; // continuation lines get a leading space later
-      if (currentBytes + chBytes > limit) {
-        segments.push(current);
-        current = ch;
-        currentBytes = chBytes;
-        isFirst = false;
+    if (line.length <= 75) return line;
+    const folded = [];
+    let start = 0;
+    while (start < line.length) {
+      if (start === 0) {
+        folded.push(line.substring(0, 75));
+        start = 75;
       } else {
-        current += ch;
-        currentBytes += chBytes;
+        folded.push(" " + line.substring(start, start + 74));
+        start += 74;
       }
     }
-    if (current) segments.push(current);
-    if (segments.length === 1) return segments[0];
-    return segments[0] + "\r\n" + segments.slice(1).map((s) => " " + s).join("\r\n");
+    return folded.join("\r\n");
   };
 
   // Step 3: Process each valid exam
   validExams.forEach((exam) => {
     const hasTime = Boolean(exam.time && exam.time.trim().length);
-    const hasDurationDays = Boolean(exam.duration_day && exam.duration_day.trim().length);
     let startTime: Date | undefined;
     let endTime: Date | undefined;
-    let isMultiDay = false;
-    let dayCount = 1;
 
     if (hasTime) {
       const [examHours, examMinutes] = exam.time.split(":").map(Number);
@@ -710,13 +641,6 @@ function generateUPVCompatibleICalContent(
         endMinute,
         0
       );
-    } else if (hasDurationDays) {
-      // Parse duration_day format (P1D, P2D, etc.)
-      const dayMatch = (exam.duration_day as string).match(/^P(\d+)D$/i);
-      if (dayMatch) {
-        dayCount = parseInt(dayMatch[1], 10);
-        isMultiDay = dayCount > 1;
-      }
     }
 
     // Get colors for this subject
@@ -776,16 +700,11 @@ function generateUPVCompatibleICalContent(
         "END:VEVENT"
       );
     } else {
-      // --- Handle all-day and multi-day exams ---
+      // --- new code for all-day exams when hour is unknown ---
       const startDate = exam.date.replace(/-/g, ""); // e.g. 20251031
-      const endObj = new Date(exam.date);
-      endObj.setDate(endObj.getDate() + dayCount); // Add the number of days
+      const endObj = new Date(exam.date); // +1 day
+      endObj.setDate(endObj.getDate() + 1);
       const endDate = endObj.toISOString().slice(0, 10).replace(/-/g, "");
-      
-      const summaryText = isMultiDay 
-        ? `Examen ${exam.subject} (${dayCount} días)`
-        : `Examen ${exam.subject} (hora por confirmar)`;
-      
       icalLines.push(
         "BEGIN:VEVENT",
         `DTSTART;VALUE=DATE:${startDate}`,
@@ -798,11 +717,12 @@ function generateUPVCompatibleICalContent(
         foldLine(`LOCATION:${escapeICalLocation(location)}`),
         "SEQUENCE:0",
         "STATUS:CONFIRMED",
-        foldLine(`SUMMARY:${summaryText}`),
+        foldLine(`SUMMARY:Examen ${exam.subject} (hora por confirmar)`),
         "TRANSP:OPAQUE",
         `UPV_BGCOLOR:${colors.bg}`,
         `UPV_FGCOLOR:${colors.fg}`,
         "END:VEVENT"
+        // Google expects end = next day
       );
     }
   });
@@ -898,40 +818,7 @@ function generateStableId(exam: Exam): string {
   return Math.abs(hash).toString(16).toUpperCase().padStart(8, "0");
 }
 
-// Generate short token for calendar URLs to avoid long cid parameters
-function generateShortToken(filters: Record<string, string[]>, calendarName: string): string {
-  const tokenData = {
-    name: calendarName,
-    filters: filters,
-    timestamp: Date.now()
-  };
-  
-  // Create a short, URL-safe token with manual base64url encoding
-  const tokenString = JSON.stringify(tokenData);
-  let token: string;
-  
-  try {
-    // Try native base64url if available (Node.js 16+)
-    token = Buffer.from(tokenString).toString('base64url');
-  } catch (error) {
-    // Fallback: manual base64url encoding for older Node.js versions
-    const base64 = Buffer.from(tokenString).toString('base64');
-    token = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-  }
-  
-  // Store token temporarily (in production, use Redis or database)
-  if (typeof window === 'undefined') {
-    // Server-side: store in a simple Map (for demo - use proper storage in production)
-    if (!(global as any).tokenStore) {
-      (global as any).tokenStore = new Map();
-    }
-    (global as any).tokenStore.set(token, tokenData);
-  }
-  
-  return token;
-}
-
-// Generate UPV-style token URL with short token approach
+// Generate UPV-style token URL with direct parameter encoding (more reliable than token storage)
 export async function generateUPVTokenUrl(
   filters: Record<string, string[]>,
   calendarName: string = "UPV Exams"
@@ -939,26 +826,14 @@ export async function generateUPVTokenUrl(
   console.log("🔧 [generateUPVTokenUrl] Starting with filters:", filters);
   console.log("🔧 [generateUPVTokenUrl] Calendar name:", calendarName);
 
-  // Generate short token instead of long query string
-  const token = generateShortToken(filters, calendarName);
-  console.log("🔧 [generateUPVTokenUrl] Generated short token:", token);
-  
-  // Use short token URL
-  const shortUrl = `/api/ical?t=${token}`;
-  console.log("🔧 [generateUPVTokenUrl] Short API URL:", shortUrl);
-  
-  return shortUrl;
-}
-
-// Fallback function for direct parameter encoding (when token approach fails)
-export function generateDirectUrl(
-  filters: Record<string, string[]>,
-  calendarName: string = "UPV Exams"
-): string {
+  // Use direct API route with parameters instead of token-based approach
+  // This is more reliable for serverless environments
   const params = new URLSearchParams();
+  
+  // URLSearchParams automatically handles encoding, so we don't need to double-encode
   params.set("name", calendarName);
 
-  // Add individual filter parameters
+  // Add individual filter parameters - URLSearchParams handles encoding automatically
   if (filters.school && filters.school.length > 0) {
     filters.school.forEach((school) => params.append("school", school));
   }
@@ -975,5 +850,20 @@ export function generateDirectUrl(
     filters.subject.forEach((subject) => params.append("subject", subject));
   }
 
-  return `/api/ical?${params.toString()}`;
+  const queryString = params.toString();
+  console.log("🔧 [generateUPVTokenUrl] Generated query string:", queryString);
+  console.log("🔧 [generateUPVTokenUrl] Total filter categories:", Object.keys(filters).length);
+  console.log("🔧 [generateUPVTokenUrl] Filter details:", {
+    schools: filters.school?.length || 0,
+    degrees: filters.degree?.length || 0,
+    years: filters.year?.length || 0,
+    semesters: filters.semester?.length || 0,
+    subjects: filters.subject?.length || 0
+  });
+
+  // Use direct API route instead of token-based approach for better reliability
+  const directUrl = `/api/ical?${queryString}`;
+  console.log("🔧 [generateUPVTokenUrl] Direct API URL:", directUrl);
+  
+  return directUrl;
 }
