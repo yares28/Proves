@@ -101,7 +101,7 @@ jest.mock('framer-motion', () => ({
 // Mock window.location
 Object.defineProperty(window, 'location', {
   value: {
-    origin: 'https://upv-cal.vercel.app',
+    origin: 'https://www.upvcal.com',
   },
   writable: true,
 });
