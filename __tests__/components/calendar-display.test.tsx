@@ -89,16 +89,6 @@ jest.mock('@/components/save-calendar-dialog', () => ({
   ),
 }));
 
-jest.mock('@/components/export-calendar-dialog', () => ({
-  ExportCalendarDialog: ({ open, onOpenChange, onExport }: any) => (
-    open ? (
-      <div data-testid="export-calendar-dialog">
-        <button onClick={() => onExport('Test Calendar')}>Export</button>
-        <button onClick={() => onOpenChange(false)}>Close</button>
-      </div>
-    ) : null
-  ),
-}));
 
 // Mock framer-motion
 jest.mock('framer-motion', () => ({

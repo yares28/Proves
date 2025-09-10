@@ -39,7 +39,6 @@ import {
   generateAcademicYearMonths,
 } from "@/utils/date-utils";
 import { SaveCalendarDialog } from "@/components/save-calendar-dialog";
-import { ExportCalendarDialog } from "@/components/export-calendar-dialog";
 
 import { useAuth } from "@/context/auth-context";
 import { useSettings } from "@/context/settings-context";
@@ -83,7 +82,6 @@ export function CalendarDisplay({
     endYear: number;
   } | null>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [existingNames, setExistingNames] = useState<string[]>([]);
   const [googleIcalBaseUrl, setGoogleIcalBaseUrl] = useState(DEFAULT_GOOGLE_ICAL_BASE_URL);
   const [error, setError] = useState<string | null>(null);
@@ -406,70 +404,14 @@ export function CalendarDisplay({
     }
   };
 
-  // Export to Google Calendar with modern URL pattern
+  // Disabled export functionality
   const exportToGoogleCalendar = async (calendarName: string) => {
-    try {
-      console.log("🔄 Starting Google Calendar export with name:", calendarName);
-      console.log("🔍 Active filters:", activeFilters);
-      console.log("🔍 Active filters details:", {
-        totalCategories: Object.keys(activeFilters).length,
-        schools: activeFilters.school?.length || 0,
-        degrees: activeFilters.degree?.length || 0,
-        years: activeFilters.year?.length || 0,
-        semesters: activeFilters.semester?.length || 0,
-        subjects: activeFilters.subject?.length || 0,
-        hasAnyFilters: Object.values(activeFilters).some(arr => arr && arr.length > 0)
-      });
-
-      // Generate UPV-style token URL
-      const { generateUPVTokenUrl } = await import("@/lib/utils");
-      console.log("📦 Utils imported successfully");
-      
-      const tokenPath = await generateUPVTokenUrl(activeFilters, calendarName);
-      console.log("🔑 Generated token path:", tokenPath);
-      
-      const icalUrl = `${googleIcalBaseUrl}${tokenPath}`;
-      console.log("🌐 Full iCal URL:", icalUrl);
-
-      // Skip HEAD request validation due to serverless token storage limitations
-      // The token storage uses in-memory Map which doesn't persist across serverless function instances
-      console.log("⚡ Skipping HEAD request validation for serverless compatibility");
-      console.log("🌐 Generated iCal URL:", icalUrl);
-      console.log("📱 This URL will be used directly for Google Calendar subscription");
-
-      // Construct calendar feed URL using webcal protocol for better calendar app integration
-      const calendarFeed = icalUrl.replace(/^https?:/, "webcal:");
-      console.log("📱 Calendar feed URL:", calendarFeed);
-
-      // Use Google Calendar's modern subscription URL with /u/0/r?cid= pattern
-      // This opens the "Add this calendar?" dialog with Add/Cancel options
-      const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(
-        calendarFeed
-      )}`;
-      console.log("🔗 Final Google Calendar URL:", googleCalendarUrl);
-
-      // Open Google Calendar in a new tab with proper security attributes
-      window.open(googleCalendarUrl, "_blank", "noopener,noreferrer");
-
-      toast({
-        title: "Redirigiendo a Google Calendar",
-        description: "Se abrirá Google Calendar con el enlace de suscripción.",
-      });
-      
-      console.log("✅ Google Calendar export completed successfully");
-    } catch (error) {
-      console.error("❌ Error in exportToGoogleCalendar:", error);
-      console.error("📋 Error stack:", error instanceof Error ? error.stack : 'No stack trace');
-      
-      toast({
-        title: "Error de exportación",
-        description: error instanceof Error ? error.message : "No se pudo abrir Google Calendar.",
-        variant: "destructive",
-      });
-      
-      // Re-throw the error so the ExportCalendarDialog can handle it
-      throw error;
-    }
+    toast({
+      title: "Funcionalidad deshabilitada",
+      description: "La exportación a Google Calendar ha sido deshabilitada.",
+      variant: "destructive",
+    });
+    throw new Error("Export functionality has been disabled");
   };
 
   return (
@@ -502,8 +444,12 @@ export function CalendarDisplay({
             variant="outline"
             size="sm"
             className="h-10 px-3 py-1.5 gap-2 rounded-sm text-sm font-medium"
-            disabled={exams.length === 0}
-            onClick={() => setExportDialogOpen(true)}
+            disabled={true}
+            onClick={() => toast({
+              title: "Funcionalidad deshabilitada",
+              description: "La exportación ha sido deshabilitada.",
+              variant: "destructive",
+            })}
           >
             <Share2 className="h-4 w-4" />
             <span>Exportar</span>
@@ -546,12 +492,6 @@ export function CalendarDisplay({
           existingNames={existingNames}
         />
 
-        {/* Add ExportCalendarDialog component */}
-        <ExportCalendarDialog
-          open={exportDialogOpen}
-          onOpenChange={setExportDialogOpen}
-          onExport={exportToGoogleCalendar}
-        />
 
       <AnimatePresence mode="wait">
         {settings.viewMode === "calendar" ? (
