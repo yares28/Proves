@@ -58,7 +58,7 @@ import { getCurrentSession, getFreshAuthTokens } from "@/utils/auth-helpers";
 import type { Exam } from "@/types/exam";
 
 // Default URL for SSR - will be updated on client
-const DEFAULT_GOOGLE_ICAL_BASE_URL = "https://upv-cal.vercel.app";
+const DEFAULT_GOOGLE_ICAL_BASE_URL = "https://www.upvcal.com";
 
 export function CalendarDisplay({
   activeFilters = {},

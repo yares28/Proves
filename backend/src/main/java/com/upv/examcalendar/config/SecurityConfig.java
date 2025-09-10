@@ -126,7 +126,7 @@ public class SecurityConfig {
                 configuration.setAllowedOrigins(Arrays.asList(
                                 "http://localhost:3000", // Next.js development
                                 "http://localhost:3001", // Alternative development port
-                                "https://upv-cal-v2.vercel.app", // Specific Vercel deployment
+                                "https://www.upvcal.com", // Production domain
                                 "https://your-production-domain.com" // Replace with actual production domain
                 // Note: Remove wildcard patterns for security
                 // Add specific deployments as needed
