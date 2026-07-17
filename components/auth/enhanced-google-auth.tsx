@@ -122,15 +122,7 @@ export function EnhancedGoogleAuth({
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
         console.log('✅ Google authentication completed successfully')
-        
-        // Store provider tokens if available
-        if (session.provider_token) {
-          localStorage.setItem('oauth_provider_token', session.provider_token)
-        }
-        if (session.provider_refresh_token) {
-          localStorage.setItem('oauth_provider_refresh_token', session.provider_refresh_token)
-        }
-        
+
         toast({
           title: "¡Bienvenido!",
           description: "Has iniciado sesión exitosamente con Google.",

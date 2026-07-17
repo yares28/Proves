@@ -2,10 +2,11 @@
 
 import { createContext, useContext, useEffect, useState } from "react"
 import { useTheme } from "next-themes"
+import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n"
 
 interface AppSettings {
   theme: 'light' | 'dark' | 'system'
-  language: 'es' | 'en'
+  language: Locale
   notifications: boolean
   examReminders: {
     oneHour: boolean
@@ -23,7 +24,7 @@ interface SettingsContextProps {
 
 const defaultSettings: AppSettings = {
   theme: 'system',
-  language: 'es',
+  language: DEFAULT_LOCALE,
   notifications: true,
   examReminders: {
     oneHour: true,

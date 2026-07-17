@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { motion } from "framer-motion"
 import { Clock, MapPin, School, BookOpen, ChevronDown, ChevronUp, Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -8,77 +8,30 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { getExams } from "@/actions/exam-actions"
-
-type Exam = {
-  id: number | string;
-  date: string;
-  subject: string;
-  code: string;
-  time: string;
-  location: string;
-  year: string;
-  semester: string;
-  school: string;
-  degree: string;
-};
+import { useSettings } from "@/context/settings-context"
+import { examSubject } from "@/lib/i18n"
+import type { Exam } from "@/types/exam"
 
 type SortField = "date" | "subject" | "time" | "location" | "year" | "semester"
 type SortDirection = "asc" | "desc"
 
-export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<string, string[]> }) {
-  const [exams, setExams] = useState<Exam[]>([])
+/**
+ * The list rendering of the same exams the calendar shows. It used to re-fetch
+ * them with the identical filters its parent had already resolved; now they are
+ * passed in.
+ */
+export function ExamListView({
+  exams = [],
+  isLoading = false,
+}: {
+  exams?: Exam[]
+  isLoading?: boolean
+}) {
+  const { settings } = useSettings()
   const [searchQuery, setSearchQuery] = useState("")
   const [sortField, setSortField] = useState<SortField>("date")
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
   const [expandedExam, setExpandedExam] = useState<number | string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  // Check if ETSINF is in the schools filter
-  const hasETSINFFilter = activeFilters?.school?.includes("ETSINF")
-
-  // Check if filters are meaningful (beyond just school/degree)
-  const hasMeaningfulFilters = () => {
-    if (!activeFilters || Object.keys(activeFilters).length === 0) {
-      return false;
-    }
-    
-    // Check if there are any filters other than school and degree
-    const meaningfulFilterKeys = Object.keys(activeFilters).filter(key => 
-      key !== 'school' && key !== 'degree' && 
-      activeFilters[key] && activeFilters[key].length > 0
-    );
-    
-    return meaningfulFilterKeys.length > 0;
-  };
-
-  useEffect(() => {
-    const fetchExams = async () => {
-      setIsLoading(true)
-      
-      // Only fetch exams if we have meaningful filters
-      if (!hasMeaningfulFilters()) {
-        console.log("ExamListView - No meaningful filters selected, clearing exams")
-        setExams([])
-        setIsLoading(false)
-        return
-      }
-
-      try {
-        console.log("ExamListView - Fetching with filters:", activeFilters)
-        const data = await getExams(activeFilters)
-        console.log(`ExamListView - Fetched ${data.length} exams:`, data.slice(0, 2)) // Log the first 2 exams
-        setExams(data || [])
-      } catch (error) {
-        console.error("Error fetching exams:", error)
-        setExams([])
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchExams()
-  }, [activeFilters])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -93,7 +46,10 @@ export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<st
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
     return (
+      // Search every language, not just the one on screen: students mix them.
       exam.subject.toLowerCase().includes(query) ||
+      (exam.subject_va?.toLowerCase().includes(query) ?? false) ||
+      (exam.subject_en?.toLowerCase().includes(query) ?? false) ||
       (exam.code && exam.code.toLowerCase().includes(query)) ||
       exam.location.toLowerCase().includes(query) ||
       exam.school.toLowerCase().includes(query) ||
@@ -257,7 +213,7 @@ export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<st
                       </td>
                       <td className="p-4">
                         <div className="flex flex-col">
-                          <span>{exam.subject}</span>
+                          <span>{examSubject(exam, settings.language)}</span>
                           <span className="text-xs text-muted-foreground">{exam.code || "-"}</span>
                         </div>
                       </td>
@@ -270,10 +226,9 @@ export function ExamListView({ activeFilters = {} }: { activeFilters?: Record<st
                 ) : (
                   <tr>
                     <td colSpan={6} className="h-24 text-center border-b p-4">
-                      {!hasMeaningfulFilters() ? 
-                        "Selecciona tu año, semestre o asignaturas específicas para ver los exámenes." :
-                        "No se encontraron exámenes para los filtros seleccionados."
-                      }
+                      {searchQuery
+                        ? "Ningún examen coincide con tu búsqueda."
+                        : "Selecciona tu año, semestre o asignaturas específicas para ver los exámenes."}
                     </td>
                   </tr>
                 )}

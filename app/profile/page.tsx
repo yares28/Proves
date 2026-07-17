@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useAuth } from "@/context/auth-context"
 import { useSettings } from "@/context/settings-context"
 import { useRouter } from "next/navigation"
@@ -31,7 +31,8 @@ import {
   List,
   Lock,
   Eye,
-  EyeOff
+  EyeOff,
+  Camera
 } from "lucide-react"
 import React from "react"
 
@@ -80,6 +81,8 @@ export default function ProfilePage() {
   const [isChangingUsername, setIsChangingUsername] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -145,6 +148,71 @@ export default function ProfilePage() {
       }
     } catch (error) {
       console.error('Error refreshing user data:', error)
+    }
+  }
+
+  // Upload a new avatar directly from the browser to Supabase Storage.
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file later
+    if (!file || !user) return
+
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Error",
+        description: "El archivo debe ser una imagen.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "Error",
+        description: "La imagen no puede superar los 5 MB.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsUploadingAvatar(true)
+    try {
+      const ext = file.name.split('.').pop() || 'png'
+      const filePath = `${user.id}/${Date.now()}.${ext}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true, contentType: file.type })
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: { avatar_url: publicUrl },
+      })
+
+      if (updateError) throw updateError
+
+      setProfile((prev) => (prev ? { ...prev, avatar_url: publicUrl } : prev))
+      await refreshUserData()
+
+      toast({
+        title: "Foto actualizada",
+        description: "Tu foto de perfil se ha actualizado correctamente.",
+      })
+    } catch (error) {
+      console.error('Error uploading avatar:', error)
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "No se pudo subir la imagen. Intenta de nuevo.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploadingAvatar(false)
     }
   }
 
@@ -394,14 +462,38 @@ export default function ProfilePage() {
             {/* Avatar Section */}
             <div className="flex items-center gap-4">
               <Avatar className="h-20 w-20">
-                <AvatarImage 
-                  src={profile?.avatar_url} 
+                <AvatarImage
+                  src={profile?.avatar_url}
                   alt="Avatar del usuario"
                 />
                 <AvatarFallback className="text-lg">
-                  {profile?.full_name ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase() : profile?.email?.slice(0, 2).toUpperCase() || 'U'}
+                  {profile?.full_name ? profile.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : profile?.email?.slice(0, 2).toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
+              <div className="flex flex-col gap-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingAvatar}
+                >
+                  {isUploadingAvatar ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
+                  ) : (
+                    <Camera className="h-4 w-4 mr-2" />
+                  )}
+                  {isUploadingAvatar ? 'Subiendo...' : 'Cambiar foto'}
+                </Button>
+                <p className="text-xs text-muted-foreground">JPG o PNG, máx 5 MB</p>
+              </div>
             </div>
 
             <Separator />

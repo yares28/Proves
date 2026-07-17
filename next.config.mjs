@@ -1,10 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
-    ignoreDuringBuilds: true,
+    // Surface lint problems during builds instead of hiding them.
+    ignoreDuringBuilds: false,
   },
   typescript: {
-    ignoreBuildErrors: true,
+    // Fail the build on type errors instead of shipping them.
+    ignoreBuildErrors: false,
   },
   images: {
     unoptimized: true,

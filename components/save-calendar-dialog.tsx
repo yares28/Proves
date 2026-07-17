@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { isAuthenticated } from "@/lib/auth/token-manager"
 import {
   Dialog,
   DialogContent,
@@ -27,7 +26,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
-import { getFreshAuthTokens } from "@/utils/auth-helpers"
 
 const formSchema = z.object({
   name: z
@@ -107,34 +105,9 @@ export function SaveCalendarDialog({
       }
       
       console.log('✅ Token synchronization successful');
-      
-      // Double check authentication after sync
-      console.log('🔍 Verifying authentication status...');
-      const authValid = await isAuthenticated();
-      if (!authValid) {
-        console.error('❌ Authentication validation failed after token sync');
-        throw new Error("Error en la validación de autenticación. Por favor cierra sesión e inicia sesión de nuevo.");
-      }
-      
-      // Get auth token from localStorage to pass directly to server
-      let authToken = null;
-      try {
-        const storedAuth = localStorage.getItem('supabase.auth.token');
-        if (storedAuth) {
-          const authData = JSON.parse(storedAuth);
-          if (authData.currentSession?.access_token) {
-            authToken = authData.currentSession.access_token;
-            console.log("✅ Found auth token for direct server call");
-          }
-        }
-      } catch (e) {
-        console.error("Error extracting auth token:", e);
-      }
-      
-      console.log('✅ Authentication verified, proceeding with save');
-      console.log('📝 Saving calendar:', { name: values.name, filters: filters });
-      
-      // Call the parent component's save function with auth token
+
+      // Delegate the actual persistence to the parent, which supplies the
+      // server-validated session tokens to the save action.
       onSave(values.name)
       
       // Show success toast

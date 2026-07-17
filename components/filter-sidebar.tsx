@@ -9,9 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { motion } from "framer-motion"
-import { useFilterData } from "@/lib/hooks/use-filter-data"
-import { LoadingState } from "@/components/ui/loading-state"
-import { ErrorState } from "@/components/ui/error-state"
+
 import { Card, CardContent } from "@/components/ui/card"
 import { SaveCalendarDialog } from "@/components/save-calendar-dialog"
 import { useAuth } from "@/context/auth-context"
@@ -21,19 +19,44 @@ import { getFreshAuthTokens } from "@/utils/auth-helpers"
 import Image from "next/image"
 import { useTheme } from "next-themes"
 import { useSettings } from "@/context/settings-context"
+import type { FilterOptions } from "@/types/exam"
+import { subjectLabel, type Locale } from "@/lib/i18n"
+
+/**
+ * `value` is what gets filtered on and written to the URL; `label` is what the
+ * student reads. They differ only for subjects, whose label follows the chosen
+ * language while the value stays Castellano so saved calendars keep resolving.
+ */
+type FilterOption = { value: string; label: string };
 
 type FilterCategory = {
   name: string;
   field: string;
-  options: string[];
+  options: FilterOption[];
   searchable: boolean;
   dependsOn?: string[]; // New field to define dependencies
 };
 
 type ActiveFilters = Record<string, string[]>;
 
-export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?: (filters: ActiveFilters) => void }) {
-  const [activeFilters, setActiveFilters] = useState<ActiveFilters>({})
+const EMPTY_OPTIONS: FilterOptions = {
+  schools: [], degrees: [], semesters: [], years: [], subjects: [],
+};
+
+/**
+ * The filter selection is owned by the URL and passed down, not held here.
+ * Every mutation reports the next selection upward; the parent writes it to the
+ * query string and the new value arrives back as a prop.
+ */
+export function FilterSidebar({
+  filters: activeFilters,
+  options,
+  onFiltersChange = () => {},
+}: {
+  filters: ActiveFilters
+  options?: FilterOptions
+  onFiltersChange?: (filters: ActiveFilters) => void
+}) {
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({})
   const [expandedItems, setExpandedItems] = useState<string[]>([]) // Start with nothing expanded
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
@@ -69,43 +92,32 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
   const hasSelectedSemesters = selectedSemesters.length > 0
   const hasSelectedYears = selectedYears.length > 0
 
-  // Use a memoized or stable reference to pass to useFilterData
-  // This prevents passing a new array reference on every render
-  const selectedSchoolsForData = JSON.stringify(selectedSchools) === JSON.stringify(prevSchoolsRef.current) 
-    ? prevSchoolsRef.current 
-    : selectedSchools;
-  
-  // Update ref when schools change
-  useEffect(() => {
-    prevSchoolsRef.current = selectedSchools;
-  }, [selectedSchools]);
+  // Options arrive already narrowed to the current selection, rendered on the
+  // server. While a change is in flight the previous options stay on screen —
+  // stale-but-valid reads better than a sidebar that blanks on every click.
+  const { schools, degrees, semesters, years, subjects } = options ?? EMPTY_OPTIONS
 
-  const { schools, degrees, semesters, years, subjects, isLoading, error } = useFilterData(
-    selectedSchoolsForData,
-    selectedDegrees,
-    selectedSemesters,
-    selectedYears
-  )
-  
-  // Add debugging console logs
-  useEffect(() => {
-    console.log('DEBUG - FilterSidebar filters:', {
-      selectedSchools,
-      selectedDegrees,
-      selectedSemesters,
-      selectedYears,
-      subjects: subjects.length,
-    });
-  }, [selectedSchools, selectedDegrees, selectedSemesters, selectedYears, subjects]);
-  
+  const locale: Locale = settings.language
+  const plain = (values: Array<string | number>): FilterOption[] =>
+    values.map((value) => ({ value: String(value), label: String(value) }))
+
   // Define filter categories with more flexible dependencies
   const filterCategories: FilterCategory[] = [
-    { name: "Escuelas", field: "school", options: schools, searchable: true },
-    { name: "Carreras", field: "degree", options: degrees, searchable: true, dependsOn: ["school"] },
-    { name: "Semestres", field: "semester", options: semesters, searchable: false, dependsOn: ["school", "degree"] },
-    { name: "Años del Curso", field: "year", options: years.map(String), searchable: false, dependsOn: ["school", "degree", "semester"] },
+    { name: "Escuelas", field: "school", options: plain(schools), searchable: true },
+    { name: "Carreras", field: "degree", options: plain(degrees), searchable: true, dependsOn: ["school"] },
+    { name: "Semestres", field: "semester", options: plain(semesters), searchable: false, dependsOn: ["school", "degree"] },
+    { name: "Años del Curso", field: "year", options: plain(years), searchable: false, dependsOn: ["school", "degree", "semester"] },
     // More flexible: subjects only need school OR degree (not both AND all others)
-    { name: "Asignaturas", field: "subject", options: subjects, searchable: true, dependsOn: ["school"] },
+    {
+      name: "Asignaturas",
+      field: "subject",
+      options: subjects.map((subject) => ({
+        value: subject.value,
+        label: subjectLabel(subject, locale),
+      })),
+      searchable: true,
+      dependsOn: ["school"],
+    },
   ]
 
   // Auto-expansion logic: open categories with options, close empty ones
@@ -172,91 +184,64 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
   };
 
   const addFilter = (category: string, value: string) => {
-    setActiveFilters(prev => {
-      // Create a new object for updated filters
-      let newFilters = {...prev};
-      
-      // Add the new filter value
-      newFilters[category] = [...(prev[category] || []), value];
-      
-      // More selective clearing of child filters when parent filters change
-      if (category === "school") {
-        // When school changes, only clear degree (keep other filters that might still be valid)
-        delete newFilters.degree;
-      } else if (category === "degree") {
-        // When degree changes, clear semester and year (but keep subjects as they may still be valid)
-        delete newFilters.semester;
-        delete newFilters.year;
-      } else if (category === "semester") {
-        // When semester changes, clear year only
-        delete newFilters.year;
-      }
-      // Note: We don't automatically clear subjects anymore - let the backend handle invalid combinations
-      
-      // Call onFiltersChange after state update
-      setTimeout(() => onFiltersChange(newFilters), 0);
-      return newFilters;
-    });
+    const newFilters: ActiveFilters = { ...activeFilters };
+    newFilters[category] = [...(activeFilters[category] || []), value];
+
+    // More selective clearing of child filters when parent filters change
+    if (category === "school") {
+      // When school changes, only clear degree (keep other filters that might still be valid)
+      delete newFilters.degree;
+    } else if (category === "degree") {
+      // When degree changes, clear semester and year (but keep subjects as they may still be valid)
+      delete newFilters.semester;
+      delete newFilters.year;
+    } else if (category === "semester") {
+      // When semester changes, clear year only
+      delete newFilters.year;
+    }
+    // Note: We don't automatically clear subjects anymore - let the backend handle invalid combinations
+
+    onFiltersChange(newFilters);
   };
 
   const removeFilter = (category: string, value: string) => {
-    setActiveFilters(prev => {
-      const newFilters = {
-        ...prev,
-        [category]: prev[category].filter(f => f !== value)
-      };
-      
-      // More selective clearing when all filters of a category are removed
-      if (category === "school" && newFilters.school.length === 0) {
-        // Only clear degree when all schools are removed
-        delete newFilters.degree;
-      } else if (category === "degree" && newFilters.degree.length === 0) {
-        // Clear semester and year when all degrees are removed
-        delete newFilters.semester;
-        delete newFilters.year;
-      } else if (category === "semester" && newFilters.semester.length === 0) {
-        // Clear year when all semesters are removed
-        delete newFilters.year;
-      }
-      // Note: Keep subjects even when parent filters are removed - they might still be valid
-      
-      // Call onFiltersChange after state update
-      setTimeout(() => onFiltersChange(newFilters), 0);
-      return newFilters;
-    });
+    const newFilters: ActiveFilters = {
+      ...activeFilters,
+      [category]: (activeFilters[category] || []).filter(f => f !== value)
+    };
+
+    // More selective clearing when all filters of a category are removed
+    if (category === "school" && newFilters.school.length === 0) {
+      // Only clear degree when all schools are removed
+      delete newFilters.degree;
+    } else if (category === "degree" && newFilters.degree.length === 0) {
+      // Clear semester and year when all degrees are removed
+      delete newFilters.semester;
+      delete newFilters.year;
+    } else if (category === "semester" && newFilters.semester.length === 0) {
+      // Clear year when all semesters are removed
+      delete newFilters.year;
+    }
+    // Note: Keep subjects even when parent filters are removed - they might still be valid
+
+    onFiltersChange(newFilters);
   };
 
   const clearAllFilters = () => {
-    setActiveFilters({});
-    // Call onFiltersChange after state update is complete
-    setTimeout(() => onFiltersChange({}), 0);
+    onFiltersChange({});
   };
 
   // Add "Select All" function for a category
   const selectAllFilters = (category: FilterCategory) => {
     if (!hasRequiredDependencies(category)) return;
     
-    console.log(`🔄 Select all for ${category.field}`);
-    
+    // Selects what the search currently shows, not the whole category.
     const searchQuery = searchQueries[category.field]?.toLowerCase() || "";
-    const filteredOptions = category.options.filter(option => 
-      option.toLowerCase().includes(searchQuery)
-    );
-    
-    const options = filteredOptions;
-    
-    setActiveFilters(prev => {
-      const newFilters = { ...prev };
-      
-      // Set all filtered options as selected
-      newFilters[category.field] = options;
-      
-      console.log(`📋 Updated filters for ${category.field}:`, options);
-      
-      // Call onFiltersChange after state update to avoid render conflicts
-      setTimeout(() => onFiltersChange(newFilters), 0);
-      return newFilters;
-    });
+    const matching = category.options
+      .filter(option => option.label.toLowerCase().includes(searchQuery))
+      .map(option => option.value);
+
+    onFiltersChange({ ...activeFilters, [category.field]: matching });
   };
 
   const filteredOptions = (category: FilterCategory) => {
@@ -266,20 +251,10 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
     }
     
     const searchQuery = searchQueries[category.field]?.toLowerCase() || "";
-    
-    // Filter by the search query if one exists
-    const filtered = category.options.filter(option => 
-      option.toLowerCase().includes(searchQuery)
+
+    return category.options.filter(option =>
+      option.label.toLowerCase().includes(searchQuery)
     );
-    
-    const finalFiltered = filtered;
-    
-    // Debug: Logging for School category specifically
-    if (category.field === 'school') {
-      console.log(`School options available: ${finalFiltered.length}`, finalFiltered);
-    }
-    
-    return finalFiltered;
   };
 
   const handleAccordionChange = (value: string[]) => {
@@ -345,33 +320,29 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
   const clearCategoryFilters = (category: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     
-    setActiveFilters(prev => {
-      const newFilters = { ...prev };
-      
-      // Remove this category's filters
-      delete newFilters[category];
-      
-      // Clear dependent filters if needed
-      if (category === "school") {
-        delete newFilters.degree;
-        delete newFilters.semester;
-        delete newFilters.year;
-        delete newFilters.subject;
-      } else if (category === "degree") {
-        delete newFilters.semester;
-        delete newFilters.year;
-        delete newFilters.subject;
-      } else if (category === "semester") {
-        delete newFilters.year;
-        delete newFilters.subject;
-      } else if (category === "year") {
-        delete newFilters.subject;
-      }
-      
-      // Call onFiltersChange after state update
-      setTimeout(() => onFiltersChange(newFilters), 0);
-      return newFilters;
-    });
+    const newFilters: ActiveFilters = { ...activeFilters };
+
+    // Remove this category's filters
+    delete newFilters[category];
+
+    // Clear dependent filters if needed
+    if (category === "school") {
+      delete newFilters.degree;
+      delete newFilters.semester;
+      delete newFilters.year;
+      delete newFilters.subject;
+    } else if (category === "degree") {
+      delete newFilters.semester;
+      delete newFilters.year;
+      delete newFilters.subject;
+    } else if (category === "semester") {
+      delete newFilters.year;
+      delete newFilters.subject;
+    } else if (category === "year") {
+      delete newFilters.subject;
+    }
+
+    onFiltersChange(newFilters);
   };
 
   // Fetch existing calendar names when the component mounts or user changes
@@ -493,36 +464,6 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
       return false
     }
   };
-
-  if (isLoading) {
-    return (
-      <motion.aside
-        id="filters-section"
-        initial={{ opacity: 0, x: -20 }}
-        whileInView={{ opacity: 1, x: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.5 }}
-        className="space-y-6 rounded-xl border bg-card p-6 shadow-lg"
-      >
-        <LoadingState />
-      </motion.aside>
-    )
-  }
-
-  if (error) {
-    return (
-      <motion.aside
-        id="filters-section"
-        initial={{ opacity: 0, x: -20 }}
-        whileInView={{ opacity: 1, x: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.5 }}
-        className="space-y-6 rounded-xl border bg-card p-6 shadow-lg"
-      >
-        <ErrorState error={error} />
-      </motion.aside>
-    )
-  }
 
   return (
     <motion.aside
@@ -669,20 +610,20 @@ export function FilterSidebar({ onFiltersChange = () => {} }: { onFiltersChange?
                 <div className="space-y-2">
                   {filteredOptions(category).length > 0 ? (
                     filteredOptions(category).map((option) => (
-                      <div key={option} className="flex items-center space-x-2">
+                      <div key={option.value} className="flex items-center space-x-2">
                         <Checkbox
-                          id={`${category.field}-${option}`}
-                          checked={activeFilters[category.field]?.includes(option)}
+                          id={`${category.field}-${option.value}`}
+                          checked={activeFilters[category.field]?.includes(option.value)}
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              addFilter(category.field, option);
+                              addFilter(category.field, option.value);
                             } else {
-                              removeFilter(category.field, option);
+                              removeFilter(category.field, option.value);
                             }
                           }}
                         />
-                        <Label htmlFor={`${category.field}-${option}`} className="text-sm">
-                          {option}
+                        <Label htmlFor={`${category.field}-${option.value}`} className="text-sm">
+                          {option.label}
                         </Label>
                       </div>
                     ))

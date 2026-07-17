@@ -7,6 +7,9 @@
 /.next/
 /out/
 
+# test coverage
+/coverage
+
 # production
 /build
 
@@ -28,3 +31,9 @@ next-env.d.ts
 
 # cursor
 .cursor
+# macOS junk
+.DS_Store
+**/.DS_Store
+
+# Personal thesis documents — must not be served publicly from /public
+/public/TFG/

@@ -39,6 +39,10 @@ import {
   generateAcademicYearMonths,
 } from "@/utils/date-utils";
 import { SaveCalendarDialog } from "@/components/save-calendar-dialog";
+import { hasMeaningfulFilters } from "@/lib/filter-params";
+import { examSubject } from "@/lib/i18n";
+import { detectConflicts } from "@/lib/exam-conflicts";
+import { ExamConflictsBanner } from "@/components/exam-conflicts-banner";
 
 import { useAuth } from "@/context/auth-context";
 import { useSettings } from "@/context/settings-context";
@@ -55,16 +59,23 @@ import {
   getUserCalendarNames,
 } from "@/actions/user-calendars";
 import { getCurrentSession, getFreshAuthTokens } from "@/utils/auth-helpers";
+import { openInGoogleCalendar, remindersToIso } from "@/lib/calendar-export";
 import type { Exam } from "@/types/exam";
 
-// Default URL for SSR - will be updated on client
-const DEFAULT_GOOGLE_ICAL_BASE_URL = "https://www.upvcal.com";
-
+/**
+ * Renders exams; it does not fetch them. The page resolves the filters in the
+ * URL on the server and passes the results down, so the first paint already has
+ * the calendar in it.
+ */
 export function CalendarDisplay({
   activeFilters = {},
+  exams = [],
+  loading = false,
   onExamsChange,
 }: {
   activeFilters?: Record<string, string[]>;
+  exams?: Exam[];
+  loading?: boolean;
   onExamsChange?: (exams: any[]) => void;
 }) {
   const [selectedDay, setSelectedDay] = useState<{
@@ -75,36 +86,14 @@ export function CalendarDisplay({
   const [visibleMonths, setVisibleMonths] = useState<number[]>([
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
   ]); // Show all 12 months by default
-  const [exams, setExams] = useState<any[]>([]);
-  const [months, setMonths] = useState<any[]>([]);
-  const [academicYear, setAcademicYear] = useState<{
-    startYear: number;
-    endYear: number;
-  } | null>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [existingNames, setExistingNames] = useState<string[]>([]);
-  const [googleIcalBaseUrl, setGoogleIcalBaseUrl] = useState(DEFAULT_GOOGLE_ICAL_BASE_URL);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const { user, syncToken } = useAuth();
   const { settings, updateSettings } = useSettings();
   const { toast } = useToast();
 
-  // Set the correct URL on client-side to avoid hydration mismatch
-  useEffect(() => {
-    const isLocalhost = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
-    const baseUrl = isLocalhost ? window.location.origin : DEFAULT_GOOGLE_ICAL_BASE_URL;
-    setGoogleIcalBaseUrl(baseUrl);
-  }, []);
-
   // Check if ETSINF is in the schools filter
   const hasETSINFFilter = activeFilters?.school?.includes("ETSINF");
-
-  // Log the active filters to debug
-  useEffect(() => {
-    console.log("CalendarDisplay - Active Filters:", activeFilters);
-    console.log("ETSINF Filter Active:", hasETSINFFilter);
-  }, [activeFilters, hasETSINFFilter]);
 
   // Notify parent component when exams change
   useEffect(() => {
@@ -113,118 +102,30 @@ export function CalendarDisplay({
     }
   }, [exams, onExamsChange]);
 
-  // Check if filters are meaningful (beyond just school/degree)
-  const hasMeaningfulFilters = () => {
-    if (!activeFilters || Object.keys(activeFilters).length === 0) {
-      return false;
-    }
-    
-    // Check if there are any filters other than school and degree
-    const meaningfulFilterKeys = Object.keys(activeFilters).filter(key => 
-      key !== 'school' && key !== 'degree' && 
-      activeFilters[key] && activeFilters[key].length > 0
-    );
-    
-    return meaningfulFilterKeys.length > 0;
-  };
+  // The calendar spans the academic year the exams actually fall in, which is
+  // read from the data rather than the clock: browsing next year's exams in July
+  // should not render last year's grid. With nothing selected there is no data
+  // to read, so the current course is the sensible frame.
+  const academicYear = useMemo(() => {
+    const dates = [...new Set(exams.map((exam) => exam.date))].sort();
+    const detected = dates.length ? detectAcademicYearFromExams(dates) : null;
+    if (detected) return detected;
+    const currentYear = getCurrentYear();
+    return { startYear: currentYear, endYear: currentYear + 1 };
+  }, [exams]);
 
-  // Fetch exams when filters change
-  useEffect(() => {
-    const fetchExams = async () => {
-      setLoading(true);
-      setError(null);
-      
-      // Only fetch exams if we have meaningful filters
-      if (!hasMeaningfulFilters()) {
-        console.log("CalendarDisplay - No meaningful filters selected, clearing exams");
-        setExams([]);
-        // Set up default months for current academic year
-        const currentYear = getCurrentYear();
-        const fallbackMonths = generateAcademicYearMonths(currentYear);
-        setMonths(fallbackMonths);
-        setAcademicYear({ startYear: currentYear, endYear: currentYear + 1 });
-        setLoading(false);
-        return;
-      }
+  const months = useMemo(
+    () => generateAcademicYearMonths(academicYear.startYear),
+    [academicYear.startYear]
+  );
 
-      try {
-        console.log(
-          "CalendarDisplay - Fetching exams with filters:",
-          activeFilters
-        );
-        // Pass filters directly to getExams
-        const data = (await getExams(activeFilters)) as Exam[];
-        console.log(
-          `CalendarDisplay - Fetched ${data.length} exams. Sample:`,
-          data.slice(0, 2)
-        );
-
-        // For debugging - log all unique dates in the exam data
-        if (data.length > 0) {
-          const uniqueDates: string[] = [
-            ...new Set(data.map((exam: Exam) => exam.date)),
-          ].sort();
-          console.log("CalendarDisplay - Unique exam dates:", uniqueDates);
-
-          // Detect academic year from exam dates
-          const detectedAcademicYear = detectAcademicYearFromExams(uniqueDates);
-          console.log(
-            "CalendarDisplay - Detected academic year:",
-            detectedAcademicYear
-          );
-
-          if (detectedAcademicYear) {
-            setAcademicYear(detectedAcademicYear);
-            // Generate months for the detected academic year
-            const academicMonths = generateAcademicYearMonths(
-              detectedAcademicYear.startYear
-            );
-            console.log(
-              "CalendarDisplay - Generated academic months:",
-              academicMonths.map((m) => `${m.name} ${m.year}`)
-            );
-            setMonths(academicMonths);
-          } else {
-            // Fallback to current year if no academic year detected
-            console.log(
-              "CalendarDisplay - No academic year detected, using current year fallback"
-            );
-            const currentYear = getCurrentYear();
-            const fallbackMonths = generateAcademicYearMonths(currentYear);
-            setMonths(fallbackMonths);
-            setAcademicYear({
-              startYear: currentYear,
-              endYear: currentYear + 1,
-            });
-          }
-        } else {
-          // No exams, use current year as fallback
-          console.log(
-            "CalendarDisplay - No exams found, using current year fallback"
-          );
-          const currentYear = getCurrentYear();
-          const fallbackMonths = generateAcademicYearMonths(currentYear);
-          setMonths(fallbackMonths);
-          setAcademicYear({ startYear: currentYear, endYear: currentYear + 1 });
-        }
-
-        setExams(data);
-      } catch (error) {
-        console.error("CalendarDisplay - Error fetching exams:", error);
-        setError("Error al cargar los exámenes");
-        setExams([]);
-        // Set fallback months even on error
-        const currentYear = getCurrentYear();
-        const fallbackMonths = generateAcademicYearMonths(currentYear);
-        setMonths(fallbackMonths);
-        setAcademicYear({ startYear: currentYear, endYear: currentYear + 1 });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchExams();
-  }, [activeFilters]);
+  // Meaningful here specifically because it's expensive to get wrong: only
+  // once filters are narrow (a semester + subjects, not a whole degree) does
+  // "these exams clash" describe one student's real schedule.
+  const conflicts = useMemo(
+    () => (hasMeaningfulFilters(activeFilters) ? detectConflicts(exams) : []),
+    [exams, activeFilters]
+  );
 
   // Fetch existing calendar names when the component mounts or user changes
   useEffect(() => {
@@ -292,6 +193,14 @@ export function CalendarDisplay({
     );
     setSelectedExams(dayExams);
   };
+
+  // Keyed by date so a day cell can be colored by its worst conflict without
+  // re-scanning `conflicts` on every cell.
+  const conflictByDate = useMemo(() => {
+    const map = new Map<string, (typeof conflicts)[number]["severity"]>();
+    for (const conflict of conflicts) map.set(conflict.date, conflict.severity);
+    return map;
+  }, [conflicts]);
 
   const hasExam = (month: string, day: number) => {
     // Find the month data to get the correct year and month number
@@ -404,14 +313,26 @@ export function CalendarDisplay({
     }
   };
 
-  // Disabled export functionality
-  const exportToGoogleCalendar = async (calendarName: string) => {
-    toast({
-      title: "Funcionalidad deshabilitada",
-      description: "La exportación a Google Calendar ha sido deshabilitada.",
-      variant: "destructive",
+  // Open Google Calendar with the current filters as a subscribable feed.
+  const handleExport = () => {
+    if (exams.length === 0) {
+      toast({
+        title: "No hay exámenes",
+        description: "Selecciona tus filtros para generar tu calendario.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    openInGoogleCalendar(activeFilters, {
+      name: "Exámenes UPV",
+      reminders: remindersToIso(settings.examReminders),
     });
-    throw new Error("Export functionality has been disabled");
+
+    toast({
+      title: "Abriendo Google Calendar",
+      description: "Confirma en Google Calendar para añadir tus exámenes a tu cuenta.",
+    });
   };
 
   return (
@@ -444,12 +365,8 @@ export function CalendarDisplay({
             variant="outline"
             size="sm"
             className="h-10 px-3 py-1.5 gap-2 rounded-sm text-sm font-medium"
-            disabled={true}
-            onClick={() => toast({
-              title: "Funcionalidad deshabilitada",
-              description: "La exportación ha sido deshabilitada.",
-              variant: "destructive",
-            })}
+            disabled={exams.length === 0}
+            onClick={handleExport}
           >
             <Share2 className="h-4 w-4" />
             <span>Exportar</span>
@@ -468,12 +385,7 @@ export function CalendarDisplay({
         </div>
       </div>
 
-      {/* Error state */}
-      {error && (
-        <div className="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
-          {error}
-        </div>
-      )}
+      <ExamConflictsBanner conflicts={conflicts} />
 
       {/* Loading state */}
       {loading && (
@@ -554,6 +466,12 @@ export function CalendarDisplay({
                               selectedDay?.month === month.name &&
                               selectedDay?.day === day;
                             const dayHasExam = hasExam(month.name, day);
+                            const dateString = formatDateString(
+                              month.year,
+                              month.monthNumber,
+                              day
+                            );
+                            const conflictSeverity = conflictByDate.get(dateString);
 
                             return (
                               <Tooltip key={`day-${day}`} delayDuration={150}>
@@ -567,17 +485,33 @@ export function CalendarDisplay({
                                         : dayHasExam
                                         ? "bg-primary/10 font-medium text-primary"
                                         : "hover:bg-accent"
+                                    } ${
+                                      conflictSeverity === "overlap"
+                                        ? "ring-2 ring-destructive ring-inset"
+                                        : conflictSeverity
+                                        ? "ring-2 ring-amber-500/70 ring-inset"
+                                        : ""
                                     }`}
                                     onClick={() =>
                                       handleDayClick(month.name, day)
                                     }
                                     title={`${month.name} ${day}, ${
                                       month.year
-                                    }${dayHasExam ? " - Has exams" : ""}`}
+                                    }${dayHasExam ? " - Has exams" : ""}${
+                                      conflictSeverity ? " - Conflicto de horario" : ""
+                                    }`}
                                   >
                                     {day}
                                     {dayHasExam && (
-                                      <span className="absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-primary"></span>
+                                      <span
+                                        className={`absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${
+                                          conflictSeverity === "overlap"
+                                            ? "bg-destructive"
+                                            : conflictSeverity
+                                            ? "bg-amber-500"
+                                            : "bg-primary"
+                                        }`}
+                                      ></span>
                                     )}
                                   </motion.div>
                                 </TooltipTrigger>
@@ -628,7 +562,7 @@ export function CalendarDisplay({
                                                 className={styles.examCard}
                                               >
                                                 <div className="flex justify-between mb-1">
-                                                  <span className="font-medium">{exam.name || exam.subject}</span>
+                                                  <span className="font-medium">{examSubject(exam, settings.language)}</span>
                                                   <Badge variant="outline" className="text-xs">
                                                     {new Date(exam.date).toLocaleDateString()}
                                                   </Badge>
@@ -716,7 +650,7 @@ export function CalendarDisplay({
                           >
                             <div className="flex items-start justify-between mb-2">
                               <span className="font-medium leading-tight">
-                                {exam.name || exam.subject}
+                                {examSubject(exam, settings.language)}
                               </span>
                               <Badge variant="outline" className="text-xs">
                                 {new Date(exam.date).toLocaleDateString()}
@@ -756,7 +690,7 @@ export function CalendarDisplay({
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
                     <Calendar className="h-12 w-12 mb-4 opacity-20" />
-                    {!hasMeaningfulFilters() ? (
+                    {!hasMeaningfulFilters(activeFilters) ? (
                       <>
                         <p>Selecciona tus criterios para ver el calendario</p>
                         <p className="text-sm mt-2">
@@ -782,7 +716,7 @@ export function CalendarDisplay({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <ExamListView activeFilters={activeFilters} />
+            <ExamListView exams={exams} isLoading={loading} />
           </motion.div>
         )}
       </AnimatePresence>

@@ -1,0 +1,21 @@
+{
+  "name": "upv-cal-scraper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Syncs ETSINF exam data from the official UPV API into Supabase. Standalone: not part of the Next.js build.",
+  "type": "module",
+  "scripts": {
+    "sync": "tsx src/index.ts",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4"
+  }
+}

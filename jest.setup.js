@@ -79,6 +79,22 @@ global.ResizeObserver = class ResizeObserver {
   unobserve() {}
 };
 
+// jsdom doesn't implement pointer capture or scrollIntoView, which Radix UI
+// primitives (Select, Dropdown, etc.) call during interaction. Without these,
+// any test that opens a Radix popover throws "hasPointerCapture is not a function".
+if (typeof window !== 'undefined' && window.HTMLElement) {
+  if (!window.HTMLElement.prototype.hasPointerCapture) {
+    window.HTMLElement.prototype.hasPointerCapture = jest.fn(() => false);
+  }
+  if (!window.HTMLElement.prototype.setPointerCapture) {
+    window.HTMLElement.prototype.setPointerCapture = jest.fn();
+  }
+  if (!window.HTMLElement.prototype.releasePointerCapture) {
+    window.HTMLElement.prototype.releasePointerCapture = jest.fn();
+  }
+  window.HTMLElement.prototype.scrollIntoView = jest.fn();
+}
+
 // Mock matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

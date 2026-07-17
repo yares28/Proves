@@ -164,23 +164,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (event === 'SIGNED_IN' && session) {
         setUser(session.user)
-        
-        // Handle OAuth provider tokens
-        if (session.provider_token) {
-          console.log('✅ Provider token received, storing...')
-          localStorage.setItem('oauth_provider_token', session.provider_token)
-        }
-        
-        if (session.provider_refresh_token) {
-          localStorage.setItem('oauth_provider_refresh_token', session.provider_refresh_token)
-        }
-        
+
         // Schedule automatic refresh
         if (session.expires_at) {
           scheduleTokenRefresh(session.expires_at)
         }
-        
-        console.log('✅ User signed in:', session.user.email)
+
+        console.log('✅ User signed in')
       } else if (event === 'SIGNED_OUT') {
         console.log('🔄 User signed out event received')
         setUser(null)
@@ -203,15 +193,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (event === 'TOKEN_REFRESHED' && session) {
         setUser(session.user)
         console.log('✅ Token refreshed')
-        
-        // Update stored provider tokens if refreshed
-        if (session.provider_token) {
-          localStorage.setItem('oauth_provider_token', session.provider_token)
-        }
-        
-        if (session.provider_refresh_token) {
-          localStorage.setItem('oauth_provider_refresh_token', session.provider_refresh_token)
-        }
       }
       
       setLoading(false)

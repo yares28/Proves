@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { openInGoogleCalendar } from "@/lib/calendar-export";
 import type { Exam, ExamFilters } from "@/types/exam";
 
 interface ExportButtonProps {
@@ -14,10 +15,14 @@ export function ExportButton({ exams, filters }: ExportButtonProps) {
   const { toast } = useToast();
 
   const handleExport = () => {
+    if (exams.length === 0) return;
+
+    openInGoogleCalendar(filters, { name: "Exámenes UPV" });
+
     toast({
-      title: "Funcionalidad deshabilitada",
-      description: "La exportación ha sido deshabilitada temporalmente.",
-      variant: "destructive",
+      title: "Abriendo Google Calendar",
+      description:
+        "Confirma en Google Calendar para añadir el calendario de exámenes a tu cuenta.",
     });
   };
 
