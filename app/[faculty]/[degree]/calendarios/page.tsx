@@ -2,12 +2,14 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { fromSlug } from '@/lib/slug'
 import { ExamListView } from '@/components/exam-list-view'
+import { getExams } from '@/actions/exam-actions'
 
-type Props = { params: { faculty: string; degree: string } }
+type Props = { params: Promise<{ faculty: string; degree: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const facultyName = fromSlug(params.faculty)
-  const degreeName = fromSlug(params.degree)
+  const { faculty, degree } = await params
+  const facultyName = fromSlug(faculty)
+  const degreeName = fromSlug(degree)
   const title = `Calendarios de exámenes UPV ${facultyName} · ${degreeName}`
   const description = `Exámenes de ${degreeName} en ${facultyName} (UPV). Filtra por semestre, año y asignaturas y exporta a tu calendario.`
 
@@ -15,20 +17,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description,
     alternates: {
-      canonical: `/${params.faculty}/${params.degree}/calendarios`,
+      canonical: `/${faculty}/${degree}/calendarios`,
     },
     openGraph: {
       title,
       description,
-      url: `/${params.faculty}/${params.degree}/calendarios`,
+      url: `/${faculty}/${degree}/calendarios`,
       type: 'website',
     },
   }
 }
 
-export default function DegreeCalendarsPage({ params }: Props) {
-  const facultyName = fromSlug(params.faculty)
-  const degreeName = fromSlug(params.degree)
+export default async function DegreeCalendarsPage({ params }: Props) {
+  const { faculty, degree } = await params
+  const facultyName = fromSlug(faculty)
+  const degreeName = fromSlug(degree)
+
+  // Fetched here rather than in the client: this page exists to be crawled, and
+  // an empty list is what a crawler saw while the exams loaded after hydration.
+  const exams = await getExams({ school: [facultyName], degree: [degreeName] })
 
   const faqJsonLd = {
     '@context': 'https://schema.org',
@@ -58,8 +65,8 @@ export default function DegreeCalendarsPage({ params }: Props) {
     '@type': 'BreadcrumbList',
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Inicio', item: '/' },
-      { '@type': 'ListItem', position: 2, name: facultyName, item: `/${params.faculty}/calendarios` },
-      { '@type': 'ListItem', position: 3, name: degreeName, item: `/${params.faculty}/${params.degree}/calendarios` },
+      { '@type': 'ListItem', position: 2, name: facultyName, item: `/${faculty}/calendarios` },
+      { '@type': 'ListItem', position: 3, name: degreeName, item: `/${faculty}/${degree}/calendarios` },
     ],
   }
 
@@ -79,11 +86,11 @@ export default function DegreeCalendarsPage({ params }: Props) {
 
       <div className="mb-6 text-sm">
         <Link href="/">Inicio</Link> {"/"}
-        <Link href={`/${params.faculty}/calendarios`}>{facultyName}</Link> {"/"}
+        <Link href={`/${faculty}/calendarios`}>{facultyName}</Link> {"/"}
         <span>{degreeName}</span>
       </div>
 
-      <ExamListView activeFilters={{ school: [facultyName], degree: [degreeName] }} />
+      <ExamListView exams={exams} />
     </div>
   )
 }

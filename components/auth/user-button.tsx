@@ -32,7 +32,7 @@ export function UserButton() {
   }
 
   const initials = user.user_metadata?.full_name
-    ? user.user_metadata.full_name.split(" ").map(n => n[0]).join("").toUpperCase()
+    ? user.user_metadata.full_name.split(" ").map((n: string) => n[0]).join("").toUpperCase()
     : user.email?.slice(0, 2).toUpperCase() || "U"
 
   return (

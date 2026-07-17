@@ -11,10 +11,10 @@ A modern calendar application for viewing and managing UPV (Universitat Politèc
 - **Save Calendar Views**: Save your filtered views for quick access
 
 ### 🔗 Google Calendar Integration
-- **Export to Google Calendar**: Export selected exams directly to your Google Calendar
-- **Automatic Calendar Creation**: Creates a dedicated "UPV Exams" calendar
+- **One-click Export**: Opens Google Calendar's "add calendar" dialog with your exam feed pre-filled — just confirm to add it
+- **Live Subscription (webcal/ICS)**: Subscribes to a filtered iCalendar feed served at `/api/ical`, so the calendar stays in sync
 - **Smart Event Details**: Each exam includes complete information (subject, location, time, etc.)
-- **Reminder Setup**: Automatic email and popup reminders
+- **Reminder Setup**: Popup reminders based on your preferences (1 hour / 1 day / 1 week before the exam)
 
 ### 🔐 Authentication
 - **Supabase Integration**: Secure user authentication and data management
@@ -24,7 +24,7 @@ A modern calendar application for viewing and managing UPV (Universitat Politèc
 ## Tech Stack
 
 ### Frontend
-- **Next.js 14**: React framework with App Router
+- **Next.js 15**: React framework with App Router
 - **TypeScript**: Type-safe development
 - **Tailwind CSS**: Utility-first CSS framework
 - **Framer Motion**: Smooth animations
@@ -34,7 +34,7 @@ A modern calendar application for viewing and managing UPV (Universitat Politèc
 ### Backend
 - **Supabase**: Backend-as-a-Service for authentication and database
 - **PostgreSQL**: Primary database
-- **Spring Boot**: Java backend service 
+- **Next.js Route Handlers**: Server actions and the `/api/ical` calendar feed
 
 ## Usage
 
@@ -49,11 +49,10 @@ A modern calendar application for viewing and managing UPV (Universitat Politèc
 3. Switch between calendar and list views using the toggle
 
 ### Exporting to Google Calendar
-1. Filter exams to show only the ones you want to export
-2. Click "Export to Google Calendar" button
-3. Follow the OAuth flow to authorize calendar access
-4. Choose a calendar name and confirm the export
-5. View your exams in Google Calendar
+1. Filter exams to show only the ones you want
+2. Click the "Exportar" button
+3. Google Calendar opens with the exam feed pre-filled in its "add calendar" dialog
+4. Confirm to add it — your exams (and reminders) appear in Google Calendar and stay in sync
 
 ### Saving Calendar Views
 1. Set up your desired filters

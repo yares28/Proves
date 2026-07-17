@@ -1,375 +1,93 @@
 import { mapExamData } from '@/utils/exam-mapper';
 
+/**
+ * mapExamData converts a raw Supabase exam row (DB column names) into the
+ * `Exam` shape the UI consumes.
+ */
 describe('Exam Mapper', () => {
   describe('mapExamData', () => {
-    it('should map exam data correctly', () => {
-      const rawExamData = {
-        id: '1',
-        name: 'Programming Exam',
-        date: '2024-01-15',
+    it('maps a full DB row to the Exam shape', () => {
+      const row = {
+        exam_instance_id: 42,
+        exam_date: '2026-01-15',
+        exam_time: '09:00',
+        duration_minutes: 90,
+        duration_day: 'P1D',
+        subject: 'Programación',
+        code: 11604,
+        acronym: 'PRG',
+        place: 'Aula 1G 1.7',
+        comment: 'Examen parcial',
+        year: 2,
+        semester: 'A',
         school: 'ETSINF',
-        degree: 'Computer Science',
-        semester: '1st Semester',
-        year: 2024,
-        subject: 'Programming',
-        description: 'Final programming exam',
-        duration: 120,
-        location: 'Room 101',
-        type: 'Final',
+        degree: 'GIINF',
       };
 
-      const mappedData = mapExamData(rawExamData);
-
-      expect(mappedData).toEqual({
-        id: '1',
-        name: 'Programming Exam',
-        date: '2024-01-15',
+      expect(mapExamData(row)).toEqual({
+        id: 42,
+        date: '2026-01-15',
+        time: '09:00',
+        duration_minutes: 90,
+        duration_day: 'P1D',
+        subject: 'Programación',
+        code: '11604',
+        acronym: 'PRG',
+        location: 'Aula 1G 1.7',
+        comment: 'Examen parcial',
+        year: '2',
+        semester: 'A',
         school: 'ETSINF',
-        degree: 'Computer Science',
-        semester: '1st Semester',
-        year: 2024,
-        subject: 'Programming',
-        description: 'Final programming exam',
-        duration: 120,
-        location: 'Room 101',
-        type: 'Final',
+        degree: 'GIINF',
       });
     });
 
-    it('should handle missing optional fields', () => {
-      const rawExamData = {
-        id: '1',
-        name: 'Programming Exam',
-        date: '2024-01-15',
-        school: 'ETSINF',
-      };
-
-      const mappedData = mapExamData(rawExamData);
-
-      expect(mappedData).toEqual({
-        id: '1',
-        name: 'Programming Exam',
-        date: '2024-01-15',
-        school: 'ETSINF',
-        degree: undefined,
-        semester: undefined,
-        year: undefined,
-        subject: undefined,
-        description: undefined,
-        duration: undefined,
-        location: undefined,
-        type: undefined,
-      });
+    it('defaults duration_minutes to 120 when missing or null', () => {
+      expect(mapExamData({ exam_instance_id: 1 }).duration_minutes).toBe(120);
+      expect(mapExamData({ exam_instance_id: 1, duration_minutes: null }).duration_minutes).toBe(120);
     });
 
-    it('should handle null values', () => {
-      const rawExamData = {
-        id: '1',
-        name: 'Programming Exam',
-        date: '2024-01-15',
-        school: 'ETSINF',
-        degree: null,
-        semester: null,
-        year: null,
-        subject: null,
-        description: null,
-        duration: null,
-        location: null,
-        type: null,
-      };
-
-      const mappedData = mapExamData(rawExamData);
-
-      expect(mappedData).toEqual({
-        id: '1',
-        name: 'Programming Exam',
-        date: '2024-01-15',
-        school: 'ETSINF',
-        degree: null,
-        semester: null,
-        year: null,
-        subject: null,
-        description: null,
-        duration: null,
-        location: null,
-        type: null,
-      });
+    it('preserves an explicit zero duration (does not fall back to 120)', () => {
+      expect(mapExamData({ exam_instance_id: 1, duration_minutes: 0 }).duration_minutes).toBe(0);
     });
 
-    it('should handle empty string values', () => {
-      const rawExamData = {
-        id: '1',
-        name: 'Programming Exam',
-        date: '2024-01-15',
-        school: 'ETSINF',
-        degree: '',
-        semester: '',
-        year: '',
-        subject: '',
-        description: '',
-        duration: '',
+    it('normalizes code and year to strings', () => {
+      const mapped = mapExamData({ exam_instance_id: 1, code: 11566, year: 4 });
+      expect(mapped.code).toBe('11566');
+      expect(mapped.year).toBe('4');
+    });
+
+    it('coerces missing optional text fields to empty strings', () => {
+      const mapped = mapExamData({ exam_instance_id: 7, subject: 'X' });
+      expect(mapped).toMatchObject({
+        id: 7,
+        subject: 'X',
+        time: '',
+        duration_day: '',
+        code: '',
         location: '',
-        type: '',
-      };
-
-      const mappedData = mapExamData(rawExamData);
-
-      expect(mappedData).toEqual({
-        id: '1',
-        name: 'Programming Exam',
-        date: '2024-01-15',
-        school: 'ETSINF',
-        degree: '',
-        semester: '',
+        comment: '',
         year: '',
-        subject: '',
-        description: '',
-        duration: '',
-        location: '',
-        type: '',
+        semester: '',
+        school: '',
+        degree: '',
+        acronym: '',
       });
     });
 
-    it('should handle undefined values', () => {
-      const rawExamData = {
-        id: '1',
-        name: 'Programming Exam',
-        date: '2024-01-15',
-        school: 'ETSINF',
-        degree: undefined,
-        semester: undefined,
-        year: undefined,
-        subject: undefined,
-        description: undefined,
-        duration: undefined,
-        location: undefined,
-        type: undefined,
-      };
-
-      const mappedData = mapExamData(rawExamData);
-
-      expect(mappedData).toEqual({
-        id: '1',
-        name: 'Programming Exam',
-        date: '2024-01-15',
-        school: 'ETSINF',
-        degree: undefined,
-        semester: undefined,
-        year: undefined,
-        subject: undefined,
-        description: undefined,
-        duration: undefined,
-        location: undefined,
-        type: undefined,
-      });
+    it('maps the place column to location', () => {
+      expect(mapExamData({ exam_instance_id: 1, place: 'Aula 2.1' }).location).toBe('Aula 2.1');
     });
 
-    it('should handle different data types correctly', () => {
-      const rawExamData = {
-        id: 1, // number instead of string
-        name: 'Programming Exam',
-        date: '2024-01-15',
-        school: 'ETSINF',
-        degree: 'Computer Science',
-        semester: '1st Semester',
-        year: '2024', // string instead of number
-        subject: 'Programming',
-        description: 'Final programming exam',
-        duration: '120', // string instead of number
-        location: 'Room 101',
-        type: 'Final',
-      };
-
-      const mappedData = mapExamData(rawExamData);
-
-      expect(mappedData).toEqual({
-        id: 1,
-        name: 'Programming Exam',
-        date: '2024-01-15',
-        school: 'ETSINF',
-        degree: 'Computer Science',
-        semester: '1st Semester',
-        year: '2024',
-        subject: 'Programming',
-        description: 'Final programming exam',
-        duration: '120',
-        location: 'Room 101',
-        type: 'Final',
-      });
-    });
-
-    it('should handle special characters in text fields', () => {
-      const rawExamData = {
-        id: '1',
-        name: 'Programming & Algorithms Exam',
-        date: '2024-01-15',
-        school: 'ETSINF',
-        degree: 'Computer Science & Engineering',
-        semester: '1st Semester',
-        year: 2024,
-        subject: 'Programming & Algorithms',
-        description: 'Final programming exam with special characters: áéíóú',
-        duration: 120,
-        location: 'Room 101-A',
-        type: 'Final',
-      };
-
-      const mappedData = mapExamData(rawExamData);
-
-      expect(mappedData).toEqual({
-        id: '1',
-        name: 'Programming & Algorithms Exam',
-        date: '2024-01-15',
-        school: 'ETSINF',
-        degree: 'Computer Science & Engineering',
-        semester: '1st Semester',
-        year: 2024,
-        subject: 'Programming & Algorithms',
-        description: 'Final programming exam with special characters: áéíóú',
-        duration: 120,
-        location: 'Room 101-A',
-        type: 'Final',
-      });
-    });
-
-    it('should handle very long text fields', () => {
-      const longDescription = 'A'.repeat(1000);
-      const rawExamData = {
-        id: '1',
-        name: 'Programming Exam',
-        date: '2024-01-15',
-        school: 'ETSINF',
-        degree: 'Computer Science',
-        semester: '1st Semester',
-        year: 2024,
-        subject: 'Programming',
-        description: longDescription,
-        duration: 120,
-        location: 'Room 101',
-        type: 'Final',
-      };
-
-      const mappedData = mapExamData(rawExamData);
-
-      expect(mappedData.description).toBe(longDescription);
-      expect(mappedData.description.length).toBe(1000);
-    });
-
-    it('should handle edge cases for numeric fields', () => {
-      const rawExamData = {
-        id: '1',
-        name: 'Programming Exam',
-        date: '2024-01-15',
-        school: 'ETSINF',
-        degree: 'Computer Science',
-        semester: '1st Semester',
-        year: 0, // edge case
-        subject: 'Programming',
-        description: 'Final programming exam',
-        duration: 0, // edge case
-        location: 'Room 101',
-        type: 'Final',
-      };
-
-      const mappedData = mapExamData(rawExamData);
-
-      expect(mappedData.year).toBe(0);
-      expect(mappedData.duration).toBe(0);
-    });
-
-    it('should handle malformed date strings', () => {
-      const rawExamData = {
-        id: '1',
-        name: 'Programming Exam',
-        date: 'invalid-date',
-        school: 'ETSINF',
-        degree: 'Computer Science',
-        semester: '1st Semester',
-        year: 2024,
-        subject: 'Programming',
-        description: 'Final programming exam',
-        duration: 120,
-        location: 'Room 101',
-        type: 'Final',
-      };
-
-      const mappedData = mapExamData(rawExamData);
-
-      expect(mappedData.date).toBe('invalid-date');
-    });
-
-    it('should handle array of exam data', () => {
-      const rawExamDataArray = [
-        {
-          id: '1',
-          name: 'Programming Exam',
-          date: '2024-01-15',
-          school: 'ETSINF',
-        },
-        {
-          id: '2',
-          name: 'Database Exam',
-          date: '2024-01-20',
-          school: 'ETSINF',
-        },
+    it('can be used to map an array of rows', () => {
+      const rows = [
+        { exam_instance_id: 1, subject: 'A', exam_date: '2026-01-10' },
+        { exam_instance_id: 2, subject: 'B', exam_date: '2026-01-11' },
       ];
-
-      const mappedDataArray = rawExamDataArray.map(mapExamData);
-
-      expect(mappedDataArray).toHaveLength(2);
-      expect(mappedDataArray[0]).toEqual({
-        id: '1',
-        name: 'Programming Exam',
-        date: '2024-01-15',
-        school: 'ETSINF',
-        degree: undefined,
-        semester: undefined,
-        year: undefined,
-        subject: undefined,
-        description: undefined,
-        duration: undefined,
-        location: undefined,
-        type: undefined,
-      });
-      expect(mappedDataArray[1]).toEqual({
-        id: '2',
-        name: 'Database Exam',
-        date: '2024-01-20',
-        school: 'ETSINF',
-        degree: undefined,
-        semester: undefined,
-        year: undefined,
-        subject: undefined,
-        description: undefined,
-        duration: undefined,
-        location: undefined,
-        type: undefined,
-      });
-    });
-
-    it('should preserve original object structure', () => {
-      const rawExamData = {
-        id: '1',
-        name: 'Programming Exam',
-        date: '2024-01-15',
-        school: 'ETSINF',
-        degree: 'Computer Science',
-        semester: '1st Semester',
-        year: 2024,
-        subject: 'Programming',
-        description: 'Final programming exam',
-        duration: 120,
-        location: 'Room 101',
-        type: 'Final',
-        extraField: 'This should be preserved',
-        nestedObject: { key: 'value' },
-      };
-
-      const mappedData = mapExamData(rawExamData);
-
-      // Should include all original fields
-      expect(mappedData).toHaveProperty('extraField', 'This should be preserved');
-      expect(mappedData).toHaveProperty('nestedObject', { key: 'value' });
+      const mapped = rows.map(mapExamData);
+      expect(mapped).toHaveLength(2);
+      expect(mapped[0]).toMatchObject({ id: 1, subject: 'A', date: '2026-01-10' });
+      expect(mapped[1]).toMatchObject({ id: 2, subject: 'B', date: '2026-01-11' });
     });
   });
-}); 
+});

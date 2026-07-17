@@ -1,0 +1,90 @@
+name: Sync ETSINF exams
+
+# Exam dates move most while a term is being scheduled, so the sync runs weekly
+# through the busy months (January, August, September, December) and monthly the
+# rest of the year. The two schedules cover disjoint months, so a run's cadence
+# is unambiguous and no run ever needs to be skipped. Runs are idempotent: an
+# extra one is a no-op.
+on:
+  schedule:
+    - cron: '0 5 * 1,8,9,12 1'          # Mondays 05:00 UTC, Jan/Aug/Sep/Dec
+    - cron: '0 5 1 2,3,4,5,6,7,10,11 *'  # 1st of the month 05:00 UTC, other months
+  workflow_dispatch:
+    inputs:
+      year:
+        description: 'Academic start year (e.g. 2026), or "current"'
+        required: false
+        default: 'current'
+      dry_run:
+        description: 'Report the diff without writing anything'
+        type: boolean
+        required: false
+        default: true
+      force:
+        description: 'Allow a deletion batch larger than the safety cap'
+        type: boolean
+        required: false
+        default: false
+
+# Never let two syncs write at once; queue instead of cancelling a run mid-write.
+concurrency:
+  group: sync-exams
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: scraper
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: scraper/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Sync exams
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Lets a successful sync purge the site's cached exam data immediately;
+          # without them the site heals on the hourly backstop instead.
+          REVALIDATE_URL: ${{ secrets.REVALIDATE_URL }}
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+          SYNC_TRIGGER: ${{ github.event_name == 'schedule' && (github.event.schedule == '0 5 * 1,8,9,12 1' && 'cron-weekly' || 'cron-monthly') || 'manual' }}
+        run: |
+          args="--year ${{ github.event.inputs.year || 'current' }}"
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then args="$args --dry-run"; fi
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then args="$args --force"; fi
+          echo "Running: npm run sync -- $args"
+          npm run sync -- $args
+
+      # Exit code 2 means a safety gate stopped the run: the data upstream looked
+      # wrong, so production kept the previous data. Worth knowing, not a crisis.
+      - name: Explain a gated run
+        if: failure()
+        run: |
+          echo "::warning::Sync did not complete. Exit code 2 = a safety gate aborted the run (bad upstream data, nothing written). Exit code 1 = an unexpected failure. See the JSON logs above and the sync_runs table."
+
+      - name: Notify on failure
+        if: failure() && env.ALERT_WEBHOOK_URL != ''
+        env:
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+        run: |
+          curl -sf -X POST -H 'Content-Type: application/json' \
+            -d "{\"content\":\"UPV-Cal exam sync failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            "$ALERT_WEBHOOK_URL" || echo "Webhook notification failed (non-fatal)"

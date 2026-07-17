@@ -1,86 +1,94 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { FilterSidebar } from '@/components/filter-sidebar';
+import type { FilterOptions } from '@/types/exam';
+import type { Locale } from '@/lib/i18n';
 
-// Mock the auth context
-const mockUser = {
-  id: 'user-123',
-  email: 'test@example.com',
-  user_metadata: { full_name: 'John Doe' },
-};
+/**
+ * These use fireEvent rather than userEvent. userEvent's synthetic pointer
+ * sequence does not drive Radix's Checkbox under jsdom — the click lands but
+ * onCheckedChange never runs — while fireEvent exercises the same handler a real
+ * click does. The real pointer path is covered in the browser, not here.
+ */
+
+/**
+ * FilterSidebar is controlled: the selection lives in the URL and arrives as the
+ * `filters` prop, and every interaction reports the *next* selection through
+ * onFiltersChange. So these tests assert on what the sidebar reports upward and
+ * on what it renders for a given selection — not on internal state, which it no
+ * longer has.
+ */
 
 jest.mock('@/context/auth-context', () => ({
-  useAuth: () => ({
-    user: mockUser,
-    syncToken: jest.fn(),
-    loading: false,
-  }),
+  useAuth: () => ({ user: { id: 'user-123' }, syncToken: jest.fn(), loading: false }),
 }));
 
-// Mock the toast hook
-const mockToast = jest.fn();
-jest.mock('@/hooks/use-toast', () => ({
-  useToast: () => ({ toast: mockToast }),
-}));
+jest.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: jest.fn() }) }));
 
-// Mock the filter data hook
-const mockUseFilterData = jest.fn();
-jest.mock('@/lib/hooks/use-filter-data', () => ({
-  useFilterData: mockUseFilterData,
-}));
-
-// Mock the user calendar actions
 jest.mock('@/actions/user-calendars', () => ({
   saveUserCalendar: jest.fn(),
-  getUserCalendarNames: jest.fn(),
+  getUserCalendarNames: jest.fn().mockResolvedValue([]),
 }));
 
-// Mock the auth helpers
-jest.mock('@/utils/auth-helpers', () => ({
-  getFreshAuthTokens: jest.fn(),
+jest.mock('@/utils/auth-helpers', () => ({ getFreshAuthTokens: jest.fn() }));
+
+jest.mock('next-themes', () => ({ useTheme: () => ({ theme: 'dark' }) }));
+
+jest.mock('@/context/settings-context', () => ({
+  useSettings: () => ({ settings: { theme: 'dark', language }, updateSettings: jest.fn() }),
 }));
 
-// Mock framer-motion
+// Any motion.<tag> renders as that plain tag; the component uses aside and div.
 jest.mock('framer-motion', () => ({
-  motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  },
+  motion: new Proxy(
+    {},
+    {
+      get: (_target, tag: string) => {
+        const Component = ({ children, ...props }: any) => {
+          const { initial, animate, exit, whileInView, viewport, transition, whileHover, whileTap, ...rest } = props;
+          return React.createElement(tag, rest, children);
+        };
+        Component.displayName = `motion.${tag}`;
+        return Component;
+      },
+    }
+  ),
+  AnimatePresence: ({ children }: any) => <>{children}</>,
 }));
 
-// Mock Next.js Image component
 jest.mock('next/image', () => ({
   __esModule: true,
-  default: ({ src, alt, ...props }: any) => (
-    <img src={src} alt={alt} {...props} />
-  ),
+  default: ({ src, alt }: any) => <img src={src} alt={alt} />,
 }));
 
+const OPTIONS: FilterOptions = {
+  schools: ['ETSA', 'ETSINF'],
+  degrees: ['GCD', 'GIINF'],
+  semesters: ['A', 'B'],
+  years: [1, 2],
+  subjects: [
+    { value: 'Programación (PRG)', va: 'Programació (PRG)', en: 'Programming (PRG)' },
+    // Untranslated upstream, as the ETSA rows are: falls back to `value`.
+    { value: 'Álgebra (ALG)' },
+  ],
+};
+
+let language: Locale = 'es';
+
+beforeEach(() => {
+  language = 'es';
+});
+
+function renderSidebar(filters: Record<string, string[]> = {}, options: FilterOptions = OPTIONS) {
+  const onFiltersChange = jest.fn();
+  render(<FilterSidebar filters={filters} options={options} onFiltersChange={onFiltersChange} />);
+  return { onFiltersChange };
+}
+
 describe('FilterSidebar', () => {
-  const mockOnFiltersChange = jest.fn();
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockUseFilterData.mockReturnValue({
-      schools: ['ETSINF', 'ETSID', 'ETSAM'],
-      degrees: ['Computer Science', 'Software Engineering'],
-      semesters: ['1st Semester', '2nd Semester'],
-      years: [2024, 2025],
-      subjects: ['Programming', 'Databases'],
-      isLoading: false,
-      error: null,
-    });
-  });
-
-  const renderFilterSidebar = () => {
-    return render(
-      <FilterSidebar onFiltersChange={mockOnFiltersChange} />
-    );
-  };
-
-  describe('Rendering', () => {
-    it('should render the filter sidebar with all categories', () => {
-      renderFilterSidebar();
+  describe('rendering', () => {
+    it('renders every filter category', () => {
+      renderSidebar();
 
       expect(screen.getByText('Filtros')).toBeInTheDocument();
       expect(screen.getByText('Escuelas')).toBeInTheDocument();
@@ -90,455 +98,208 @@ describe('FilterSidebar', () => {
       expect(screen.getByText('Asignaturas')).toBeInTheDocument();
     });
 
-    it('should render search inputs for searchable categories', () => {
-      renderFilterSidebar();
+    it('renders the options it was given', () => {
+      renderSidebar();
 
-      const searchInputs = screen.getAllByPlaceholderText('Buscar...');
-      expect(searchInputs).toHaveLength(3); // Schools, degrees, and subjects are searchable
+      expect(screen.getByLabelText('ETSINF')).toBeInTheDocument();
+      expect(screen.getByLabelText('ETSA')).toBeInTheDocument();
     });
 
-    it('should render save calendar button when user is authenticated', () => {
-      renderFilterSidebar();
+    it('reflects the incoming selection as checked boxes', () => {
+      renderSidebar({ school: ['ETSINF'] });
 
-      expect(screen.getByText('Guardar Calendario')).toBeInTheDocument();
+      expect(screen.getByLabelText('ETSINF')).toBeChecked();
+      expect(screen.getByLabelText('ETSA')).not.toBeChecked();
     });
 
-    it('should not render save calendar button when user is not authenticated', () => {
-      jest.doMock('@/context/auth-context', () => ({
-        useAuth: () => ({
-          user: null,
-          syncToken: jest.fn(),
-          loading: false,
-        }),
-      }));
-
-      renderFilterSidebar();
-
+    it('offers saving only once something is selected', () => {
+      const { rerender } = render(
+        <FilterSidebar filters={{}} options={OPTIONS} onFiltersChange={jest.fn()} />
+      );
       expect(screen.queryByText('Guardar Calendario')).not.toBeInTheDocument();
-    });
-  });
 
-  describe('Filter Interactions', () => {
-    it('should handle school selection', async () => {
-      const user = userEvent.setup();
-      renderFilterSidebar();
-
-      const schoolCheckbox = screen.getByLabelText('ETSINF');
-      await user.click(schoolCheckbox);
-
-      expect(schoolCheckbox).toBeChecked();
-      expect(mockOnFiltersChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          school: ['ETSINF'],
-        })
+      rerender(
+        <FilterSidebar filters={{ school: ['ETSINF'] }} options={OPTIONS} onFiltersChange={jest.fn()} />
       );
-    });
-
-    it('should handle multiple school selections', async () => {
-      const user = userEvent.setup();
-      renderFilterSidebar();
-
-      const etsinfCheckbox = screen.getByLabelText('ETSINF');
-      const etsidCheckbox = screen.getByLabelText('ETSID');
-
-      await user.click(etsinfCheckbox);
-      await user.click(etsidCheckbox);
-
-      expect(etsinfCheckbox).toBeChecked();
-      expect(etsidCheckbox).toBeChecked();
-      expect(mockOnFiltersChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          school: ['ETSINF', 'ETSID'],
-        })
-      );
-    });
-
-    it('should handle degree selection', async () => {
-      const user = userEvent.setup();
-      renderFilterSidebar();
-
-      const degreeCheckbox = screen.getByLabelText('Computer Science');
-      await user.click(degreeCheckbox);
-
-      expect(degreeCheckbox).toBeChecked();
-      expect(mockOnFiltersChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          degree: ['Computer Science'],
-        })
-      );
-    });
-
-    it('should handle semester selection', async () => {
-      const user = userEvent.setup();
-      renderFilterSidebar();
-
-      const semesterCheckbox = screen.getByLabelText('1st Semester');
-      await user.click(semesterCheckbox);
-
-      expect(semesterCheckbox).toBeChecked();
-      expect(mockOnFiltersChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          semester: ['1st Semester'],
-        })
-      );
-    });
-
-    it('should handle year selection', async () => {
-      const user = userEvent.setup();
-      renderFilterSidebar();
-
-      const yearCheckbox = screen.getByLabelText('2024');
-      await user.click(yearCheckbox);
-
-      expect(yearCheckbox).toBeChecked();
-      expect(mockOnFiltersChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          year: ['2024'],
-        })
-      );
-    });
-
-    it('should handle subject selection', async () => {
-      const user = userEvent.setup();
-      renderFilterSidebar();
-
-      const subjectCheckbox = screen.getByLabelText('Programming');
-      await user.click(subjectCheckbox);
-
-      expect(subjectCheckbox).toBeChecked();
-      expect(mockOnFiltersChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          subject: ['Programming'],
-        })
-      );
-    });
-  });
-
-  describe('Search Functionality', () => {
-    it('should filter schools when searching', async () => {
-      const user = userEvent.setup();
-      renderFilterSidebar();
-
-      const schoolSearchInput = screen.getAllByPlaceholderText('Buscar...')[0];
-      await user.type(schoolSearchInput, 'ETSINF');
-
-      expect(screen.getByText('ETSINF')).toBeInTheDocument();
-      expect(screen.queryByText('ETSID')).not.toBeInTheDocument();
-    });
-
-    it('should filter degrees when searching', async () => {
-      const user = userEvent.setup();
-      renderFilterSidebar();
-
-      const degreeSearchInput = screen.getAllByPlaceholderText('Buscar...')[1];
-      await user.type(degreeSearchInput, 'Computer');
-
-      expect(screen.getByText('Computer Science')).toBeInTheDocument();
-      expect(screen.queryByText('Software Engineering')).not.toBeInTheDocument();
-    });
-
-    it('should filter subjects when searching', async () => {
-      const user = userEvent.setup();
-      renderFilterSidebar();
-
-      const subjectSearchInput = screen.getAllByPlaceholderText('Buscar...')[2];
-      await user.type(subjectSearchInput, 'Programming');
-
-      expect(screen.getByText('Programming')).toBeInTheDocument();
-      expect(screen.queryByText('Databases')).not.toBeInTheDocument();
-    });
-
-    it('should clear search when input is cleared', async () => {
-      const user = userEvent.setup();
-      renderFilterSidebar();
-
-      const schoolSearchInput = screen.getAllByPlaceholderText('Buscar...')[0];
-      await user.type(schoolSearchInput, 'ETSINF');
-      await user.clear(schoolSearchInput);
-
-      expect(screen.getByText('ETSINF')).toBeInTheDocument();
-      expect(screen.getByText('ETSID')).toBeInTheDocument();
-    });
-  });
-
-  describe('Filter Dependencies', () => {
-    it('should show degrees only when schools are selected', async () => {
-      mockUseFilterData.mockReturnValue({
-        schools: ['ETSINF', 'ETSID'],
-        degrees: [],
-        semesters: [],
-        years: [],
-        subjects: [],
-        isLoading: false,
-        error: null,
-      });
-
-      renderFilterSidebar();
-
-      // Initially, degrees should be empty
-      expect(screen.queryByText('Computer Science')).not.toBeInTheDocument();
-
-      // Select a school
-      const user = userEvent.setup();
-      const schoolCheckbox = screen.getByLabelText('ETSINF');
-      await user.click(schoolCheckbox);
-
-      // Now degrees should be populated
-      mockUseFilterData.mockReturnValue({
-        schools: ['ETSINF', 'ETSID'],
-        degrees: ['Computer Science', 'Software Engineering'],
-        semesters: [],
-        years: [],
-        subjects: [],
-        isLoading: false,
-        error: null,
-      });
-
-      // Re-render to see updated degrees
-      renderFilterSidebar();
-      expect(screen.getByText('Computer Science')).toBeInTheDocument();
-    });
-
-    it('should show semesters only when schools and degrees are selected', async () => {
-      mockUseFilterData.mockReturnValue({
-        schools: ['ETSINF'],
-        degrees: ['Computer Science'],
-        semesters: [],
-        years: [],
-        subjects: [],
-        isLoading: false,
-        error: null,
-      });
-
-      renderFilterSidebar();
-
-      // Initially, semesters should be empty
-      expect(screen.queryByText('1st Semester')).not.toBeInTheDocument();
-
-      // Select school and degree
-      const user = userEvent.setup();
-      const schoolCheckbox = screen.getByLabelText('ETSINF');
-      const degreeCheckbox = screen.getByLabelText('Computer Science');
-
-      await user.click(schoolCheckbox);
-      await user.click(degreeCheckbox);
-
-      // Now semesters should be populated
-      mockUseFilterData.mockReturnValue({
-        schools: ['ETSINF'],
-        degrees: ['Computer Science'],
-        semesters: ['1st Semester', '2nd Semester'],
-        years: [],
-        subjects: [],
-        isLoading: false,
-        error: null,
-      });
-
-      // Re-render to see updated semesters
-      renderFilterSidebar();
-      expect(screen.getByText('1st Semester')).toBeInTheDocument();
-    });
-  });
-
-  describe('Save Calendar Functionality', () => {
-    it('should open save dialog when save button is clicked', async () => {
-      const user = userEvent.setup();
-      renderFilterSidebar();
-
-      const saveButton = screen.getByText('Guardar Calendario');
-      await user.click(saveButton);
-
       expect(screen.getByText('Guardar Calendario')).toBeInTheDocument();
     });
+  });
 
-    it('should handle save calendar success', async () => {
-      const { saveUserCalendar } = require('@/actions/user-calendars');
-      saveUserCalendar.mockResolvedValue({ success: true });
+  describe('reporting changes', () => {
+    it('reports a school selection', () => {
+      const { onFiltersChange } = renderSidebar();
 
-      const user = userEvent.setup();
-      renderFilterSidebar();
+      fireEvent.click(screen.getByLabelText('ETSINF'));
 
-      const saveButton = screen.getByText('Guardar Calendario');
-      await user.click(saveButton);
+      expect(onFiltersChange).toHaveBeenCalledWith({ school: ['ETSINF'] });
+    });
 
-      // Fill in calendar name
-      const nameInput = screen.getByPlaceholderText('Nombre del calendario');
-      await user.type(nameInput, 'My Calendar');
+    it('adds to an existing selection rather than replacing it', () => {
+      const { onFiltersChange } = renderSidebar({ school: ['ETSA'] });
 
-      // Submit the form
-      const submitButton = screen.getByText('Guardar');
-      await user.click(submitButton);
+      fireEvent.click(screen.getByLabelText('ETSINF'));
 
-      await waitFor(() => {
-        expect(saveUserCalendar).toHaveBeenCalled();
-        expect(mockToast).toHaveBeenCalledWith({
-          title: 'Éxito',
-          description: 'Calendario guardado correctamente',
-        });
+      expect(onFiltersChange).toHaveBeenCalledWith({ school: ['ETSA', 'ETSINF'] });
+    });
+
+    it('reports a deselection', () => {
+      const { onFiltersChange } = renderSidebar({ school: ['ETSA', 'ETSINF'] });
+
+      fireEvent.click(screen.getByLabelText('ETSA'));
+
+      expect(onFiltersChange).toHaveBeenCalledWith({ school: ['ETSINF'] });
+    });
+
+    it('clears the whole selection', () => {
+      const { onFiltersChange } = renderSidebar({ school: ['ETSINF'], degree: ['GIINF'] });
+
+      // The header's clear-all, not a category's.
+      fireEvent.click(screen.getAllByText('Limpiar todo')[0]);
+
+      expect(onFiltersChange).toHaveBeenCalledWith({});
+    });
+  });
+
+  describe('cascade', () => {
+    // Choosing a school invalidates the degree under it, and a degree
+    // invalidates the semester/year under that. Leaving them selected would
+    // silently filter against a combination the user never chose.
+    it('drops the degree when the school changes', () => {
+      const { onFiltersChange } = renderSidebar({ school: ['ETSA'], degree: ['GCD'] });
+
+      fireEvent.click(screen.getByLabelText('ETSINF'));
+
+      expect(onFiltersChange).toHaveBeenCalledWith({ school: ['ETSA', 'ETSINF'] });
+    });
+
+    it('drops semester and year when the degree changes', () => {
+      const { onFiltersChange } = renderSidebar({
+        school: ['ETSINF'],
+        degree: ['GCD'],
+        semester: ['A'],
+        year: ['1'],
+      });
+
+      fireEvent.click(screen.getByLabelText('GIINF'));
+
+      expect(onFiltersChange).toHaveBeenCalledWith({
+        school: ['ETSINF'],
+        degree: ['GCD', 'GIINF'],
       });
     });
 
-    it('should handle save calendar error', async () => {
-      const { saveUserCalendar } = require('@/actions/user-calendars');
-      saveUserCalendar.mockRejectedValue(new Error('Save failed'));
+    it('keeps subjects when a school is added, since they may still apply', () => {
+      const { onFiltersChange } = renderSidebar({
+        school: ['ETSA'],
+        subject: ['Programación (PRG)'],
+      });
 
-      const user = userEvent.setup();
-      renderFilterSidebar();
+      fireEvent.click(screen.getByLabelText('ETSINF'));
 
-      const saveButton = screen.getByText('Guardar Calendario');
-      await user.click(saveButton);
-
-      // Fill in calendar name
-      const nameInput = screen.getByPlaceholderText('Nombre del calendario');
-      await user.type(nameInput, 'My Calendar');
-
-      // Submit the form
-      const submitButton = screen.getByText('Guardar');
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(mockToast).toHaveBeenCalledWith({
-          title: 'Error',
-          description: 'Error al guardar el calendario',
-          variant: 'destructive',
-        });
+      expect(onFiltersChange).toHaveBeenCalledWith({
+        school: ['ETSA', 'ETSINF'],
+        subject: ['Programación (PRG)'],
       });
     });
   });
 
-  describe('Loading States', () => {
-    it('should show loading state when data is loading', () => {
-      mockUseFilterData.mockReturnValue({
-        schools: [],
-        degrees: [],
-        semesters: [],
-        years: [],
-        subjects: [],
-        isLoading: true,
-        error: null,
-      });
+  describe('dependencies', () => {
+    it('does not offer degrees before a school is chosen', () => {
+      renderSidebar({}, { ...OPTIONS, degrees: [] });
 
-      renderFilterSidebar();
-
-      expect(screen.getByTestId('loading-state')).toBeInTheDocument();
+      expect(screen.queryByLabelText('GIINF')).not.toBeInTheDocument();
     });
 
-    it('should show error state when there is an error', () => {
-      mockUseFilterData.mockReturnValue({
-        schools: [],
-        degrees: [],
-        semesters: [],
-        years: [],
-        subjects: [],
-        isLoading: false,
-        error: 'Failed to load data',
-      });
+    it('offers degrees once a school is chosen', () => {
+      renderSidebar({ school: ['ETSINF'] });
 
-      renderFilterSidebar();
-
-      expect(screen.getByTestId('error-state')).toBeInTheDocument();
-      expect(screen.getByText('Error al cargar los filtros')).toBeInTheDocument();
+      expect(screen.getByLabelText('GIINF')).toBeInTheDocument();
     });
   });
 
-  describe('Filter Clearing', () => {
-    it('should clear all filters when clear button is clicked', async () => {
-      const user = userEvent.setup();
-      renderFilterSidebar();
+  describe('language', () => {
+    it('labels subjects in Castellano by default', () => {
+      renderSidebar({ school: ['ETSINF'] });
 
-      // Select some filters
-      const schoolCheckbox = screen.getByLabelText('ETSINF');
-      const degreeCheckbox = screen.getByLabelText('Computer Science');
+      expect(screen.getByLabelText('Programación (PRG)')).toBeInTheDocument();
+    });
 
-      await user.click(schoolCheckbox);
-      await user.click(degreeCheckbox);
+    it('labels subjects in Valencià when chosen', () => {
+      language = 'va';
+      renderSidebar({ school: ['ETSINF'] });
 
-      // Clear all filters
-      const clearButton = screen.getByText('Limpiar Filtros');
-      await user.click(clearButton);
+      expect(screen.getByLabelText('Programació (PRG)')).toBeInTheDocument();
+    });
 
-      expect(schoolCheckbox).not.toBeChecked();
-      expect(degreeCheckbox).not.toBeChecked();
-      expect(mockOnFiltersChange).toHaveBeenCalledWith({});
+    it('labels subjects in English when chosen', () => {
+      language = 'en';
+      renderSidebar({ school: ['ETSINF'] });
+
+      expect(screen.getByLabelText('Programming (PRG)')).toBeInTheDocument();
+    });
+
+    it('falls back to Castellano for untranslated subjects', () => {
+      language = 'va';
+      renderSidebar({ school: ['ETSINF'] });
+
+      expect(screen.getByLabelText('Álgebra (ALG)')).toBeInTheDocument();
+    });
+
+    // The value is the identity: it is what the URL carries and what
+    // user_calendars.filters stores. Reporting a Valencià label upward would
+    // silently orphan every calendar saved before the language was switched.
+    it('still reports the Castellano value when displaying Valencià', () => {
+      language = 'va';
+      const { onFiltersChange } = renderSidebar({ school: ['ETSINF'] });
+
+      fireEvent.click(screen.getByLabelText('Programació (PRG)'));
+
+      expect(onFiltersChange).toHaveBeenCalledWith({
+        school: ['ETSINF'],
+        subject: ['Programación (PRG)'],
+      });
     });
   });
 
-  describe('Accessibility', () => {
-    it('should have proper ARIA labels and roles', () => {
-      renderFilterSidebar();
+  // Only subjects get a search box — there are 300+ of them, and a handful of
+  // schools. It appears once a school or degree narrows the list.
+  describe('subject search', () => {
+    const search = () => screen.getByPlaceholderText('Buscar asignaturas...');
 
-      expect(screen.getByRole('button', { name: 'Guardar Calendario' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Limpiar Filtros' })).toBeInTheDocument();
+    it('narrows subjects to matching options', () => {
+      renderSidebar({ school: ['ETSINF'] });
+
+      fireEvent.change(search(), { target: { value: 'Programa' } });
+
+      expect(screen.getByLabelText('Programación (PRG)')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Álgebra (ALG)')).not.toBeInTheDocument();
     });
 
-    it('should have proper keyboard navigation', async () => {
-      const user = userEvent.setup();
-      renderFilterSidebar();
+    it('restores every subject when the search is cleared', () => {
+      renderSidebar({ school: ['ETSINF'] });
 
-      const schoolCheckbox = screen.getByLabelText('ETSINF');
-      
-      // Focus the checkbox
-      schoolCheckbox.focus();
-      expect(schoolCheckbox).toHaveFocus();
+      fireEvent.change(search(), { target: { value: 'Programa' } });
+      fireEvent.change(search(), { target: { value: '' } });
 
-      // Toggle with Space key
-      await user.keyboard(' ');
-      expect(schoolCheckbox).toBeChecked();
-    });
-  });
-
-  describe('Edge Cases', () => {
-    it('should handle empty filter data', () => {
-      mockUseFilterData.mockReturnValue({
-        schools: [],
-        degrees: [],
-        semesters: [],
-        years: [],
-        subjects: [],
-        isLoading: false,
-        error: null,
-      });
-
-      renderFilterSidebar();
-
-      expect(screen.getByText('No hay datos disponibles')).toBeInTheDocument();
+      expect(screen.getByLabelText('Programación (PRG)')).toBeInTheDocument();
+      expect(screen.getByLabelText('Álgebra (ALG)')).toBeInTheDocument();
     });
 
-    it('should handle large filter lists', () => {
-      const largeSchoolsList = Array.from({ length: 50 }, (_, i) => `School ${i + 1}`);
-      
-      mockUseFilterData.mockReturnValue({
-        schools: largeSchoolsList,
-        degrees: [],
-        semesters: [],
-        years: [],
-        subjects: [],
-        isLoading: false,
-        error: null,
-      });
+    it('has no search box before a school or degree is chosen', () => {
+      renderSidebar();
 
-      renderFilterSidebar();
-
-      // Should render without crashing
-      expect(screen.getByText('School 1')).toBeInTheDocument();
-      expect(screen.getByText('School 50')).toBeInTheDocument();
-    });
-
-    it('should handle special characters in filter names', () => {
-      mockUseFilterData.mockReturnValue({
-        schools: ['ETSINF', 'ETSID', 'ETSAM'],
-        degrees: ['Computer Science & Engineering', 'Software Engineering'],
-        semesters: ['1st Semester', '2nd Semester'],
-        years: [2024, 2025],
-        subjects: ['Programming & Algorithms', 'Databases & SQL'],
-        isLoading: false,
-        error: null,
-      });
-
-      renderFilterSidebar();
-
-      expect(screen.getByText('Computer Science & Engineering')).toBeInTheDocument();
-      expect(screen.getByText('Programming & Algorithms')).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('Buscar asignaturas...')).not.toBeInTheDocument();
     });
   });
-}); 
+
+  describe('empty options', () => {
+    it('says so instead of rendering an empty list', () => {
+      renderSidebar({}, { schools: [], degrees: [], semesters: [], years: [], subjects: [] });
+
+      // Empty categories stay collapsed, and Radix unmounts closed panels.
+      fireEvent.click(screen.getByText('Escuelas'));
+
+      expect(screen.getByText(/No hay escuelas disponibles/i)).toBeInTheDocument();
+    });
+  });
+});

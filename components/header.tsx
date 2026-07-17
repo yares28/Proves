@@ -10,6 +10,14 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { UserButton } from "@/components/auth/user-button"
 import { useSettings } from "@/context/settings-context"
+import { LOCALE_LABELS, type Locale } from "@/lib/i18n"
+
+/** Valencià is a co-official language at UPV, not a translation afterthought. */
+const LOCALE_MENU: Array<{ locale: Locale; flag: string; label: string }> = [
+  { locale: "es", flag: "🇪🇸", label: LOCALE_LABELS.es },
+  { locale: "va", flag: "🎗️", label: LOCALE_LABELS.va },
+  { locale: "en", flag: "🇬🇧", label: LOCALE_LABELS.en },
+]
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -49,7 +57,7 @@ export function Header() {
     updateSettings({ theme: nextTheme })
   }
 
-  const handleLanguageChange = (newLanguage: 'es' | 'en') => {
+  const handleLanguageChange = (newLanguage: Locale) => {
     updateSettings({ language: newLanguage })
   }
 
@@ -93,18 +101,15 @@ export function Header() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem 
-                onClick={() => handleLanguageChange("es")}
-                className={settings.language === "es" ? "bg-accent" : ""}
-              >
-                🇪🇸 Español
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => handleLanguageChange("en")}
-                className={settings.language === "en" ? "bg-accent" : ""}
-              >
-                🇺🇸 English
-              </DropdownMenuItem>
+              {LOCALE_MENU.map(({ locale, flag, label }) => (
+                <DropdownMenuItem
+                  key={locale}
+                  onClick={() => handleLanguageChange(locale)}
+                  className={settings.language === locale ? "bg-accent" : ""}
+                >
+                  {flag} {label}
+                </DropdownMenuItem>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
 

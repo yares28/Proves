@@ -12,14 +12,15 @@ import { ExportButton } from "@/components/export-button"
 export default async function ExamsPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | string[] | undefined }
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
+  const resolvedSearchParams = await searchParams
   const filters: ExamFilters = {
-    acronym: typeof searchParams.acronym === "string" ? searchParams.acronym : undefined,
-    school: typeof searchParams.school === "string" && searchParams.school !== "all" ? searchParams.school : undefined,
-    degree: typeof searchParams.degree === "string" && searchParams.degree !== "all" ? searchParams.degree : undefined,
-    year: typeof searchParams.year === "string" ? searchParams.year : undefined,
-    semester: typeof searchParams.semester === "string" ? searchParams.semester : undefined,
+    acronym: typeof resolvedSearchParams.acronym === "string" ? resolvedSearchParams.acronym : undefined,
+    school: typeof resolvedSearchParams.school === "string" && resolvedSearchParams.school !== "all" ? resolvedSearchParams.school : undefined,
+    degree: typeof resolvedSearchParams.degree === "string" && resolvedSearchParams.degree !== "all" ? resolvedSearchParams.degree : undefined,
+    year: typeof resolvedSearchParams.year === "string" ? resolvedSearchParams.year : undefined,
+    semester: typeof resolvedSearchParams.semester === "string" ? resolvedSearchParams.semester : undefined,
   }
 
   console.log("Applied filters:", filters);

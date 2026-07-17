@@ -23,6 +23,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { getFreshAuthTokens } from "@/utils/auth-helpers";
+import { openInGoogleCalendar } from "@/lib/calendar-export";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -192,7 +193,7 @@ export default function MyCalendarsPage() {
       });
 
       // Ensure filters are in the correct format (map plural -> singular)
-      let processedFilters = normalizeSavedFilters(calendar.filters || {});
+      const processedFilters = normalizeSavedFilters(calendar.filters || {});
 
       // Validate and clean up filters if needed
       if (typeof processedFilters === "object" && processedFilters !== null) {
@@ -391,11 +392,15 @@ export default function MyCalendarsPage() {
     }
   };
 
-  const exportExamsToGoogleCalendar = async (calendar: SavedCalendar) => {
+  const exportExamsToGoogleCalendar = (calendar: SavedCalendar) => {
+    const filters = normalizeSavedFilters(calendar.filters || {});
+
+    openInGoogleCalendar(filters, { name: calendar.name });
+
     toast({
-      title: "Funcionalidad deshabilitada",
-      description: "La exportación a Google Calendar ha sido deshabilitada.",
-      variant: "destructive",
+      title: "Abriendo Google Calendar",
+      description:
+        "Confirma en Google Calendar para añadir este calendario a tu cuenta.",
     });
   };
 
@@ -411,11 +416,20 @@ export default function MyCalendarsPage() {
     if (totalFilters === 0) return "Sin filtros";
 
     const categories = filterEntries.map(([category, values]) => {
+      // Accept both plural (legacy saved) and singular (current) filter keys.
       const categoryNames: Record<string, string> = {
         schools: "Escuelas",
+        school: "Escuelas",
         degrees: "Titulaciones",
+        degree: "Titulaciones",
         years: "Cursos",
+        year: "Cursos",
         subjects: "Asignaturas",
+        subject: "Asignaturas",
+        semesters: "Semestres",
+        semester: "Semestres",
+        acronyms: "Asignaturas",
+        acronym: "Asignaturas",
         departments: "Departamentos",
         types: "Tipos",
       };

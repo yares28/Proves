@@ -104,15 +104,7 @@ function AuthCallbackContent() {
           if (data?.session) {
             console.log('✅ Supabase PKCE auth successful')
             authPerformanceTracker.complete(true)
-            
-            // Store provider tokens if available for future use
-            if (data.session.provider_token) {
-              localStorage.setItem('oauth_provider_token', data.session.provider_token)
-            }
-            if (data.session.provider_refresh_token) {
-              localStorage.setItem('oauth_provider_refresh_token', data.session.provider_refresh_token)
-            }
-            
+
             toast({
               title: "¡Autenticación exitosa!",
               description: "Has iniciado sesión correctamente.",

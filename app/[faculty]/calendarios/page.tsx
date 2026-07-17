@@ -2,11 +2,13 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { fromSlug } from '@/lib/slug'
 import { ExamListView } from '@/components/exam-list-view'
+import { getExams } from '@/actions/exam-actions'
 
-type Props = { params: { faculty: string } }
+type Props = { params: Promise<{ faculty: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const facultyName = fromSlug(params.faculty)
+  const { faculty } = await params
+  const facultyName = fromSlug(faculty)
   const title = `Calendarios de exámenes UPV ${facultyName}`
   const description = `Consulta y exporta los calendarios de exámenes de ${facultyName} (UPV). Filtra por grado, semestre y asignaturas.`
 
@@ -14,19 +16,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description,
     alternates: {
-      canonical: `/${params.faculty}/calendarios`,
+      canonical: `/${faculty}/calendarios`,
     },
     openGraph: {
       title,
       description,
-      url: `/${params.faculty}/calendarios`,
+      url: `/${faculty}/calendarios`,
       type: 'website',
     },
   }
 }
 
-export default function FacultyCalendarsPage({ params }: Props) {
-  const facultyName = fromSlug(params.faculty)
+export default async function FacultyCalendarsPage({ params }: Props) {
+  const { faculty } = await params
+  const facultyName = fromSlug(faculty)
+
+  // Fetched here rather than in the client: this page exists to be crawled, and
+  // an empty list is what a crawler saw while the exams loaded after hydration.
+  const exams = await getExams({ school: [facultyName] })
   const faqJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
@@ -64,7 +71,7 @@ export default function FacultyCalendarsPage({ params }: Props) {
         '@type': 'ListItem',
         position: 2,
         name: facultyName,
-        item: `/${params.faculty}/calendarios`,
+        item: `/${faculty}/calendarios`,
       },
     ],
   }
@@ -93,7 +100,7 @@ export default function FacultyCalendarsPage({ params }: Props) {
         <Link href="/">Inicio</Link> {"/"} <span>{facultyName}</span>
       </div>
 
-      <ExamListView activeFilters={{ school: [facultyName] }} />
+      <ExamListView exams={exams} />
     </div>
   )
 }

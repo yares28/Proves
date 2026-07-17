@@ -1,13 +1,14 @@
 "use client"
 
 import { useEffect, useMemo, useState } from 'react'
-import { getSchools, getSubjects, getExams } from '@/actions/exam-actions'
+import { getAcademicYears, getSchools, getSubjects, getExams } from '@/actions/exam-actions'
 import { cn } from '@/lib/utils'
-import { AVAILABLE_EXAMS_TABLES } from '@/lib/supabase'
+import { academicYearShortLabel, currentAcademicYear } from '@/lib/academic-year'
 
 type ColumnItem = { label: string; value: string }
 
 export default function ListaExamenesAnterioresPage() {
+  const [academicYears, setAcademicYears] = useState<number[]>([])
   const [schools, setSchools] = useState<string[]>([])
   const [selectedSchool, setSelectedSchool] = useState<string | null>(null)
   const [subjects, setSubjects] = useState<string[]>([])
@@ -15,17 +16,32 @@ export default function ListaExamenesAnterioresPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [subjectQuery, setSubjectQuery] = useState('')
   const [exams, setExams] = useState<any[]>([])
-  const [selectedTable, setSelectedTable] = useState<string>(AVAILABLE_EXAMS_TABLES[0] || '25-26')
+  const [selectedYear, setSelectedYear] = useState<number>(currentAcademicYear())
+
+  // Which courses exist is a property of the data, not of the deployment: the
+  // list used to be a hardcoded array of table names.
+  useEffect(() => {
+    const load = async () => {
+      const years = await getAcademicYears()
+      setAcademicYears(years)
+      if (years.length && !years.includes(selectedYear)) {
+        setSelectedYear(years[0])
+      }
+    }
+    load()
+    // Intentionally on mount only: the year list does not depend on selection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     const load = async () => {
       setIsLoading(true)
-      const s = await getSchools(selectedTable)
+      const s = await getSchools(selectedYear)
       setSchools(s)
       setIsLoading(false)
     }
     load()
-  }, [selectedTable])
+  }, [selectedYear])
 
   useEffect(() => {
     const loadSubjects = async () => {
@@ -35,12 +51,12 @@ export default function ListaExamenesAnterioresPage() {
         return
       }
       setIsLoading(true)
-      const subj = await getSubjects([selectedSchool], undefined, undefined, undefined, selectedTable)
+      const subj = await getSubjects([selectedSchool], undefined, undefined, undefined, selectedYear)
       setSubjects([...subj].sort((a, b) => a.localeCompare(b, 'es')))
       setIsLoading(false)
     }
     loadSubjects()
-  }, [selectedSchool, selectedTable])
+  }, [selectedSchool, selectedYear])
 
   useEffect(() => {
     const loadExams = async () => {
@@ -49,12 +65,12 @@ export default function ListaExamenesAnterioresPage() {
         return
       }
       setIsLoading(true)
-      const results = await getExams({ school: [selectedSchool], subject: [selectedSubject] }, undefined as any, selectedTable)
+      const results = await getExams({ school: [selectedSchool], subject: [selectedSubject] }, selectedYear)
       setExams(results || [])
       setIsLoading(false)
     }
     loadExams()
-  }, [selectedSchool, selectedSubject, selectedTable])
+  }, [selectedSchool, selectedSubject, selectedYear])
 
   const schoolItems: ColumnItem[] = useMemo(
     () => schools.map((s) => ({ label: s, value: s })),
@@ -77,26 +93,30 @@ export default function ListaExamenesAnterioresPage() {
       <p className="mb-8 text-muted-foreground">Explora por curso académico, escuelas y asignaturas.</p>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {/* Column 1: Academic year (table) selector */}
+        {/* Column 1: Academic year selector */}
         <div className="rounded-lg border bg-card p-4">
           <h2 className="mb-3 text-lg font-semibold">Curso académico</h2>
           <div className="space-y-2">
-            {AVAILABLE_EXAMS_TABLES.map(t => (
-              <button
-                key={t}
-                className={cn(
-                  'w-full rounded-md px-3 py-2 text-left text-sm hover:bg-accent',
-                  selectedTable === t && 'bg-accent'
-                )}
-                onClick={() => {
-                  setSelectedTable(t)
-                  setSelectedSchool(null)
-                  setSelectedSubject(null)
-                }}
-              >
-                {t.replace('-', '/')}
-              </button>
-            ))}
+            {academicYears.length === 0 ? (
+              <div className="text-sm text-muted-foreground">Cargando cursos…</div>
+            ) : (
+              academicYears.map(year => (
+                <button
+                  key={year}
+                  className={cn(
+                    'w-full rounded-md px-3 py-2 text-left text-sm hover:bg-accent',
+                    selectedYear === year && 'bg-accent'
+                  )}
+                  onClick={() => {
+                    setSelectedYear(year)
+                    setSelectedSchool(null)
+                    setSelectedSubject(null)
+                  }}
+                >
+                  {academicYearShortLabel(year).replace('-', '/')}
+                </button>
+              ))
+            )}
           </div>
         </div>
 
