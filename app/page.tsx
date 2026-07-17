@@ -5,6 +5,7 @@ import { HeroSection } from "@/components/hero-section"
 import { StatisticsSection } from "@/components/statistics-section"
 import { FAQSection } from "@/components/faq-section"
 import { FilterConnection } from "@/components/filter-connection"
+import { HomeHeading } from "@/components/home-heading"
 import { AuthRequiredCheck } from "@/components/auth-required-check"
 import { AuthStatusIndicator } from "@/components/auth-status-indicator"
 import { getExams, getFilterOptions } from "@/actions/exam-actions"
@@ -50,9 +51,7 @@ export default async function Home({
         </Suspense>
 
         <section className="container mx-auto px-4 py-16 md:px-6 md:py-24 lg:py-32">
-          <h2 className="mb-12 text-center text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl">
-            Encuentra tus <span className="text-primary">Exámenes</span>
-          </h2>
+          <HomeHeading />
           <Suspense fallback={null}>
             <FilterConnection filters={filters} options={options} exams={exams} />
           </Suspense>

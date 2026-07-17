@@ -8,8 +8,10 @@ import { useTheme } from "next-themes"
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { useSettings } from "@/context/settings-context"
+import { useTranslations } from "@/hooks/use-translations"
 
 export function HeroSection() {
+  const t = useTranslations()
   const { theme } = useTheme()
   const { settings } = useSettings()
   const [mounted, setMounted] = useState(false)
@@ -185,15 +187,14 @@ export function HeroSection() {
             </motion.div>
 
             <h1 className="mb-5 text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl xl:text-6xl">
-              Encuentra tu{" "}
+              {t("hero.titlePre")}{" "}
               <span className="relative inline-block">
-                <span className="relative z-10 text-primary">Calendario de Exámenes</span>
+                <span className="relative z-10 text-primary">{t("hero.titleAccent")}</span>
                 <span className="absolute bottom-2 left-0 z-0 h-4 w-full bg-primary/20"></span>
               </span>
             </h1>
             <p className="mx-auto mb-6 max-w-2xl text-base text-emerald-800/80 dark:text-emerald-100/80 md:text-lg lg:mx-0 lg:text-xl">
-              Descubre, filtra y organiza tu calendario de exámenes universitarios de la UPV.
-              Nunca más te pierdas una fecha de examen importante.
+              {t("hero.subtitle")}
             </p>
 
             

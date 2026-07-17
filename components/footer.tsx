@@ -5,8 +5,10 @@ import Image from "next/image"
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
 import { useSettings } from "@/context/settings-context"
+import { useTranslations } from "@/hooks/use-translations"
 
 export function Footer() {
+  const t = useTranslations()
   const [currentYear, setCurrentYear] = useState("2024")
   const [mounted, setMounted] = useState(false)
   const { theme } = useTheme()
@@ -140,7 +142,7 @@ export function Footer() {
         </div>
 
         <div className="mt-16 border-t border-border/40 pt-8 text-center text-sm text-muted-foreground">
-          <p>© {currentYear} Calendario de Exámenes UPV. Todos los derechos reservados.</p>
+          <p>{t("footer.rights", { year: currentYear })}</p>
         </div>
       </div>
     </footer>
