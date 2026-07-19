@@ -2,13 +2,10 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { Clock, MapPin, School, BookOpen, ChevronDown, ChevronUp, Search } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { ChevronDown, ChevronUp, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useSettings } from "@/context/settings-context"
+import { useTranslations } from "@/hooks/use-translations"
 import { examSubject } from "@/lib/i18n"
 import type { Exam } from "@/types/exam"
 
@@ -28,6 +25,7 @@ export function ExamListView({
   isLoading?: boolean
 }) {
   const { settings } = useSettings()
+  const t = useTranslations()
   const [searchQuery, setSearchQuery] = useState("")
   const [sortField, setSortField] = useState<SortField>("date")
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
@@ -99,7 +97,7 @@ export function ExamListView({
       <div className="relative">
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Buscar exámenes..."
+          placeholder={t("list.search")}
           className="pl-9"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -120,7 +118,7 @@ export function ExamListView({
                       className="flex items-center text-sm font-medium hover:text-primary"
                       onClick={() => handleSort("date")}
                     >
-                      Fecha
+                      {t("list.colDate")}
                       {sortField === "date" && (
                         sortDirection === "asc" ? 
                           <ChevronUp className="ml-1 h-4 w-4" /> : 
@@ -133,7 +131,7 @@ export function ExamListView({
                       className="flex items-center text-sm font-medium hover:text-primary"
                       onClick={() => handleSort("subject")}
                     >
-                      Asignatura
+                      {t("list.colSubject")}
                       {sortField === "subject" && (
                         sortDirection === "asc" ? 
                           <ChevronUp className="ml-1 h-4 w-4" /> : 
@@ -146,7 +144,7 @@ export function ExamListView({
                       className="flex items-center text-sm font-medium hover:text-primary"
                       onClick={() => handleSort("time")}
                     >
-                      Hora
+                      {t("list.colTime")}
                       {sortField === "time" && (
                         sortDirection === "asc" ? 
                           <ChevronUp className="ml-1 h-4 w-4" /> : 
@@ -159,7 +157,7 @@ export function ExamListView({
                       className="flex items-center text-sm font-medium hover:text-primary"
                       onClick={() => handleSort("location")}
                     >
-                      Ubicación
+                      {t("list.colLocation")}
                       {sortField === "location" && (
                         sortDirection === "asc" ? 
                           <ChevronUp className="ml-1 h-4 w-4" /> : 
@@ -172,7 +170,7 @@ export function ExamListView({
                       className="flex items-center text-sm font-medium hover:text-primary"
                       onClick={() => handleSort("year")}
                     >
-                      Año
+                      {t("list.colYear")}
                       {sortField === "year" && (
                         sortDirection === "asc" ? 
                           <ChevronUp className="ml-1 h-4 w-4" /> : 
@@ -185,7 +183,7 @@ export function ExamListView({
                       className="flex items-center text-sm font-medium hover:text-primary"
                       onClick={() => handleSort("semester")}
                     >
-                      Semestre
+                      {t("list.colSemester")}
                       {sortField === "semester" && (
                         sortDirection === "asc" ? 
                           <ChevronUp className="ml-1 h-4 w-4" /> : 
@@ -227,8 +225,8 @@ export function ExamListView({
                   <tr>
                     <td colSpan={6} className="h-24 text-center border-b p-4">
                       {searchQuery
-                        ? "Ningún examen coincide con tu búsqueda."
-                        : "Selecciona tu año, semestre o asignaturas específicas para ver los exámenes."}
+                        ? t("list.noMatch")
+                        : t("list.selectCriteria")}
                     </td>
                   </tr>
                 )}

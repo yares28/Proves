@@ -5,6 +5,7 @@ import { AuthProvider } from '@/context/auth-context'
 import { SettingsProvider } from '@/context/settings-context'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { Toaster } from "@/components/ui/toaster"
+import { safeJsonLd } from '@/lib/json-ld'
 import './globals.css'
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
@@ -85,9 +86,8 @@ export default function RootLayout({
         {/* Structured Data for richer AI/search understanding */}
         <script
           type="application/ld+json"
-          // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
+            __html: safeJsonLd({
               '@context': 'https://schema.org',
               '@type': 'Organization',
               name: 'UPVCal',
@@ -98,9 +98,8 @@ export default function RootLayout({
         />
         <script
           type="application/ld+json"
-          // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
+            __html: safeJsonLd({
               '@context': 'https://schema.org',
               '@type': 'WebSite',
               name: 'Calendario de Exámenes UPV',
@@ -115,9 +114,8 @@ export default function RootLayout({
         />
         <script
           type="application/ld+json"
-          // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
+            __html: safeJsonLd({
               '@context': 'https://schema.org',
               '@type': 'SoftwareApplication',
               name: 'UPV Exam Calendar',

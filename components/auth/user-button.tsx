@@ -5,7 +5,7 @@ import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { LogOut, Settings, User, Calendar } from "lucide-react"
+import { LogOut, User, Calendar } from "lucide-react"
 import { AuthDialog } from "@/components/auth/auth-dialog"
 import { useRouter } from "next/navigation"
 

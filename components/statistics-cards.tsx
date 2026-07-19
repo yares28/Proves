@@ -4,6 +4,7 @@ import { motion } from "framer-motion"
 import { Card, CardContent } from "@/components/ui/card"
 import { Calendar, School, BookOpen } from "lucide-react"
 import CountUp from "./ui/countup"
+import { useTranslations } from "@/hooks/use-translations"
 import type { ExamStats } from "@/actions/exam-actions"
 
 /**
@@ -12,24 +13,25 @@ import type { ExamStats } from "@/actions/exam-actions"
  * the truth, which is a bad look on a product whose whole value is accurate data.
  */
 export function StatisticsCards({ stats }: { stats: ExamStats }) {
+  const t = useTranslations()
   const cards = [
     {
       icon: Calendar,
       value: stats.exams,
-      label: "Exámenes Registrados",
-      description: "Disponibles en nuestra base de datos",
+      label: t("stats.examsLabel"),
+      description: t("stats.examsDesc"),
     },
     {
       icon: School,
       value: stats.schools,
-      label: "Escuelas (Por ahora😁)",
-      description: "Conectadas a nuestra plataforma",
+      label: t("stats.schoolsLabel"),
+      description: t("stats.schoolsDesc"),
     },
     {
       icon: BookOpen,
       value: stats.subjects,
-      label: "Asignaturas",
-      description: "De todas las escuelas",
+      label: t("stats.subjectsLabel"),
+      description: t("stats.subjectsDesc"),
     },
   ]
 

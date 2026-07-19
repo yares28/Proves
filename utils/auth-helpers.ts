@@ -10,45 +10,27 @@ const supabase = createClient()
 export async function getCurrentSession(): Promise<Session | null> {
   try {
     const { data: { session }, error } = await supabase.auth.getSession()
-    
-    if (error) {
-      console.error('❌ Error getting session:', error.message)
+
+    if (error || !session) {
       return null
     }
-    
-    if (!session) {
-      console.log('⚠️ No session found')
-      return null
-    }
-    
-    // Check if token is expired or will expire in the next 5 minutes
+
+    // Refresh proactively if the token is expired or expires within 5 minutes.
     const expiresAt = session.expires_at! * 1000 // Convert to milliseconds
-    const now = Date.now()
-    const fiveMinutesFromNow = now + (5 * 60 * 1000)
-    
+    const fiveMinutesFromNow = Date.now() + (5 * 60 * 1000)
+
     if (expiresAt <= fiveMinutesFromNow) {
-      console.log('🔄 Token is expired or expiring soon, refreshing...')
-      
       const { data: refreshedSession, error: refreshError } = await supabase.auth.refreshSession()
-      
-      if (refreshError) {
-        console.error('❌ Token refresh failed:', refreshError.message)
+
+      if (refreshError || !refreshedSession?.session) {
         return null
       }
-      
-      if (refreshedSession?.session) {
-        console.log('✅ Token refreshed successfully')
-        return refreshedSession.session
-      }
-      
-      console.error('❌ No session after refresh')
-      return null
+
+      return refreshedSession.session
     }
-    
-    console.log('✅ Using existing valid session')
+
     return session
-  } catch (error) {
-    console.error('❌ Error in getCurrentSession:', error)
+  } catch {
     return null
   }
 }
@@ -60,8 +42,7 @@ export async function syncAuthState(): Promise<boolean> {
   try {
     const session = await getCurrentSession()
     return !!session
-  } catch (error) {
-    console.error('❌ Error synchronizing auth state:', error)
+  } catch {
     return false
   }
 }
@@ -73,18 +54,16 @@ export async function syncAuthState(): Promise<boolean> {
 export async function getFreshAuthTokens(): Promise<{ accessToken: string; refreshToken: string } | null> {
   try {
     const session = await getCurrentSession()
-    
+
     if (!session?.access_token || !session?.refresh_token) {
-      console.log('❌ No valid tokens available')
       return null
     }
-    
+
     return {
       accessToken: session.access_token,
       refreshToken: session.refresh_token
     }
-  } catch (error) {
-    console.error('❌ Error getting fresh auth tokens:', error)
+  } catch {
     return null
   }
 }

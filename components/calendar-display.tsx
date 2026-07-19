@@ -2,21 +2,14 @@
 
 import type React from "react";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Calendar,
-  Download,
   Save,
-  ChevronLeft,
-  ChevronRight,
   Clock,
   MapPin,
-  List,
-  Grid,
   Share2,
-  Settings,
   Loader2,
-  MoreHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,34 +23,24 @@ import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { ViewToggle } from "@/components/view-toggle";
 import { ExamListView } from "@/components/exam-list-view";
-import { getExams } from "@/actions/exam-actions";
 import {
   formatDateString,
   getCurrentYear,
-  getAcademicYearForMonth,
   detectAcademicYearFromExams,
   generateAcademicYearMonths,
 } from "@/utils/date-utils";
 import { SaveCalendarDialog } from "@/components/save-calendar-dialog";
 import { hasMeaningfulFilters } from "@/lib/filter-params";
-import { examSubject } from "@/lib/i18n";
+import { examSubject, LOCALE_TAGS } from "@/lib/i18n";
+import { useTranslations } from "@/hooks/use-translations";
 import { detectConflicts } from "@/lib/exam-conflicts";
 import { ExamConflictsBanner } from "@/components/exam-conflicts-banner";
 
 import { useAuth } from "@/context/auth-context";
 import { useSettings } from "@/context/settings-context";
 import { useToast } from "@/hooks/use-toast";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import styles from "@/styles/tooltip.module.css";
-import {
-  saveUserCalendar,
-  getUserCalendarNames,
-} from "@/actions/user-calendars";
+import { getUserCalendarNames } from "@/actions/user-calendars";
 import { getCurrentSession, getFreshAuthTokens } from "@/utils/auth-helpers";
 import { openInGoogleCalendar, remindersToIso } from "@/lib/calendar-export";
 import type { Exam } from "@/types/exam";
@@ -90,6 +73,12 @@ export function CalendarDisplay({
   const [existingNames, setExistingNames] = useState<string[]>([]);
   const { user, syncToken } = useAuth();
   const { settings, updateSettings } = useSettings();
+  const t = useTranslations();
+
+  // month.name stays the internal identifier (used to match selected days); the
+  // localized name is display-only, so switching language never breaks matching.
+  const monthLabel = (monthNumber: number, year: number) =>
+    new Date(year, monthNumber - 1, 1).toLocaleString(LOCALE_TAGS[settings.language], { month: "long" });
   const { toast } = useToast();
 
   // Check if ETSINF is in the schools filter
@@ -346,7 +335,7 @@ export function CalendarDisplay({
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">
-            Calendario de Exámenes
+            {t("calendar.title")}
             {academicYear && (
               <span className="text-lg font-normal text-muted-foreground ml-2">
                 ({academicYear.startYear}/
@@ -355,7 +344,7 @@ export function CalendarDisplay({
             )}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Se encontraron {exams.length} exámenes para el período seleccionado
+            {t("calendar.found", { count: exams.length })}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -369,7 +358,7 @@ export function CalendarDisplay({
             onClick={handleExport}
           >
             <Share2 className="h-4 w-4" />
-            <span>Exportar</span>
+            <span>{t("calendar.export")}</span>
           </Button>
 
           <Button
@@ -380,7 +369,7 @@ export function CalendarDisplay({
             onClick={openSaveDialog}
           >
             <Save className="h-4 w-4" />
-            <span>Guardar</span>
+            <span>{t("calendar.save")}</span>
           </Button>
         </div>
       </div>
@@ -391,7 +380,7 @@ export function CalendarDisplay({
       {loading && (
         <div className="flex items-center justify-center p-8">
           <Loader2 className="h-8 w-8 animate-spin" />
-          <span className="ml-2">Cargando exámenes...</span>
+          <span className="ml-2">{t("calendar.loading")}</span>
         </div>
       )}
 
@@ -437,12 +426,12 @@ export function CalendarDisplay({
                     >
                       <CardHeader className="bg-muted/30 py-4">
                         <CardTitle className="text-center text-lg font-medium tracking-tight">
-                          {month.name} {month.year}
+                          <span className="capitalize">{monthLabel(month.monthNumber, month.year)}</span> {month.year}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="p-4">
                         <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium">
-                          {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map(
+                          {[t("day.mon"), t("day.tue"), t("day.wed"), t("day.thu"), t("day.fri"), t("day.sat"), t("day.sun")].map(
                             (day) => (
                               <div key={day} className="py-1">
                                 {day}
@@ -627,7 +616,7 @@ export function CalendarDisplay({
             </div>
             <Card className="mt-8 border bg-card/60 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/50">
               <CardHeader className="flex flex-row items-center justify-between py-4">
-                <CardTitle className="text-base font-medium">Próximos exámenes</CardTitle>
+                <CardTitle className="text-base font-medium">{t("calendar.upcoming")}</CardTitle>
                 {exams.length > 0 && (
                   <Badge variant="secondary" className="text-xs">{exams.length}</Badge>
                 )}
@@ -692,15 +681,15 @@ export function CalendarDisplay({
                     <Calendar className="h-12 w-12 mb-4 opacity-20" />
                     {!hasMeaningfulFilters(activeFilters) ? (
                       <>
-                        <p>Selecciona tus criterios para ver el calendario</p>
+                        <p>{t("calendar.selectCriteria")}</p>
                         <p className="text-sm mt-2">
-                          Elige tu curso, cuatrimestre o asignaturas para ver tus exámenes.
+                          {t("calendar.selectCriteriaHint")}
                         </p>
                       </>
                     ) : (
                       <>
-                        <p>No se han encontrado exámenes con los filtros seleccionados.</p>
-                        <p className="text-sm mt-2">Prueba a ajustar los filtros.</p>
+                        <p>{t("calendar.noExams")}</p>
+                        <p className="text-sm mt-2">{t("calendar.tryAdjust")}</p>
                       </>
                     )}
                   </div>

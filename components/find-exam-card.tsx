@@ -7,16 +7,17 @@ import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Search, Loader2, ChevronDown, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { getSchools, getDegrees, getFilteredAcronymsAndSubjects } from "@/actions/exam-actions"
+import { useTranslations } from "@/hooks/use-translations"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 
 export function FindExamCard() {
   const router = useRouter()
+  const t = useTranslations()
   // MULTI-SELECT STATE
   const [selectedItems, setSelectedItems] = useState<Array<{ value: string; type: 'acronym' | 'subject'; acronym?: string }>>([])
   const [inputValue, setInputValue] = useState("")
@@ -91,7 +92,7 @@ export function FindExamCard() {
         setLoadingOptions(true)
         const data = await getFilteredAcronymsAndSubjects(school, degree)
         setOptions(data)
-      } catch (error) {
+      } catch {
         setOptions([])
       } finally {
         setLoadingOptions(false)
@@ -99,10 +100,6 @@ export function FindExamCard() {
     }
     fetchOptions()
   }, [school, degree])
-
-  const validateAcronym = (value: string) => {
-    return value.trim().length > 0 && value.trim().length <= 10;
-  }
 
   const isAcronymSearchEnabled = school && school !== "all" && degree && degree !== "all"
 
@@ -148,29 +145,6 @@ export function FindExamCard() {
     setSelectedItems(prev => prev.filter(sel => !(sel.value === item.value && sel.type === item.type)))
   }
 
-  // Input change for combobox
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value)
-    setError("")
-    if (e.target.value.length > 0 && isAcronymSearchEnabled) {
-      setAcronymOpen(true)
-    } else {
-      setAcronymOpen(false)
-    }
-  }
-
-  const handleInputFocus = () => {
-    if (isAcronymSearchEnabled) {
-      setAcronymOpen(true)
-    }
-  }
-
-  const handleInputClick = () => {
-    if (isAcronymSearchEnabled) {
-      setAcronymOpen(true)
-    }
-  }
-
   // Reset selected items if school/degree changes
   useEffect(() => {
     setSelectedItems([])
@@ -188,7 +162,7 @@ export function FindExamCard() {
         <CardHeader className="bg-primary/5 pb-3 pt-4">
           <CardTitle className="flex items-center justify-center gap-2 text-lg font-medium">
             <Search className="h-4 w-4 text-primary" />
-            Encuentra tu Examen
+            {t("find.title")}
           </CardTitle>
         </CardHeader>
         <form onSubmit={handleSearch}>
@@ -197,23 +171,23 @@ export function FindExamCard() {
             {/* Escuela section moved to the top */}
             <div className="space-y-1.5">
                 <Label htmlFor="school" className="text-sm font-medium">
-                  Escuela
+                  {t("find.school")}
               </Label>
                 <Select value={school} onValueChange={setSchool} disabled={loading}>
                   <SelectTrigger id="school" className="w-full h-9">
-                    <SelectValue placeholder={loading ? "Cargando escuelas..." : "Seleccionar escuela"} />
+                    <SelectValue placeholder={loading ? t("find.loadingSchools") : t("find.selectSchool")} />
                 </SelectTrigger>
                   <SelectContent className="max-h-[300px]">
-                    <SelectItem value="all">Todas las Escuelas</SelectItem>
+                    <SelectItem value="all">{t("find.allSchools")}</SelectItem>
                     {loading ? (
                       <div className="flex items-center justify-center py-2">
                         <Loader2 className="h-4 w-4 animate-spin text-primary mr-2" />
-                        <span className="text-sm">Cargando...</span>
+                        <span className="text-sm">{t("find.loading")}</span>
                       </div>
                     ) : fetchError ? (
                       <div className="p-2 text-xs text-destructive">{fetchError}</div>
                     ) : schools.length === 0 ? (
-                      <div className="p-2 text-xs text-muted-foreground">No se encontraron escuelas</div>
+                      <div className="p-2 text-xs text-muted-foreground">{t("find.noSchools")}</div>
                     ) : (
                       schools.map((schoolName) => (
                         <SelectItem key={schoolName} value={schoolName}>
@@ -225,14 +199,14 @@ export function FindExamCard() {
               </Select>
                 {!loading && (
                   <p className="text-xs text-muted-foreground">
-                    {schools.length} escuelas disponibles
+                    {t("find.schoolsAvailable", { count: schools.length })}
                   </p>
                 )}
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="degree" className="text-sm font-medium">
-                  Carrera
+                  {t("find.degree")}
                 </Label>
                 <Select 
                   value={degree} 
@@ -242,14 +216,14 @@ export function FindExamCard() {
                   <SelectTrigger id="degree" className="w-full h-9">
                     <SelectValue placeholder={
                       !school || school === "all" 
-                        ? "Selecciona una escuela primero" 
-                        : loadingDegrees 
-                          ? "Cargando carreras..." 
-                          : "Seleccionar carrera"
+                        ? t("find.selectSchoolFirst")
+                        : loadingDegrees
+                          ? t("find.loadingDegrees")
+                          : t("find.selectDegree")
                     } />
                   </SelectTrigger>
                   <SelectContent className="max-h-[300px]">
-                    <SelectItem value="all">Todas las Carreras</SelectItem>
+                    <SelectItem value="all">{t("find.allDegrees")}</SelectItem>
                     {loadingDegrees ? (
                       <div className="flex items-center justify-center py-2">
                         <Loader2 className="h-4 w-4 animate-spin text-primary mr-2" />
@@ -257,7 +231,7 @@ export function FindExamCard() {
                       </div>
                     ) : degrees.length === 0 ? (
                       <div className="p-2 text-xs text-muted-foreground">
-                        No se encontraron carreras para esta escuela
+                        {t("find.noDegreesForSchool")}
                       </div>
                     ) : (
                       degrees.map((degreeName) => (
@@ -270,7 +244,7 @@ export function FindExamCard() {
                 </Select>
                 {!loadingDegrees && school && school !== "all" && (
                   <p className="text-xs text-muted-foreground">
-                    {degrees.length} carreras disponibles
+                    {t("find.degreesAvailable", { count: degrees.length })}
                   </p>
                 )}
               </div>
@@ -278,7 +252,7 @@ export function FindExamCard() {
             {/* Buscar por acrónimo o asignatura section with multi-select pills */}
             <div className="space-y-1.5">
               <Label htmlFor="search" className="text-sm font-medium">
-                  Buscar por acrónimo o asignatura
+                  {t("find.subjectAcronym")}
               </Label>
               <div className="flex flex-wrap gap-2 mb-2">
                 {selectedItems.map(item => (
@@ -291,7 +265,7 @@ export function FindExamCard() {
                       type="button"
                       className="ml-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900 p-0.5"
                       onClick={() => handleRemoveItem(item)}
-                      aria-label={`Eliminar ${item.value}`}
+                      aria-label={t("find.removeItem", { name: item.value })}
                     >
                       <X className="h-3 w-3 text-destructive" />
                     </button>
@@ -308,10 +282,10 @@ export function FindExamCard() {
                     disabled={!isAcronymSearchEnabled || selectedItems.length === options.length}
                   >
                     {!isAcronymSearchEnabled
-                      ? "Selecciona escuela y carrera primero"
+                      ? t("find.selectSchoolDegreeFirst")
                       : selectedItems.length === 0
-                        ? "Ej. MAD, Introducción a la Programación, ..."
-                        : inputValue || "Agregar más acrónimos o asignaturas..."
+                        ? t("find.subjectExample")
+                        : inputValue || t("find.addMore")
                     }
                     <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -319,7 +293,7 @@ export function FindExamCard() {
                 <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
                   <Command>
                     <CommandInput
-                      placeholder="Buscar acrónimo o asignatura..."
+                      placeholder={t("find.searchPlaceholder")}
                       value={inputValue}
                       onValueChange={value => {
                         setInputValue(value)
@@ -333,19 +307,19 @@ export function FindExamCard() {
                     <CommandList>
                       {!isAcronymSearchEnabled ? (
                         <div className="p-4 text-center text-sm text-muted-foreground">
-                          Selecciona una escuela y carrera para buscar acrónimos o asignaturas
+                          {t("find.selectToSearch")}
                         </div>
                       ) : inputValue.length === 0 ? (
                         <div className="p-4 text-center text-sm text-muted-foreground">
-                          Escribe para buscar acrónimos o asignaturas
+                          {t("find.typeToSearch")}
                         </div>
                       ) : loadingOptions ? (
                         <div className="flex items-center justify-center py-2">
                           <Loader2 className="h-4 w-4 animate-spin text-primary mr-2" />
-                          <span className="text-sm">Cargando...</span>
+                          <span className="text-sm">{t("find.loading")}</span>
                         </div>
                       ) : filteredOptions.length === 0 ? (
-                        <CommandEmpty>No se encontraron resultados.</CommandEmpty>
+                        <CommandEmpty>{t("find.noResults")}</CommandEmpty>
                       ) : (
                         <CommandGroup>
                           {filteredOptions.map((item) => (
@@ -382,10 +356,10 @@ export function FindExamCard() {
               {searchLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Buscando...
+                  {t("find.searching")}
                 </>
               ) : (
-                "Buscar Exámenes"
+                t("find.searchButton")
               )}
           </Button>
         </CardFooter>

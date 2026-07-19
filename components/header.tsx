@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { UserButton } from "@/components/auth/user-button"
 import { useSettings } from "@/context/settings-context"
+import { useTranslations } from "@/hooks/use-translations"
 import { LOCALE_LABELS, type Locale } from "@/lib/i18n"
 
 /** Valencià is a co-official language at UPV, not a translation afterthought. */
@@ -25,6 +26,7 @@ export function Header() {
   const [mounted, setMounted] = useState(false)
   const { theme, setTheme } = useTheme()
   const { settings, updateSettings } = useSettings()
+  const t = useTranslations()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -68,13 +70,6 @@ export function Header() {
     return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
   }
 
-  // Determine which icon logo to use based on theme
-  const getIconLogo = () => {
-    if (!mounted) return "/logoYdark.png" // Default fallback during SSR
-    const currentTheme = settings.theme === 'system' ? theme : settings.theme
-    return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
-  }
-
   return (
     <header
       className={`sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-200 ${
@@ -96,7 +91,7 @@ export function Header() {
         <div className="flex items-center space-x-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Cambiar idioma">
+              <Button variant="ghost" size="icon" aria-label={t("header.changeLanguage")}>
                 <Globe className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -113,7 +108,7 @@ export function Header() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Cambiar tema">
+          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={t("header.changeTheme")}>
             {!mounted ? (
               <Sun className="h-4 w-4" />
             ) : (settings.theme === 'system' ? theme : settings.theme) === "dark" ? (
@@ -129,7 +124,7 @@ export function Header() {
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" className="hidden">
                 <Menu className="h-5 w-5" />
-                <span className="sr-only">Alternar menú</span>
+                <span className="sr-only">{t("header.toggleMenu")}</span>
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[300px] sm:w-[400px]">

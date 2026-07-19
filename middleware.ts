@@ -1,5 +1,7 @@
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+
+type CookieToSet = { name: string; value: string; options: CookieOptions }
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -9,7 +11,7 @@ export async function middleware(request: NextRequest) {
   })
 
   // Only process auth for specific routes to improve performance
-  const authRoutes = ['/my-calendars', '/saved-calendars', '/exams', '/auth', '/profile']
+  const authRoutes = ['/my-calendars', '/saved-calendars', '/exams', '/auth', '/profile', '/audit']
   const shouldProcessAuth = authRoutes.some(route => 
     request.nextUrl.pathname.startsWith(route)
   )
@@ -23,7 +25,7 @@ export async function middleware(request: NextRequest) {
           getAll() {
             return request.cookies.getAll()
           },
-          setAll(cookiesToSet) {
+          setAll(cookiesToSet: CookieToSet[]) {
             cookiesToSet.forEach(({ name, value, options }) => {
               request.cookies.set(name, value)
               response.cookies.set({ name, value, ...options })

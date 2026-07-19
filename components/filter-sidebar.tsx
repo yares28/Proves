@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Search, X, Info, CheckCircle, Save } from "lucide-react"
+import { X, Info, Save } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -21,6 +21,7 @@ import { useTheme } from "next-themes"
 import { useSettings } from "@/context/settings-context"
 import type { FilterOptions } from "@/types/exam"
 import { subjectLabel, type Locale } from "@/lib/i18n"
+import { useTranslations } from "@/hooks/use-translations"
 
 /**
  * `value` is what gets filtered on and written to the URL; `label` is what the
@@ -97,19 +98,20 @@ export function FilterSidebar({
   // stale-but-valid reads better than a sidebar that blanks on every click.
   const { schools, degrees, semesters, years, subjects } = options ?? EMPTY_OPTIONS
 
+  const t = useTranslations()
   const locale: Locale = settings.language
   const plain = (values: Array<string | number>): FilterOption[] =>
     values.map((value) => ({ value: String(value), label: String(value) }))
 
   // Define filter categories with more flexible dependencies
   const filterCategories: FilterCategory[] = [
-    { name: "Escuelas", field: "school", options: plain(schools), searchable: true },
-    { name: "Carreras", field: "degree", options: plain(degrees), searchable: true, dependsOn: ["school"] },
-    { name: "Semestres", field: "semester", options: plain(semesters), searchable: false, dependsOn: ["school", "degree"] },
-    { name: "Años del Curso", field: "year", options: plain(years), searchable: false, dependsOn: ["school", "degree", "semester"] },
+    { name: t("filters.schools"), field: "school", options: plain(schools), searchable: true },
+    { name: t("filters.degrees"), field: "degree", options: plain(degrees), searchable: true, dependsOn: ["school"] },
+    { name: t("filters.semesters"), field: "semester", options: plain(semesters), searchable: false, dependsOn: ["school", "degree"] },
+    { name: t("filters.years"), field: "year", options: plain(years), searchable: false, dependsOn: ["school", "degree", "semester"] },
     // More flexible: subjects only need school OR degree (not both AND all others)
     {
-      name: "Asignaturas",
+      name: t("filters.subjects"),
       field: "subject",
       options: subjects.map((subject) => ({
         value: subject.value,
@@ -500,7 +502,7 @@ export function FilterSidebar({
       {/* Add top padding to account for the logo */}
       <div className="pt-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold tracking-tight">Filtros</h2>
+          <h2 className="text-xl font-semibold tracking-tight">{t("filters.title")}</h2>
           {Object.keys(activeFilters).length > 0 && (
             <Button
               variant="ghost"
@@ -508,7 +510,7 @@ export function FilterSidebar({
               onClick={clearAllFilters}
               className="h-8 text-xs text-muted-foreground hover:text-foreground"
             >
-              Limpiar todo
+              {t("filters.clearAll")}
             </Button>
           )}
         </div>
@@ -516,7 +518,7 @@ export function FilterSidebar({
         {/* Active Filters section moved to the top */}
         {Object.keys(activeFilters).length > 0 && (
           <div className="mt-4">
-            <h3 className="text-sm font-medium mb-2">Filtros Activos</h3>
+            <h3 className="text-sm font-medium mb-2">{t("filters.active")}</h3>
             <div className="flex flex-wrap items-center gap-2">
               {Object.entries(activeFilters).map(([category, values], idx, arr) => (
                 <span key={category} className="flex items-center gap-2">
@@ -571,7 +573,7 @@ export function FilterSidebar({
                         }}
                         className="text-xs text-muted-foreground hover:text-foreground cursor-pointer underline"
                       >
-                        Seleccionar todo
+                        {t("filters.selectAll")}
                       </span>
                   )}
                   {activeFilters[category.field]?.length > 0 && (
@@ -579,7 +581,7 @@ export function FilterSidebar({
                         onClick={(e) => clearCategoryFilters(category.field, e)}
                         className="text-xs text-muted-foreground hover:text-foreground cursor-pointer underline"
                       >
-                        Limpiar todo
+                        {t("filters.clearAll")}
                       </span>
                   )}
                 </div>
@@ -589,7 +591,7 @@ export function FilterSidebar({
                   <Card className="mb-3 border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
                     <CardContent className="p-3 flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300">
                       <Info className="h-4 w-4" />
-                      <span>Selecciona una de las opciones anteriores.</span>
+                      <span>{t("filters.selectPrevious")}</span>
                     </CardContent>
                   </Card>
                 )}
@@ -597,7 +599,7 @@ export function FilterSidebar({
                 {category.searchable && hasRequiredDependencies(category) && category.field === 'subject' && (
                   <div className="mb-2">
                     <Input
-                      placeholder={`Buscar ${category.name.toLowerCase()}...`}
+                      placeholder={t("filters.search", { category: category.name.toLowerCase() })}
                       value={searchQueries[category.field] || ""}
                       onChange={(e) => setSearchQueries(prev => ({
                         ...prev,
@@ -631,7 +633,7 @@ export function FilterSidebar({
                     <div className="text-sm text-muted-foreground py-2">
                       {!hasRequiredDependencies(category)
                         ? "" // Remove the dependency message text
-                        : `No hay ${category.name.toLowerCase()} disponibles para los filtros seleccionados`}
+                        : t("filters.noOptions", { category: category.name.toLowerCase() })}
                     </div>
                   )}
                 </div>
@@ -649,7 +651,7 @@ export function FilterSidebar({
               variant="default"
             >
               <Save className="h-4 w-4" />
-              Guardar Calendario
+              {t("filters.saveCalendar")}
             </Button>
           </div>
         )}

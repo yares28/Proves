@@ -8,6 +8,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
+        disallow: '/audit',
       },
       // Allow major AI crawlers explicitly (non-standard but commonly respected)
       { userAgent: 'GPTBot', allow: '/' },

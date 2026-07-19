@@ -5,26 +5,9 @@ import { AlertTriangle, ChevronDown, ChevronUp, Clock } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { useSettings } from "@/context/settings-context"
-import { examSubject } from "@/lib/i18n"
+import { examSubject, LOCALE_TAGS } from "@/lib/i18n"
+import { useTranslations } from "@/hooks/use-translations"
 import type { DayConflict } from "@/lib/exam-conflicts"
-
-const SEVERITY_COPY: Record<DayConflict["severity"], { label: string; hint: string }> = {
-  overlap: { label: "Solapan", hint: "Coinciden en horario — no puedes estar en los dos." },
-  tight: { label: "Muy seguidos", hint: "Menos de una hora entre ellos." },
-  busy: { label: "Día cargado", hint: "Varios exámenes el mismo día." },
-}
-
-function formatTime(time: string): string {
-  return time ? time.slice(0, 5) : "Sin hora"
-}
-
-function formatDate(date: string): string {
-  return new Date(`${date}T00:00:00`).toLocaleDateString("es-ES", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  })
-}
 
 /**
  * Flags exam days a student cannot realistically get through cleanly. Only
@@ -35,6 +18,20 @@ function formatDate(date: string): string {
 export function ExamConflictsBanner({ conflicts }: { conflicts: DayConflict[] }) {
   const [expanded, setExpanded] = useState(false)
   const { settings } = useSettings()
+  const t = useTranslations()
+
+  const severityCopy = (severity: DayConflict["severity"]) => ({
+    label: t(`conflict.${severity}`),
+    hint: t(`conflict.${severity}Hint`),
+  })
+
+  const formatTime = (time: string) => (time ? time.slice(0, 5) : t("conflict.noTime"))
+  const formatDate = (date: string) =>
+    new Date(`${date}T00:00:00`).toLocaleDateString(LOCALE_TAGS[settings.language], {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    })
 
   if (conflicts.length === 0) return null
 
@@ -57,21 +54,21 @@ export function ExamConflictsBanner({ conflicts }: { conflicts: DayConflict[] })
       <AlertTitle className="flex items-center justify-between gap-2">
         <span>
           {conflicts.length === 1
-            ? "1 día con conflicto de horario"
-            : `${conflicts.length} días con conflictos de horario`}
+            ? t("conflict.oneDay")
+            : t("conflict.manyDays", { count: conflicts.length })}
         </span>
         <button
           type="button"
           onClick={() => setExpanded((e) => !e)}
           className="inline-flex items-center gap-1 text-xs font-normal underline-offset-2 hover:underline"
         >
-          {expanded ? "Ocultar" : "Ver detalle"}
+          {expanded ? t("conflict.hide") : t("conflict.seeDetail")}
           {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
         </button>
       </AlertTitle>
       <AlertDescription>
         {!expanded ? (
-          <span>Revisa tus asignaturas seleccionadas antes de confirmar tu horario.</span>
+          <span>{t("conflict.summary")}</span>
         ) : (
           <div className="mt-3 space-y-3">
             {conflicts.map((conflict) => (
@@ -86,10 +83,10 @@ export function ExamConflictsBanner({ conflicts }: { conflicts: DayConflict[] })
                         : "border-current"
                     }
                   >
-                    {SEVERITY_COPY[conflict.severity].label}
+                    {severityCopy(conflict.severity).label}
                   </Badge>
                 </div>
-                <p className="mb-2 text-xs opacity-80">{SEVERITY_COPY[conflict.severity].hint}</p>
+                <p className="mb-2 text-xs opacity-80">{severityCopy(conflict.severity).hint}</p>
                 <ul className="space-y-1 text-sm">
                   {conflict.exams
                     .slice()

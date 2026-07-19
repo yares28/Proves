@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { fromSlug } from '@/lib/slug'
+import { safeJsonLd } from '@/lib/json-ld'
 import { ExamListView } from '@/components/exam-list-view'
 import { getExams } from '@/actions/exam-actions'
 
@@ -81,11 +82,11 @@ export default async function FacultyCalendarsPage({ params }: Props) {
       <head>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(faqJsonLd) }}
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbJsonLd) }}
         />
       </head>
 

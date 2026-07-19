@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { fromSlug } from '@/lib/slug'
+import { safeJsonLd } from '@/lib/json-ld'
 import { ExamListView } from '@/components/exam-list-view'
 import { getExams } from '@/actions/exam-actions'
 
@@ -73,8 +74,8 @@ export default async function DegreeCalendarsPage({ params }: Props) {
   return (
     <div className="container mx-auto px-4 py-10 md:px-6 md:py-16">
       <head>
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(faqJsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbJsonLd) }} />
       </head>
 
       <h1 className="mb-4 text-3xl font-bold md:text-4xl">

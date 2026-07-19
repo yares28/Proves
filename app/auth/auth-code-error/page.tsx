@@ -3,7 +3,7 @@
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { AlertCircle, ArrowLeft, RefreshCw, Shield } from 'lucide-react'
+import { AlertCircle, ArrowLeft } from 'lucide-react'
 import { Suspense, useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useTheme } from 'next-themes'
@@ -57,10 +57,6 @@ function AuthErrorContent() {
   }
 
   const goBack = () => {
-    router.push('/')
-  }
-
-  const retryAuth = () => {
     router.push('/')
   }
 

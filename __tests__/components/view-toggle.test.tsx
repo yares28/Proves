@@ -1,403 +1,90 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ViewToggle } from '@/components/view-toggle';
 
+// The component only uses translations to label the two tabs. We're testing the
+// toggle behaviour, not the i18n system, so map the two keys to fixed labels.
+jest.mock('@/hooks/use-translations', () => ({
+  useTranslations: () => (key: string) =>
+    ({ 'calendar.viewCalendar': 'Calendario', 'calendar.viewList': 'Lista' }[key] ?? key),
+}));
+
 describe('ViewToggle', () => {
-  const mockOnViewChange = jest.fn();
+  const onChange = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  const renderViewToggle = (props = {}) => {
-    return render(
-      <ViewToggle 
-        view="calendar"
-        onViewChange={mockOnViewChange}
-        {...props}
-      />
-    );
-  };
+  const renderToggle = (view: 'calendar' | 'list' = 'calendar') =>
+    render(<ViewToggle view={view} onChange={onChange} />);
 
   describe('Rendering', () => {
-    it('should render the view toggle with calendar and list options', () => {
-      renderViewToggle();
+    it('renders a calendar and a list tab', () => {
+      renderToggle();
 
-      expect(screen.getByRole('button', { name: 'Calendar' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'List' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Calendario' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Lista' })).toBeInTheDocument();
     });
 
-    it('should show calendar as active when view is calendar', () => {
-      renderViewToggle({ view: 'calendar' });
+    it('marks the calendar tab active when view is "calendar"', () => {
+      renderToggle('calendar');
 
-      const calendarButton = screen.getByRole('button', { name: 'Calendar' });
-      const listButton = screen.getByRole('button', { name: 'List' });
-
-      expect(calendarButton).toHaveClass('bg-primary');
-      expect(listButton).not.toHaveClass('bg-primary');
+      expect(screen.getByRole('tab', { name: 'Calendario' })).toHaveAttribute('data-state', 'active');
+      expect(screen.getByRole('tab', { name: 'Lista' })).toHaveAttribute('data-state', 'inactive');
     });
 
-    it('should show list as active when view is list', () => {
-      renderViewToggle({ view: 'list' });
+    it('marks the list tab active when view is "list"', () => {
+      renderToggle('list');
 
-      const calendarButton = screen.getByRole('button', { name: 'Calendar' });
-      const listButton = screen.getByRole('button', { name: 'List' });
-
-      expect(listButton).toHaveClass('bg-primary');
-      expect(calendarButton).not.toHaveClass('bg-primary');
-    });
-
-    it('should render with proper styling', () => {
-      renderViewToggle();
-
-      const toggleGroup = screen.getByRole('group');
-      expect(toggleGroup).toHaveClass('inline-flex');
-      expect(toggleGroup).toHaveClass('bg-muted');
-      expect(toggleGroup).toHaveClass('p-1');
-    });
-
-    it('should render buttons with proper styling', () => {
-      renderViewToggle();
-
-      const calendarButton = screen.getByRole('button', { name: 'Calendar' });
-      const listButton = screen.getByRole('button', { name: 'List' });
-
-      expect(calendarButton).toHaveClass('inline-flex');
-      expect(calendarButton).toHaveClass('items-center');
-      expect(listButton).toHaveClass('inline-flex');
-      expect(listButton).toHaveClass('items-center');
+      expect(screen.getByRole('tab', { name: 'Lista' })).toHaveAttribute('data-state', 'active');
+      expect(screen.getByRole('tab', { name: 'Calendario' })).toHaveAttribute('data-state', 'inactive');
     });
   });
 
-  describe('Button Interactions', () => {
-    it('should call onViewChange when calendar button is clicked', async () => {
+  describe('Interaction', () => {
+    it('calls onChange with "list" when the list tab is clicked', async () => {
       const user = userEvent.setup();
-      renderViewToggle({ view: 'list' });
+      renderToggle('calendar');
 
-      const calendarButton = screen.getByRole('button', { name: 'Calendar' });
-      await user.click(calendarButton);
+      await user.click(screen.getByRole('tab', { name: 'Lista' }));
 
-      expect(mockOnViewChange).toHaveBeenCalledWith('calendar');
+      expect(onChange).toHaveBeenCalledWith('list');
     });
 
-    it('should call onViewChange when list button is clicked', async () => {
+    it('calls onChange with "calendar" when the calendar tab is clicked', async () => {
       const user = userEvent.setup();
-      renderViewToggle({ view: 'calendar' });
+      renderToggle('list');
 
-      const listButton = screen.getByRole('button', { name: 'List' });
-      await user.click(listButton);
+      await user.click(screen.getByRole('tab', { name: 'Calendario' }));
 
-      expect(mockOnViewChange).toHaveBeenCalledWith('list');
+      expect(onChange).toHaveBeenCalledWith('calendar');
     });
 
-    it('should not call onViewChange when clicking the already active view', async () => {
+    it('does not call onChange when the already-active tab is clicked', async () => {
       const user = userEvent.setup();
-      renderViewToggle({ view: 'calendar' });
+      renderToggle('calendar');
 
-      const calendarButton = screen.getByRole('button', { name: 'Calendar' });
-      await user.click(calendarButton);
+      await user.click(screen.getByRole('tab', { name: 'Calendario' }));
 
-      expect(mockOnViewChange).not.toHaveBeenCalled();
-    });
-
-    it('should handle rapid button clicks', async () => {
-      const user = userEvent.setup();
-      renderViewToggle({ view: 'calendar' });
-
-      const listButton = screen.getByRole('button', { name: 'List' });
-      
-      // Rapidly click the list button
-      for (let i = 0; i < 5; i++) {
-        await user.click(listButton);
-      }
-
-      // Should only call once per click
-      expect(mockOnViewChange).toHaveBeenCalledTimes(5);
-      expect(mockOnViewChange).toHaveBeenLastCalledWith('list');
+      expect(onChange).not.toHaveBeenCalled();
     });
   });
 
   describe('Accessibility', () => {
-    it('should have proper ARIA labels and roles', () => {
-      renderViewToggle();
+    it('exposes the tablist and tab roles', () => {
+      renderToggle();
 
-      const toggleGroup = screen.getByRole('group');
-      expect(toggleGroup).toBeInTheDocument();
-
-      const calendarButton = screen.getByRole('button', { name: 'Calendar' });
-      const listButton = screen.getByRole('button', { name: 'List' });
-
-      expect(calendarButton).toBeInTheDocument();
-      expect(listButton).toBeInTheDocument();
+      expect(screen.getByRole('tablist')).toBeInTheDocument();
+      expect(screen.getAllByRole('tab')).toHaveLength(2);
     });
 
-    it('should have proper keyboard navigation', async () => {
-      const user = userEvent.setup();
-      renderViewToggle();
+    it('reflects the active tab via aria-selected', () => {
+      renderToggle('calendar');
 
-      const calendarButton = screen.getByRole('button', { name: 'Calendar' });
-      const listButton = screen.getByRole('button', { name: 'List' });
-
-      // Focus the calendar button
-      calendarButton.focus();
-      expect(calendarButton).toHaveFocus();
-
-      // Navigate to list button with Tab key
-      await user.keyboard('{Tab}');
-      expect(listButton).toHaveFocus();
-
-      // Activate with Enter key
-      await user.keyboard('{Enter}');
-      expect(mockOnViewChange).toHaveBeenCalledWith('list');
-    });
-
-    it('should have proper keyboard navigation with Space key', async () => {
-      const user = userEvent.setup();
-      renderViewToggle();
-
-      const listButton = screen.getByRole('button', { name: 'List' });
-      
-      // Focus the list button
-      listButton.focus();
-      expect(listButton).toHaveFocus();
-
-      // Activate with Space key
-      await user.keyboard(' ');
-      expect(mockOnViewChange).toHaveBeenCalledWith('list');
-    });
-
-    it('should have proper aria-pressed attributes', () => {
-      renderViewToggle({ view: 'calendar' });
-
-      const calendarButton = screen.getByRole('button', { name: 'Calendar' });
-      const listButton = screen.getByRole('button', { name: 'List' });
-
-      expect(calendarButton).toHaveAttribute('aria-pressed', 'true');
-      expect(listButton).toHaveAttribute('aria-pressed', 'false');
-    });
-
-    it('should update aria-pressed when view changes', async () => {
-      const user = userEvent.setup();
-      const { rerender } = renderViewToggle({ view: 'calendar' });
-
-      const calendarButton = screen.getByRole('button', { name: 'Calendar' });
-      const listButton = screen.getByRole('button', { name: 'List' });
-
-      expect(calendarButton).toHaveAttribute('aria-pressed', 'true');
-      expect(listButton).toHaveAttribute('aria-pressed', 'false');
-
-      // Click list button
-      await user.click(listButton);
-
-      // Re-render with new view
-      rerender(
-        <ViewToggle 
-          view="list"
-          onViewChange={mockOnViewChange}
-        />
-      );
-
-      expect(calendarButton).toHaveAttribute('aria-pressed', 'false');
-      expect(listButton).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('tab', { name: 'Calendario' })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByRole('tab', { name: 'Lista' })).toHaveAttribute('aria-selected', 'false');
     });
   });
-
-  describe('Customization', () => {
-    it('should accept custom className', () => {
-      renderViewToggle({ className: 'custom-toggle' });
-
-      const toggleGroup = screen.getByRole('group');
-      expect(toggleGroup).toHaveClass('custom-toggle');
-    });
-
-    it('should accept custom button text', () => {
-      renderViewToggle({
-        calendarText: 'Calendar View',
-        listText: 'List View',
-      });
-
-      expect(screen.getByRole('button', { name: 'Calendar View' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'List View' })).toBeInTheDocument();
-    });
-
-    it('should accept custom view values', () => {
-      renderViewToggle({
-        calendarValue: 'calendar-view',
-        listValue: 'list-view',
-      });
-
-      const calendarButton = screen.getByRole('button', { name: 'Calendar' });
-      const listButton = screen.getByRole('button', { name: 'List' });
-
-      await userEvent.click(calendarButton);
-      expect(mockOnViewChange).toHaveBeenCalledWith('calendar-view');
-
-      await userEvent.click(listButton);
-      expect(mockOnViewChange).toHaveBeenCalledWith('list-view');
-    });
-
-    it('should accept custom disabled state', () => {
-      renderViewToggle({ disabled: true });
-
-      const calendarButton = screen.getByRole('button', { name: 'Calendar' });
-      const listButton = screen.getByRole('button', { name: 'List' });
-
-      expect(calendarButton).toBeDisabled();
-      expect(listButton).toBeDisabled();
-    });
-  });
-
-  describe('Edge Cases', () => {
-    it('should handle missing onViewChange prop', () => {
-      render(
-        <ViewToggle 
-          view="calendar"
-        />
-      );
-
-      const listButton = screen.getByRole('button', { name: 'List' });
-      userEvent.click(listButton);
-
-      // Should not throw error
-      expect(screen.getByRole('button', { name: 'List' })).toBeInTheDocument();
-    });
-
-    it('should handle undefined view prop', () => {
-      render(
-        <ViewToggle 
-          view={undefined}
-          onViewChange={mockOnViewChange}
-        />
-      );
-
-      // Should render without crashing
-      expect(screen.getByRole('button', { name: 'Calendar' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'List' })).toBeInTheDocument();
-    });
-
-    it('should handle null view prop', () => {
-      render(
-        <ViewToggle 
-          view={null}
-          onViewChange={mockOnViewChange}
-        />
-      );
-
-      // Should render without crashing
-      expect(screen.getByRole('button', { name: 'Calendar' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'List' })).toBeInTheDocument();
-    });
-
-    it('should handle invalid view prop', () => {
-      render(
-        <ViewToggle 
-          view="invalid-view"
-          onViewChange={mockOnViewChange}
-        />
-      );
-
-      // Should render without crashing
-      expect(screen.getByRole('button', { name: 'Calendar' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'List' })).toBeInTheDocument();
-    });
-
-    it('should handle component unmounting during interaction', async () => {
-      const user = userEvent.setup();
-      const { unmount } = renderViewToggle();
-
-      const listButton = screen.getByRole('button', { name: 'List' });
-      await user.click(listButton);
-
-      // Unmount component during interaction
-      unmount();
-
-      // Should not cause errors
-      expect(mockOnViewChange).toHaveBeenCalledWith('list');
-    });
-  });
-
-  describe('Integration', () => {
-    it('should work with parent components', () => {
-      const ParentComponent = () => {
-        const [view, setView] = React.useState('calendar');
-        
-        return (
-          <div>
-            <ViewToggle view={view} onViewChange={setView} />
-            <div data-testid="current-view">Current view: {view}</div>
-          </div>
-        );
-      };
-
-      render(<ParentComponent />);
-
-      expect(screen.getByTestId('current-view')).toHaveTextContent('Current view: calendar');
-
-      const listButton = screen.getByRole('button', { name: 'List' });
-      userEvent.click(listButton);
-
-      expect(screen.getByTestId('current-view')).toHaveTextContent('Current view: list');
-    });
-
-    it('should maintain state correctly in controlled component', async () => {
-      const user = userEvent.setup();
-      const { rerender } = renderViewToggle({ view: 'calendar' });
-
-      const listButton = screen.getByRole('button', { name: 'List' });
-      await user.click(listButton);
-
-      expect(mockOnViewChange).toHaveBeenCalledWith('list');
-
-      // Simulate parent updating the view
-      rerender(
-        <ViewToggle 
-          view="list"
-          onViewChange={mockOnViewChange}
-        />
-      );
-
-      const calendarButton = screen.getByRole('button', { name: 'Calendar' });
-      await user.click(calendarButton);
-
-      expect(mockOnViewChange).toHaveBeenCalledWith('calendar');
-    });
-  });
-
-  describe('Performance', () => {
-    it('should handle rapid view changes efficiently', async () => {
-      const user = userEvent.setup();
-      renderViewToggle();
-
-      const calendarButton = screen.getByRole('button', { name: 'Calendar' });
-      const listButton = screen.getByRole('button', { name: 'List' });
-
-      // Rapidly switch between views
-      for (let i = 0; i < 10; i++) {
-        await user.click(listButton);
-        await user.click(calendarButton);
-      }
-
-      // Should handle all interactions
-      expect(mockOnViewChange).toHaveBeenCalledTimes(20);
-    });
-
-    it('should not cause excessive re-renders', () => {
-      const renderSpy = jest.fn();
-      const TestComponent = () => {
-        renderSpy();
-        return (
-          <ViewToggle 
-            view="calendar"
-            onViewChange={mockOnViewChange}
-          />
-        );
-      };
-
-      render(<TestComponent />);
-
-      // Should only render once initially
-      expect(renderSpy).toHaveBeenCalledTimes(1);
-    });
-  });
-}); 
+});
