@@ -2,21 +2,14 @@
 
 import type React from "react";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Calendar,
-  Download,
   Save,
-  ChevronLeft,
-  ChevronRight,
   Clock,
   MapPin,
-  List,
-  Grid,
   Share2,
-  Settings,
   Loader2,
-  MoreHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,11 +23,9 @@ import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { ViewToggle } from "@/components/view-toggle";
 import { ExamListView } from "@/components/exam-list-view";
-import { getExams } from "@/actions/exam-actions";
 import {
   formatDateString,
   getCurrentYear,
-  getAcademicYearForMonth,
   detectAcademicYearFromExams,
   generateAcademicYearMonths,
 } from "@/utils/date-utils";
@@ -48,17 +39,8 @@ import { ExamConflictsBanner } from "@/components/exam-conflicts-banner";
 import { useAuth } from "@/context/auth-context";
 import { useSettings } from "@/context/settings-context";
 import { useToast } from "@/hooks/use-toast";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import styles from "@/styles/tooltip.module.css";
-import {
-  saveUserCalendar,
-  getUserCalendarNames,
-} from "@/actions/user-calendars";
+import { getUserCalendarNames } from "@/actions/user-calendars";
 import { getCurrentSession, getFreshAuthTokens } from "@/utils/auth-helpers";
 import { openInGoogleCalendar, remindersToIso } from "@/lib/calendar-export";
 import type { Exam } from "@/types/exam";

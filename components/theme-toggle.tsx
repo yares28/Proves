@@ -35,14 +35,6 @@ export function ThemeToggle() {
     updateSettings({ theme: nextTheme })
   }
 
-  // Get the current effective theme for display
-  const getCurrentTheme = () => {
-    if (settings.theme === 'system') {
-      return theme === 'dark' ? 'dark' : 'light'
-    }
-    return settings.theme
-  }
-
   // Don't render until mounted to prevent hydration mismatch
   if (!mounted) {
     return (
@@ -58,10 +50,8 @@ export function ThemeToggle() {
     )
   }
 
-  const currentTheme = getCurrentTheme()
-
   return (
-    <Button 
+    <Button
       variant="outline" 
       size="icon" 
       className="h-9 w-9"

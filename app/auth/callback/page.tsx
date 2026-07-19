@@ -110,9 +110,13 @@ function AuthCallbackContent() {
               description: "Has iniciado sesión correctamente.",
             })
             
-            // Get redirect destination from URL params or default
+            // Get redirect destination from URL params or default. Only allow
+            // same-origin absolute paths: a value like "//evil.com" or "/\evil.com"
+            // also starts with "/" but is a protocol-relative URL the browser
+            // would follow off-site (open redirect), so reject those explicitly.
             const next = searchParams.get('next') || '/my-calendars'
-            const validNext = next.startsWith('/') ? next : '/my-calendars'
+            const isSafeNext = /^\/(?![/\\])/.test(next)
+            const validNext = isSafeNext ? next : '/my-calendars'
             
             // Redirect immediately to intended page
             router.push(validNext)
@@ -155,7 +159,7 @@ function AuthCallbackContent() {
           description: "Código de autorización copiado al portapapeles",
         })
         setTimeout(() => setCopied(false), 2000)
-      } catch (err) {
+      } catch {
         toast({
           title: "Error al copiar",
           description: "Por favor selecciona y copia el código manualmente",

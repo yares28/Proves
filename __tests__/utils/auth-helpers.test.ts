@@ -1,525 +1,142 @@
-import { getCurrentSession, syncAuthState, getFreshAuthTokens, isAuthenticatedWithFreshTokens } from '@/utils/auth-helpers';
+import {
+  getCurrentSession,
+  syncAuthState,
+  getFreshAuthTokens,
+  isAuthenticatedWithFreshTokens,
+} from '@/utils/auth-helpers';
 
-// Mock Supabase client
-const mockSupabase = {
-  auth: {
-    getUser: jest.fn(),
-    getSession: jest.fn(),
-    refreshSession: jest.fn(),
-  },
+// auth-helpers calls createClient() at module load, so the mock has to be
+// self-contained (a factory that references no outer variables) to avoid a
+// temporal-dead-zone error. The jest.fn()s live inside the mocked module and are
+// reached from the tests via jest.requireMock.
+jest.mock('@/utils/supabase/client', () => {
+  const getSession = jest.fn();
+  const refreshSession = jest.fn();
+  const client = { auth: { getSession, refreshSession } };
+  return { createClient: () => client, __client: client };
+});
+
+const { __client } = jest.requireMock('@/utils/supabase/client') as {
+  __client: { auth: { getSession: jest.Mock; refreshSession: jest.Mock } };
 };
 
-jest.mock('@/utils/supabase/client', () => ({
-  createClient: jest.fn(() => mockSupabase),
-}));
+const { getSession, refreshSession } = __client.auth;
 
-// Mock Next.js cookies
-const mockCookies = {
-  get: jest.fn(),
-  set: jest.fn(),
-};
+// expires_at is stored in seconds; the helper multiplies by 1000.
+const nowSeconds = () => Math.floor(Date.now() / 1000);
+const session = (overrides: Record<string, unknown> = {}) => ({
+  access_token: 'access-123',
+  refresh_token: 'refresh-456',
+  expires_at: nowSeconds() + 3600, // an hour out → not expiring soon
+  ...overrides,
+});
 
-jest.mock('next/headers', () => ({
-  cookies: jest.fn(() => mockCookies),
-}));
-
-describe('Auth Helpers', () => {
+describe('auth-helpers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   describe('getCurrentSession', () => {
-    it('should return session when valid tokens exist', async () => {
-      // Given
-      mockCookies.get
-        .mockReturnValueOnce({ value: 'test-access-token' })
-        .mockReturnValueOnce({ value: 'test-refresh-token' })
-        .mockReturnValueOnce({ value: '1234567890' });
+    it('returns the session when it is valid and not expiring soon', async () => {
+      const s = session();
+      getSession.mockResolvedValue({ data: { session: s }, error: null });
 
-      // When
-      const session = await getCurrentSession();
+      await expect(getCurrentSession()).resolves.toEqual(s);
+      expect(refreshSession).not.toHaveBeenCalled();
+    });
 
-      // Then
-      expect(session).toEqual({
-        access_token: 'test-access-token',
-        refresh_token: 'test-refresh-token',
-        expires_at: 1234567890,
+    it('returns null when getSession reports an error', async () => {
+      getSession.mockResolvedValue({ data: { session: null }, error: { message: 'boom' } });
+
+      await expect(getCurrentSession()).resolves.toBeNull();
+    });
+
+    it('returns null when there is no session', async () => {
+      getSession.mockResolvedValue({ data: { session: null }, error: null });
+
+      await expect(getCurrentSession()).resolves.toBeNull();
+    });
+
+    it('refreshes and returns the new session when the token expires within 5 minutes', async () => {
+      getSession.mockResolvedValue({
+        data: { session: session({ expires_at: nowSeconds() + 60 }) },
+        error: null,
       });
+      const refreshed = session({ access_token: 'fresh-access' });
+      refreshSession.mockResolvedValue({ data: { session: refreshed }, error: null });
+
+      await expect(getCurrentSession()).resolves.toEqual(refreshed);
+      expect(refreshSession).toHaveBeenCalledTimes(1);
     });
 
-    it('should return null when access token is missing', async () => {
-      // Given
-      mockCookies.get
-        .mockReturnValueOnce({ value: undefined })
-        .mockReturnValueOnce({ value: 'test-refresh-token' });
-
-      // When
-      const session = await getCurrentSession();
-
-      // Then
-      expect(session).toBeNull();
-    });
-
-    it('should return null when refresh token is missing', async () => {
-      // Given
-      mockCookies.get
-        .mockReturnValueOnce({ value: 'test-access-token' })
-        .mockReturnValueOnce({ value: undefined });
-
-      // When
-      const session = await getCurrentSession();
-
-      // Then
-      expect(session).toBeNull();
-    });
-
-    it('should handle missing expires_at cookie', async () => {
-      // Given
-      mockCookies.get
-        .mockReturnValueOnce({ value: 'test-access-token' })
-        .mockReturnValueOnce({ value: 'test-refresh-token' })
-        .mockReturnValueOnce({ value: undefined });
-
-      // When
-      const session = await getCurrentSession();
-
-      // Then
-      expect(session).toEqual({
-        access_token: 'test-access-token',
-        refresh_token: 'test-refresh-token',
-        expires_at: null,
+    it('returns null when the refresh fails', async () => {
+      getSession.mockResolvedValue({
+        data: { session: session({ expires_at: nowSeconds() + 60 }) },
+        error: null,
       });
+      refreshSession.mockResolvedValue({ data: { session: null }, error: { message: 'nope' } });
+
+      await expect(getCurrentSession()).resolves.toBeNull();
     });
 
-    it('should handle cookies error gracefully', async () => {
-      // Given
-      mockCookies.get.mockImplementation(() => {
-        throw new Error('Cookies error');
-      });
+    it('returns null when getSession throws', async () => {
+      getSession.mockRejectedValue(new Error('network'));
 
-      // When
-      const session = await getCurrentSession();
-
-      // Then
-      expect(session).toBeNull();
-    });
-
-    it('should handle null cookie values', async () => {
-      // Given
-      mockCookies.get
-        .mockReturnValueOnce({ value: null })
-        .mockReturnValueOnce({ value: 'test-refresh-token' });
-
-      // When
-      const session = await getCurrentSession();
-
-      // Then
-      expect(session).toBeNull();
-    });
-
-    it('should handle empty string cookie values', async () => {
-      // Given
-      mockCookies.get
-        .mockReturnValueOnce({ value: '' })
-        .mockReturnValueOnce({ value: 'test-refresh-token' });
-
-      // When
-      const session = await getCurrentSession();
-
-      // Then
-      expect(session).toBeNull();
-    });
-
-    it('should handle malformed expires_at value', async () => {
-      // Given
-      mockCookies.get
-        .mockReturnValueOnce({ value: 'test-access-token' })
-        .mockReturnValueOnce({ value: 'test-refresh-token' })
-        .mockReturnValueOnce({ value: 'invalid-number' });
-
-      // When
-      const session = await getCurrentSession();
-
-      // Then
-      expect(session).toEqual({
-        access_token: 'test-access-token',
-        refresh_token: 'test-refresh-token',
-        expires_at: null,
-      });
-    });
-
-    it('should handle negative expires_at value', async () => {
-      // Given
-      mockCookies.get
-        .mockReturnValueOnce({ value: 'test-access-token' })
-        .mockReturnValueOnce({ value: 'test-refresh-token' })
-        .mockReturnValueOnce({ value: '-1234567890' });
-
-      // When
-      const session = await getCurrentSession();
-
-      // Then
-      expect(session).toEqual({
-        access_token: 'test-access-token',
-        refresh_token: 'test-refresh-token',
-        expires_at: -1234567890,
-      });
+      await expect(getCurrentSession()).resolves.toBeNull();
     });
   });
 
   describe('syncAuthState', () => {
-    it('should sync auth state successfully', async () => {
-      // Given
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser }, error: null });
+    it('resolves true when there is a valid session', async () => {
+      getSession.mockResolvedValue({ data: { session: session() }, error: null });
 
-      // When
-      const result = await syncAuthState();
-
-      // Then
-      expect(result).toBe(true);
-      expect(mockSupabase.auth.getUser).toHaveBeenCalled();
+      await expect(syncAuthState()).resolves.toBe(true);
     });
 
-    it('should handle auth error gracefully', async () => {
-      // Given
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null }, error: { message: 'Auth error' } });
+    it('resolves false when there is no session', async () => {
+      getSession.mockResolvedValue({ data: { session: null }, error: null });
 
-      // When
-      const result = await syncAuthState();
-
-      // Then
-      expect(result).toBe(false);
-    });
-
-    it('should handle network errors', async () => {
-      // Given
-      mockSupabase.auth.getUser.mockRejectedValue(new Error('Network error'));
-
-      // When
-      const result = await syncAuthState();
-
-      // Then
-      expect(result).toBe(false);
-    });
-
-    it('should handle timeout errors', async () => {
-      // Given
-      mockSupabase.auth.getUser.mockRejectedValue(new Error('Timeout'));
-
-      // When
-      const result = await syncAuthState();
-
-      // Then
-      expect(result).toBe(false);
-    });
-
-    it('should handle null user data', async () => {
-      // Given
-      mockSupabase.auth.getUser.mockResolvedValue({ data: null, error: null });
-
-      // When
-      const result = await syncAuthState();
-
-      // Then
-      expect(result).toBe(false);
-    });
-
-    it('should handle undefined user data', async () => {
-      // Given
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: undefined }, error: null });
-
-      // When
-      const result = await syncAuthState();
-
-      // Then
-      expect(result).toBe(false);
+      await expect(syncAuthState()).resolves.toBe(false);
     });
   });
 
   describe('getFreshAuthTokens', () => {
-    it('should return fresh tokens when session is valid', async () => {
-      // Given
-      const mockSession = {
-        access_token: 'test-access-token',
-        refresh_token: 'test-refresh-token',
-        expires_at: Date.now() + 3600000, // 1 hour from now
-      };
-      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: mockSession }, error: null });
+    it('returns the access and refresh tokens from a valid session', async () => {
+      getSession.mockResolvedValue({ data: { session: session() }, error: null });
 
-      // When
-      const tokens = await getFreshAuthTokens();
-
-      // Then
-      expect(tokens).toEqual(mockSession);
+      await expect(getFreshAuthTokens()).resolves.toEqual({
+        accessToken: 'access-123',
+        refreshToken: 'refresh-456',
+      });
     });
 
-    it('should refresh tokens when session is expired', async () => {
-      // Given
-      const expiredSession = {
-        access_token: 'expired-token',
-        refresh_token: 'refresh-token',
-        expires_at: Date.now() - 3600000, // 1 hour ago
-      };
-      const freshSession = {
-        access_token: 'fresh-token',
-        refresh_token: 'refresh-token',
-        expires_at: Date.now() + 3600000,
-      };
-      
-      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: expiredSession }, error: null });
-      mockSupabase.auth.refreshSession.mockResolvedValue({ data: { session: freshSession }, error: null });
+    it('returns null when there is no session', async () => {
+      getSession.mockResolvedValue({ data: { session: null }, error: null });
 
-      // When
-      const tokens = await getFreshAuthTokens();
-
-      // Then
-      expect(tokens).toEqual(freshSession);
-      expect(mockSupabase.auth.refreshSession).toHaveBeenCalled();
+      await expect(getFreshAuthTokens()).resolves.toBeNull();
     });
 
-    it('should return null when no session exists', async () => {
-      // Given
-      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    it('returns null when the session is missing a token', async () => {
+      getSession.mockResolvedValue({
+        data: { session: session({ refresh_token: undefined }) },
+        error: null,
+      });
 
-      // When
-      const tokens = await getFreshAuthTokens();
-
-      // Then
-      expect(tokens).toBeNull();
-    });
-
-    it('should handle refresh errors gracefully', async () => {
-      // Given
-      const expiredSession = {
-        access_token: 'expired-token',
-        refresh_token: 'refresh-token',
-        expires_at: Date.now() - 3600000,
-      };
-      
-      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: expiredSession }, error: null });
-      mockSupabase.auth.refreshSession.mockResolvedValue({ data: { session: null }, error: { message: 'Refresh failed' } });
-
-      // When
-      const tokens = await getFreshAuthTokens();
-
-      // Then
-      expect(tokens).toBeNull();
-    });
-
-    it('should handle session with null expires_at', async () => {
-      // Given
-      const sessionWithoutExpiry = {
-        access_token: 'test-access-token',
-        refresh_token: 'test-refresh-token',
-        expires_at: null,
-      };
-      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: sessionWithoutExpiry }, error: null });
-
-      // When
-      const tokens = await getFreshAuthTokens();
-
-      // Then
-      expect(tokens).toEqual(sessionWithoutExpiry);
-    });
-
-    it('should handle session with undefined expires_at', async () => {
-      // Given
-      const sessionWithoutExpiry = {
-        access_token: 'test-access-token',
-        refresh_token: 'test-refresh-token',
-        expires_at: undefined,
-      };
-      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: sessionWithoutExpiry }, error: null });
-
-      // When
-      const tokens = await getFreshAuthTokens();
-
-      // Then
-      expect(tokens).toEqual(sessionWithoutExpiry);
-    });
-
-    it('should handle session with zero expires_at', async () => {
-      // Given
-      const sessionWithZeroExpiry = {
-        access_token: 'test-access-token',
-        refresh_token: 'test-refresh-token',
-        expires_at: 0,
-      };
-      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: sessionWithZeroExpiry }, error: null });
-
-      // When
-      const tokens = await getFreshAuthTokens();
-
-      // Then
-      expect(tokens).toEqual(sessionWithZeroExpiry);
-    });
-
-    it('should handle network errors during refresh', async () => {
-      // Given
-      const expiredSession = {
-        access_token: 'expired-token',
-        refresh_token: 'refresh-token',
-        expires_at: Date.now() - 3600000,
-      };
-      
-      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: expiredSession }, error: null });
-      mockSupabase.auth.refreshSession.mockRejectedValue(new Error('Network error'));
-
-      // When
-      const tokens = await getFreshAuthTokens();
-
-      // Then
-      expect(tokens).toBeNull();
-    });
-
-    it('should handle timeout errors during refresh', async () => {
-      // Given
-      const expiredSession = {
-        access_token: 'expired-token',
-        refresh_token: 'refresh-token',
-        expires_at: Date.now() - 3600000,
-      };
-      
-      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: expiredSession }, error: null });
-      mockSupabase.auth.refreshSession.mockRejectedValue(new Error('Timeout'));
-
-      // When
-      const tokens = await getFreshAuthTokens();
-
-      // Then
-      expect(tokens).toBeNull();
+      await expect(getFreshAuthTokens()).resolves.toBeNull();
     });
   });
 
   describe('isAuthenticatedWithFreshTokens', () => {
-    it('should return true when user has valid tokens', async () => {
-      // Given
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-      const mockSession = {
-        access_token: 'test-access-token',
-        refresh_token: 'test-refresh-token',
-        expires_at: Date.now() + 3600000,
-      };
-      
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser }, error: null });
-      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: mockSession }, error: null });
+    it('resolves true when the session has an access token', async () => {
+      getSession.mockResolvedValue({ data: { session: session() }, error: null });
 
-      // When
-      const isAuthenticated = await isAuthenticatedWithFreshTokens();
-
-      // Then
-      expect(isAuthenticated).toBe(true);
+      await expect(isAuthenticatedWithFreshTokens()).resolves.toBe(true);
     });
 
-    it('should return false when user is not authenticated', async () => {
-      // Given
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null }, error: null });
+    it('resolves false when there is no session', async () => {
+      getSession.mockResolvedValue({ data: { session: null }, error: null });
 
-      // When
-      const isAuthenticated = await isAuthenticatedWithFreshTokens();
-
-      // Then
-      expect(isAuthenticated).toBe(false);
-    });
-
-    it('should return false when session is expired and refresh fails', async () => {
-      // Given
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-      const expiredSession = {
-        access_token: 'expired-token',
-        refresh_token: 'refresh-token',
-        expires_at: Date.now() - 3600000,
-      };
-      
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser }, error: null });
-      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: expiredSession }, error: null });
-      mockSupabase.auth.refreshSession.mockResolvedValue({ data: { session: null }, error: { message: 'Refresh failed' } });
-
-      // When
-      const isAuthenticated = await isAuthenticatedWithFreshTokens();
-
-      // Then
-      expect(isAuthenticated).toBe(false);
-    });
-
-    it('should handle network errors gracefully', async () => {
-      // Given
-      mockSupabase.auth.getUser.mockRejectedValue(new Error('Network error'));
-
-      // When
-      const isAuthenticated = await isAuthenticatedWithFreshTokens();
-
-      // Then
-      expect(isAuthenticated).toBe(false);
-    });
-
-    it('should return false when user exists but no session', async () => {
-      // Given
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-      
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser }, error: null });
-      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
-
-      // When
-      const isAuthenticated = await isAuthenticatedWithFreshTokens();
-
-      // Then
-      expect(isAuthenticated).toBe(false);
-    });
-
-    it('should return false when session exists but no user', async () => {
-      // Given
-      const mockSession = {
-        access_token: 'test-access-token',
-        refresh_token: 'test-refresh-token',
-        expires_at: Date.now() + 3600000,
-      };
-      
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null }, error: null });
-      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: mockSession }, error: null });
-
-      // When
-      const isAuthenticated = await isAuthenticatedWithFreshTokens();
-
-      // Then
-      expect(isAuthenticated).toBe(false);
-    });
-
-    it('should handle auth errors from getUser', async () => {
-      // Given
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null }, error: { message: 'Auth error' } });
-
-      // When
-      const isAuthenticated = await isAuthenticatedWithFreshTokens();
-
-      // Then
-      expect(isAuthenticated).toBe(false);
-    });
-
-    it('should handle auth errors from getSession', async () => {
-      // Given
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-      
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser }, error: null });
-      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: { message: 'Session error' } });
-
-      // When
-      const isAuthenticated = await isAuthenticatedWithFreshTokens();
-
-      // Then
-      expect(isAuthenticated).toBe(false);
-    });
-
-    it('should handle timeout errors', async () => {
-      // Given
-      mockSupabase.auth.getUser.mockRejectedValue(new Error('Timeout'));
-
-      // When
-      const isAuthenticated = await isAuthenticatedWithFreshTokens();
-
-      // Then
-      expect(isAuthenticated).toBe(false);
+      await expect(isAuthenticatedWithFreshTokens()).resolves.toBe(false);
     });
   });
-}); 
+});

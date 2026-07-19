@@ -2,12 +2,8 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { Clock, MapPin, School, BookOpen, ChevronDown, ChevronUp, Search } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { ChevronDown, ChevronUp, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useSettings } from "@/context/settings-context"
 import { useTranslations } from "@/hooks/use-translations"
 import { examSubject } from "@/lib/i18n"

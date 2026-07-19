@@ -22,6 +22,10 @@ jest.mock('next/server', () => ({
 describe('Auth Logout API Route', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // clearAllMocks() clears call data but NOT implementations, so a throwing
+    // mockImplementation set by an error-path test would leak into later tests
+    // (the route would bail after one cookie). Reset the implementation here.
+    mockNextResponse.cookies.set.mockReset();
   });
 
   describe('POST /api/auth/logout', () => {

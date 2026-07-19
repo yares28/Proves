@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Search, Loader2, ChevronDown, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
@@ -93,7 +92,7 @@ export function FindExamCard() {
         setLoadingOptions(true)
         const data = await getFilteredAcronymsAndSubjects(school, degree)
         setOptions(data)
-      } catch (error) {
+      } catch {
         setOptions([])
       } finally {
         setLoadingOptions(false)
@@ -101,10 +100,6 @@ export function FindExamCard() {
     }
     fetchOptions()
   }, [school, degree])
-
-  const validateAcronym = (value: string) => {
-    return value.trim().length > 0 && value.trim().length <= 10;
-  }
 
   const isAcronymSearchEnabled = school && school !== "all" && degree && degree !== "all"
 
@@ -148,29 +143,6 @@ export function FindExamCard() {
   // Remove item from selection
   const handleRemoveItem = (item: { value: string; type: 'acronym' | 'subject'; acronym?: string }) => {
     setSelectedItems(prev => prev.filter(sel => !(sel.value === item.value && sel.type === item.type)))
-  }
-
-  // Input change for combobox
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value)
-    setError("")
-    if (e.target.value.length > 0 && isAcronymSearchEnabled) {
-      setAcronymOpen(true)
-    } else {
-      setAcronymOpen(false)
-    }
-  }
-
-  const handleInputFocus = () => {
-    if (isAcronymSearchEnabled) {
-      setAcronymOpen(true)
-    }
-  }
-
-  const handleInputClick = () => {
-    if (isAcronymSearchEnabled) {
-      setAcronymOpen(true)
-    }
   }
 
   // Reset selected items if school/degree changes

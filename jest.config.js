@@ -42,6 +42,11 @@ const customJestConfig = {
   testPathIgnorePatterns: [
     '<rootDir>/.next/',
     '<rootDir>/node_modules/',
+    // The scraper is a standalone ESM package with its own runner
+    // (`node:test` via tsx — see scraper/package.json). Its *.test.ts files use
+    // `.js` import specifiers that Jest's resolver can't follow, and CI runs the
+    // scraper suite separately. Keep it out of the app's Jest run.
+    '<rootDir>/scraper/',
   ],
 };
 

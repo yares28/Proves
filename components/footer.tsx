@@ -29,13 +29,6 @@ export function Footer() {
     return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
   }
 
-  // Determine which icon logo to use based on theme
-  const getIconLogo = () => {
-    if (!mounted) return "/logoYdark.png" // Default fallback during SSR
-    const currentTheme = settings.theme === 'system' ? theme : settings.theme
-    return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
-  }
-
   return (
     <footer className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900">
       {/* Background pattern */}

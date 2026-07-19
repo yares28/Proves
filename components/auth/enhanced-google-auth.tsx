@@ -20,10 +20,9 @@ interface EnhancedGoogleAuthProps {
   showLoadingText?: boolean
 }
 
-export function EnhancedGoogleAuth({ 
+export function EnhancedGoogleAuth({
   onSuccess,
   onError,
-  redirectTo,
   className = "w-full",
   variant = "outline",
   size = "default",
@@ -41,7 +40,7 @@ export function EnhancedGoogleAuth({
     try {
       console.log('🔄 Initiating Google OAuth authentication...')
       
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           scopes: 'openid email profile',
@@ -204,7 +203,7 @@ export function GoogleOneTap() {
               try {
                 console.log('🔄 Processing Google One Tap response...')
                 
-                const { data, error } = await supabase.auth.signInWithIdToken({
+                const { error } = await supabase.auth.signInWithIdToken({
                   provider: 'google',
                   token: response.credential,
                   nonce,

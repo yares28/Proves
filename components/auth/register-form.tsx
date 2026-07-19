@@ -4,7 +4,6 @@ import { useState } from "react"
 import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Icons } from "@/components/icons"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -74,7 +73,7 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
       setTimeout(() => {
         onSuccess()
       }, 2000)
-    } catch (err) {
+    } catch {
       setError("Ocurrió un error inesperado. Por favor intenta de nuevo.")
     } finally {
       setIsLoading(false)

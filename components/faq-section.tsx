@@ -3,7 +3,6 @@
 import { motion } from "framer-motion"
 import { Card, CardContent } from "@/components/ui/card"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { HelpCircle } from "lucide-react"
 import { useTranslations } from "@/hooks/use-translations"
 
 export function FAQSection() {

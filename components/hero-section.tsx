@@ -1,7 +1,6 @@
 "use client"
 
 import { ArrowDown } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
 import { FindExamCard } from "@/components/find-exam-card"
 import { useTheme } from "next-themes"

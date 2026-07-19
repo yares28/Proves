@@ -1,15 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useAuth } from "@/context/auth-context"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { AlertTriangle, X } from "lucide-react"
-import { createClient } from "@/utils/supabase/client"
-
-const supabase = createClient()
-
+/**
+ * Intentionally renders nothing. The app previously showed auth warning banners
+ * here; that UX was removed but the mount point is kept so `app/page.tsx` (and
+ * any future re-enable) doesn't need to change.
+ */
 export function AuthStatusIndicator() {
-  // Component disabled - no authentication warnings or popups will be shown
   return null
-} 
+}

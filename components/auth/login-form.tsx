@@ -4,7 +4,6 @@ import { useState } from "react"
 import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Icons } from "@/components/icons"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -13,12 +12,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, Eye, EyeOff } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
-import { createClient } from "@/utils/supabase/client"
 import { EnhancedGoogleAuth } from "./enhanced-google-auth"
 import { AuthPerformanceMonitor } from "../auth-performance-monitor"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-
-const supabase = createClient()
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 const formSchema = z.object({
   email: z.string().email({ message: "Por favor ingresa un email válido" }),
@@ -33,7 +29,7 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onSuccess }: LoginFormProps) {
-  const { signIn, signInWithProvider } = useAuth()
+  const { signIn } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
@@ -65,31 +61,12 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         return
       }
       
-      // Automatic session persistence - always remember the user
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (sessionData && sessionData.session) {
-        localStorage.setItem('supabase.auth.token', JSON.stringify({
-          currentSession: sessionData.session
-        }));
-        console.log("Sesión almacenada automáticamente");
-      }
-      
+      // Session persistence is handled by the Supabase client itself; do not
+      // copy the raw tokens anywhere else (writing them to localStorage would
+      // expose the access/refresh tokens to any XSS on the page).
       onSuccess()
-    } catch (err) {
+    } catch {
       setError("Ocurrió un error inesperado. Por favor intenta de nuevo.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleProviderSignIn = async (provider: "google") => {
-    setIsLoading(true)
-    setError(null)
-    
-    try {
-      await signInWithProvider(provider)
-    } catch (err) {
-      setError("Error al iniciar sesión con el proveedor. Por favor intenta de nuevo.")
     } finally {
       setIsLoading(false)
     }

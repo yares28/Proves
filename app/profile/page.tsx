@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/utils/supabase/client"
 import { 
@@ -25,7 +25,6 @@ import {
   Moon,
   Sun,
   Globe,
-  Shield,
   Palette,
   Clock,
   List,
@@ -45,18 +44,6 @@ interface UserProfile {
   created_at: string
   last_sign_in_at?: string
   provider?: string
-}
-
-interface AppSettings {
-  theme: 'light' | 'dark' | 'system'
-  language: 'es' | 'en'
-  notifications: boolean
-  examReminders: {
-    oneHour: boolean
-    oneDay: boolean
-    oneWeek: boolean
-  }
-  viewMode: 'calendar' | 'list'
 }
 
 export default function ProfilePage() {
@@ -216,22 +203,6 @@ export default function ProfilePage() {
     }
   }
 
-  // Get provider badge
-  const getProviderBadge = () => {
-    if (!profile?.provider) return null
-    
-    const providers = {
-      google: { label: 'Google', color: 'bg-blue-100 text-blue-800' },
-      email: { label: 'Email', color: 'bg-gray-100 text-gray-800' }
-    }
-    
-    const provider = providers[profile.provider as keyof typeof providers]
-    return provider ? (
-      <Badge className={provider.color}>
-        {provider.label}
-      </Badge>
-    ) : null
-  }
 
   // Handle password change
   const handlePasswordChange = async () => {

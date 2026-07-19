@@ -70,13 +70,6 @@ export function Header() {
     return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
   }
 
-  // Determine which icon logo to use based on theme
-  const getIconLogo = () => {
-    if (!mounted) return "/logoYdark.png" // Default fallback during SSR
-    const currentTheme = settings.theme === 'system' ? theme : settings.theme
-    return currentTheme === "light" ? "/logoYWhite.png" : "/logoYdark.png"
-  }
-
   return (
     <header
       className={`sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-200 ${
