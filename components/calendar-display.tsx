@@ -25,10 +25,10 @@ import { ViewToggle } from "@/components/view-toggle";
 import { ExamListView } from "@/components/exam-list-view";
 import {
   formatDateString,
-  getCurrentYear,
   detectAcademicYearFromExams,
   generateAcademicYearMonths,
 } from "@/utils/date-utils";
+import { currentAcademicYear } from "@/lib/academic-year";
 import { SaveCalendarDialog } from "@/components/save-calendar-dialog";
 import { hasMeaningfulFilters } from "@/lib/filter-params";
 import { examSubject, LOCALE_TAGS } from "@/lib/i18n";
@@ -99,8 +99,12 @@ export function CalendarDisplay({
     const dates = [...new Set(exams.map((exam) => exam.date))].sort();
     const detected = dates.length ? detectAcademicYearFromExams(dates) : null;
     if (detected) return detected;
-    const currentYear = getCurrentYear();
-    return { startYear: currentYear, endYear: currentYear + 1 };
+    // No exams to read: frame on the course actually in progress. Use the
+    // canonical academic-year helper (the START year, e.g. 2025 for 2025-2026),
+    // not getFullYear() — in Jan–Aug the calendar year is one ahead of the course
+    // and would mislabel the grid as next year's.
+    const startYear = currentAcademicYear();
+    return { startYear, endYear: startYear + 1 };
   }, [exams]);
 
   const months = useMemo(
