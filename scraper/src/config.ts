@@ -40,8 +40,14 @@ export const GATES = {
   minRowsFraction: 0.4,
   /** Abort if a run would delete more than this fraction of synced rows. */
   maxDeleteFraction: 0.3,
-  /** Abort if more than this fraction of rows fail field-level validation. */
-  maxQuarantineFraction: 0.05,
+  /**
+   * Abort if more than this fraction of rows fail field-level validation. The
+   * strict default guards scheduled current-year syncs against a corrupted feed;
+   * very old years legitimately carry more unusable rows (missing dates, retired
+   * course codes), so a supervised historical backfill can raise it via
+   * SCRAPER_MAX_QUARANTINE_FRACTION.
+   */
+  maxQuarantineFraction: Number(process.env.SCRAPER_MAX_QUARANTINE_FRACTION) || 0.05,
 } as const;
 
 /** Rows are written in chunks to stay inside PostgREST request limits. */

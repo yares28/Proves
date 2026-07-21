@@ -118,11 +118,12 @@ export function planYear(siglas: string): number {
  * Takes the literal date part. The API sends midnight UTC (2025-09-25T00:00:00.000+00:00);
  * parsing it into a Date and formatting locally would shift it a day in Europe/Madrid.
  */
-export function toExamDate(dia: string): string | null {
-  const m = /^(\d{4}-\d{2}-\d{2})/.exec(dia ?? '');
+export function toExamDate(dia: string | null | undefined): string | null {
+  const s = dia ?? '';
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(s);
   if (!m?.[1]) return null;
-  if (!/^\d{4}-\d{2}-\d{2}T00:00:00(\.000)?\+00:00$/.test(dia)) {
-    log.warn('unexpected_date_format', 'dia is not midnight-UTC; using the date part literally', dia);
+  if (!/^\d{4}-\d{2}-\d{2}T00:00:00(\.000)?\+00:00$/.test(s)) {
+    log.warn('unexpected_date_format', 'dia is not midnight-UTC; using the date part literally', s);
   }
   return m[1];
 }

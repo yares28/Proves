@@ -18,7 +18,9 @@ export const examRowSchema = z
     curso: z.number().int(),
     cuatrimestre: z.string(),
     idAsignatura: z.number().int(),
-    dia: z.string(),
+    // A few very old records have no date. normalizeExams quarantines a row with
+    // an unparseable/absent dia, so allow null here rather than aborting the run.
+    dia: z.string().nullable(),
     hora: z.number().int().nullable(),
     minuto: z.number().int().nullable(),
     duracion: z.number().int().nullable(),
