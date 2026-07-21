@@ -50,7 +50,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # 22+: recent @supabase/supabase-js needs native WebSocket (absent in Node 20).
+          node-version: '22'
           cache: npm
           cache-dependency-path: scraper/package-lock.json
 
