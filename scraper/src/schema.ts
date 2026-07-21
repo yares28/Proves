@@ -26,7 +26,10 @@ export const examRowSchema = z
     nombreConvocatoriaValenciano: z.string().nullable(),
     nombreConvocatoriaIngles: z.string().nullable(),
     lugar: z.string().nullable(),
-    siglasAsignatura: z.string(),
+    // Next-year exams are sometimes published before an acronym is assigned, so
+    // this arrives null. normalizeExams maps it to '' (the acronym column is NOT
+    // NULL); a null here is a legitimate upstream state, not a contract change.
+    siglasAsignatura: z.string().nullable(),
     siglasTitulacion: z.string(),
     comentario: z.string().nullable(),
   })
