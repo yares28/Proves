@@ -144,18 +144,14 @@ function serviceClient() {
   })
 }
 
-// Owner allowlist. `ADMIN_EMAILS` (a comma-separated env var) takes precedence;
-// this committed default is the fallback so /audit works on a fresh deploy
-// without extra Vercel config. Only the site owner's own address — the gate
-// still requires the caller to be authenticated as this user.
-const DEFAULT_ADMIN_EMAILS = ["yayafaresw3@gmail.com"]
-
+// Owner allowlist, from the ADMIN_EMAILS env var (comma-separated). Kept out of
+// source so the owner's address isn't published in this repo; set it in Vercel
+// (and .env.local for local dev). Unset ⇒ the page reports "not configured".
 function adminEmails(): string[] {
-  const fromEnv = (process.env.ADMIN_EMAILS ?? "")
+  return (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean)
-  return fromEnv.length ? fromEnv : DEFAULT_ADMIN_EMAILS.map((e) => e.toLowerCase())
 }
 
 /**
