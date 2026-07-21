@@ -37,6 +37,9 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    # The Supabase/revalidate secrets are stored under the "Production"
+    # environment, so the job must declare it to receive them.
+    environment: Production
     timeout-minutes: 30
     defaults:
       run:
