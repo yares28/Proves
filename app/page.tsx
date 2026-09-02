@@ -44,7 +44,7 @@ export default async function Home({
       <div className="container mx-auto px-4">
         <AuthStatusIndicator />
       </div>
-      <main className="flex-1">
+      <main id="main-content" className="flex-1">
         <HeroSection />
         <Suspense fallback={null}>
           <AuthRequiredCheck />

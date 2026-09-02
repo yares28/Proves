@@ -71,6 +71,18 @@ export function Header() {
   }
 
   return (
+    <>
+      {/*
+        WCAG 2.4.1 (Bypass Blocks). Without this a keyboard user tabs through the
+        whole header on every page before reaching the results. Hidden until
+        focused, so it costs pointer users nothing.
+      */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:inline-flex focus:h-10 focus:items-center focus:rounded-md focus:bg-background focus:px-4 focus:text-sm focus:font-medium focus:shadow-lg focus:ring-2 focus:ring-ring"
+      >
+        {t("header.skipToContent")}
+      </a>
     <header
       className={`sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-200 ${
         isScrolled ? "shadow-sm" : ""
@@ -136,5 +148,6 @@ export function Header() {
         </div>
       </div>
     </header>
+    </>
   )
 }

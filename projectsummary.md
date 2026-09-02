@@ -44,7 +44,7 @@ In practice:
 3. **Supabase** holds exam rows and user accounts.
 4. Logged-in users can store filter presets in **`user_calendars`**.
 
-There is also a **Java Spring Boot backend** in the `backend/` folder, but the main website **does not use it today** — it talks to Supabase directly. The Java API looks like an alternate or future layer (admin ops, heavier queries, etc.).
+Exam data is kept current by a **scheduled sync job** (`scraper/`, driven by `.github/workflows/sync-exams.yml`) that pulls from the official ETSINF source, validates the contract, and upserts changes into Supabase.
 
 ---
 
@@ -186,7 +186,7 @@ Auth state is shared app-wide via `context/auth-context.tsx`. Login UI lives in 
 
 ---
 
-## Features: Working vs. Planned/Disabled
+## Features: Current Status
 
 | Feature | Status |
 |---------|--------|
@@ -195,12 +195,14 @@ Auth state is shared app-wide via `context/auth-context.tsx`. Login UI lives in 
 | Save calendar views | ✅ Working (login required) |
 | Quick search | ✅ Working |
 | Dark/light theme | ✅ Working |
-| Google Calendar export | ❌ **Disabled in UI** — button shows "temporarily disabled" |
-| Full i18n (English UI) | ⚠️ **Partial** — `next-intl` is installed but UI is mostly hardcoded Spanish; language toggle exists in settings |
+| Calendar export / subscribe | ✅ Working — RFC 5545 iCalendar feed at `/api/ical`, subscribable from Google/Apple Calendar |
+| Multi-language UI | ✅ Working — three locales (Castellano, Valencià, English) via `lib/messages.ts` + `hooks/use-translations`; subject names translated from the data |
+| Exam conflict detection | ✅ Working — `lib/exam-conflicts.ts` flags overlapping, back-to-back and overloaded exam days |
+| Installable PWA / offline | ✅ Working — manifest + `public/sw.js` service worker with an offline fallback page |
 
-The README still describes Google Calendar export; the code and DB (`calendar_tokens` for ICS/webcal feeds) suggest it was built or planned but is turned off for now.
+Export works by generating a live iCalendar feed rather than by calling the Google Calendar API: `components/export-button.tsx` builds a `webcal://` subscription URL pointing at `/api/ical`, so the student's calendar re-fetches and stays in sync as exam dates are corrected. `calendar_tokens` backs the planned per-user tokenised feeds.
 
-Key file: `components/export-button.tsx`
+Key files: `components/export-button.tsx`, `lib/calendar-export.ts`, `lib/ics.ts`, `app/api/ical/route.ts`
 
 ---
 
@@ -212,12 +214,12 @@ Key file: `components/export-button.tsx`
 | `components/` | UI: calendar, filters, header, footer, auth |
 | `components/ui/` | Design system (buttons, dialogs, etc. — shadcn/Radix style) |
 | `actions/` | Server Actions — exam queries + saved calendars |
-| `lib/` | Supabase clients, hooks, optional Spring API client |
+| `lib/` | Supabase clients, ICS builder, conflict detection, i18n catalogs, helpers |
 | `context/` | Global auth + settings state |
 | `utils/` | Exam mapping, date helpers |
 | `types/` | TypeScript types + Supabase schema types |
-| `backend/` | Java Spring Boot REST API (not wired into main UI) |
-| `__tests__/` | Jest tests (many currently out of sync with code) |
+| `scraper/` | Scheduled exam-data sync (own test suite, runs via GitHub Actions) |
+| `__tests__/` | Jest + React Testing Library suites (21 files, 176 tests, all green) |
 | `public/` | Logos, favicons, assets |
 
 ---
@@ -277,7 +279,7 @@ Secure tokens for calendar access via webcal/ICS feeds (supports planned export 
 | Auth | Supabase Auth + cookie sessions |
 | Hosting | Vercel |
 | Tests | Jest + React Testing Library |
-| Alt backend | Spring Boot 3.4 (Java 17) — present but unused by frontend |
+| Data sync | Node scraper + GitHub Actions schedule |
 
 ---
 
@@ -291,8 +293,7 @@ Key env vars (in `.env.local`, not committed):
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public Supabase key |
 | `NEXT_PUBLIC_EXAMS_TABLE` | Exam table name (default: `25-26`) |
 | `NEXT_PUBLIC_SITE_URL` | Canonical site URL (SEO, sitemap) |
-| `NEXT_PUBLIC_SPRING_API_URL` | Spring API base (default: `http://localhost:8080/api`) |
-| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Google OAuth for calendar export |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Google OAuth client for Google sign-in (calendar export needs no OAuth) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-side admin Supabase access (optional) |
 
 Without Supabase credentials, the app builds but cannot load real exam data.
@@ -326,22 +327,6 @@ Without Supabase credentials, the app builds but cannot load real exam data.
 
 ---
 
-## Java Backend (`backend/`)
-
-A **Spring Boot REST API** that:
-
-- Reads/writes exam data from PostgreSQL (Supabase) via JPA
-- Exposes REST endpoints at `/api/exams/*` (list, search, filter by degree/subject/year, CRUD for admins)
-- Validates Supabase JWT tokens for authenticated routes
-- Includes its own Supabase HTTP client mirroring the TypeScript client
-- Uses Caffeine caching and connection pooling for performance
-- Has health endpoint and integration/unit tests
-
-**Important:** The Next.js frontend **does not currently call this API** for normal browsing — it talks to Supabase directly. The Java backend appears to be an alternate or future API layer, useful for heavier queries, admin operations, or mobile clients.
-
-Local dev can run both via `start-services.bat` (Spring on :8080, Next on :3000).
-
----
 
 ## Testing Setup
 
@@ -349,8 +334,9 @@ Local dev can run both via `start-services.bat` (Spring on :8080, Next on :3000)
 - **Setup:** `jest.setup.js` (mocks Supabase env vars)
 - **Scripts:** `test`, `test:watch`, `test:coverage`, `test:ci` in `package.json`
 - **Coverage threshold:** 70% global (branches, functions, lines, statements)
-- **19 test files** covering auth, calendar, filters, profile, API routes, utils
-- Backend Java tests exist separately under `backend/src/test/`
+- **21 test files / 176 tests — all passing**, covering auth, calendar, filters, conflicts, ICS export, profile, API routes and utils
+- Effective coverage is ~32%, below the 70% threshold declared in `jest.config.js`; CI therefore runs the suite without `--coverage`
+- The scraper has its own separate suite run before every sync
 
 ---
 
@@ -364,11 +350,11 @@ Local dev can run both via `start-services.bat` (Spring on :8080, Next on :3000)
 ## Current State of the Repo
 
 - **Build:** Passes (`npm run build`)
-- **Lint/tests:** Many pre-existing failures (tests lag behind code changes; ESLint errors on remote)
-- **Git sync:** Local `main` matches `origin/main`
+- **Lint/tests:** Clean — `tsc --noEmit` passes, `npm run lint` passes (warnings only), Jest is green and is a blocking CI gate
+- **CI:** `.github/workflows/ci.yml` gates type-check, lint and Jest on every push/PR; `sync-exams.yml` runs the scheduled data sync
 
 ---
 
 ## One-Sentence Summary
 
-> **UPV-Cal is a student-facing exam calendar for UPV: it pulls exam schedules from Supabase, lets you filter and view them on a calendar or list, save personalized views when logged in, and is set up for Google Calendar export and SEO — with the export feature currently turned off and a Java backend sitting ready but unused.**
+> **UPV-Cal is a student-facing exam calendar for UPV: it pulls exam schedules from Supabase, lets you filter and view them on a calendar or list, flags clashing exam days, saves personalized views when logged in, exports a live iCalendar feed you can subscribe to from Google or Apple Calendar, speaks three languages, installs as an offline-capable PWA, and keeps its data current through a scheduled sync job.**

@@ -13,6 +13,9 @@ const es = {
   "header.changeLanguage": "Cambiar idioma",
   "header.changeTheme": "Cambiar tema",
   "header.toggleMenu": "Alternar menú",
+  "header.skipToContent": "Saltar al contenido principal",
+  "user.signIn": "Iniciar sesión",
+  "user.account": "Cuenta de usuario",
 
   // Home section heading
   "home.findPre": "Encuentra tus",
@@ -80,6 +83,7 @@ const es = {
   "calendar.tryAdjust": "Prueba a ajustar los filtros.",
   "calendar.viewCalendar": "Calendario",
   "calendar.viewList": "Lista",
+  "calendar.viewToggle": "Vista del calendario",
 
   // Weekday abbreviations (Monday-first)
   "day.mon": "Lu",
@@ -160,6 +164,9 @@ const va: Partial<Record<MessageKey, string>> = {
   "header.changeLanguage": "Canviar idioma",
   "header.changeTheme": "Canviar tema",
   "header.toggleMenu": "Alternar menú",
+  "header.skipToContent": "Saltar al contingut principal",
+  "user.signIn": "Iniciar sessió",
+  "user.account": "Compte d’usuari",
 
   "home.findPre": "Troba els teus",
   "home.findAccent": "Exàmens",
@@ -222,6 +229,7 @@ const va: Partial<Record<MessageKey, string>> = {
   "calendar.tryAdjust": "Prova a ajustar els filtres.",
   "calendar.viewCalendar": "Calendari",
   "calendar.viewList": "Llista",
+  "calendar.viewToggle": "Vista del calendari",
 
   "day.mon": "Dl",
   "day.tue": "Dt",
@@ -294,6 +302,9 @@ const en: Partial<Record<MessageKey, string>> = {
   "header.changeLanguage": "Change language",
   "header.changeTheme": "Change theme",
   "header.toggleMenu": "Toggle menu",
+  "header.skipToContent": "Skip to main content",
+  "user.signIn": "Sign in",
+  "user.account": "User account",
 
   "home.findPre": "Find your",
   "home.findAccent": "Exams",
@@ -356,6 +367,7 @@ const en: Partial<Record<MessageKey, string>> = {
   "calendar.tryAdjust": "Try adjusting the filters.",
   "calendar.viewCalendar": "Calendar",
   "calendar.viewList": "List",
+  "calendar.viewToggle": "Calendar view",
 
   "day.mon": "Mo",
   "day.tue": "Tu",

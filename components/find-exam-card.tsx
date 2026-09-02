@@ -174,7 +174,7 @@ export function FindExamCard() {
                   {t("find.school")}
               </Label>
                 <Select value={school} onValueChange={setSchool} disabled={loading}>
-                  <SelectTrigger id="school" className="w-full h-9">
+                  <SelectTrigger id="school" aria-label={t("find.school")} className="w-full h-9">
                     <SelectValue placeholder={loading ? t("find.loadingSchools") : t("find.selectSchool")} />
                 </SelectTrigger>
                   <SelectContent className="max-h-[300px]">
@@ -213,7 +213,7 @@ export function FindExamCard() {
                   onValueChange={setDegree} 
                   disabled={loadingDegrees || !school || school === "all"}
                 >
-                  <SelectTrigger id="degree" className="w-full h-9">
+                  <SelectTrigger id="degree" aria-label={t("find.degree")} className="w-full h-9">
                     <SelectValue placeholder={
                       !school || school === "all" 
                         ? t("find.selectSchoolFirst")
@@ -278,6 +278,7 @@ export function FindExamCard() {
                     variant="outline"
                     role="combobox"
                     aria-expanded={acronymOpen}
+                    aria-label={t("find.subjectAcronym")}
                     className={`w-full h-9 justify-between pl-3 ${!isAcronymSearchEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                     disabled={!isAcronymSearchEnabled || selectedItems.length === options.length}
                   >

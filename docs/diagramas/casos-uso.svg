@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="700" viewBox="0 0 1180 700" font-family="Georgia, 'Times New Roman', serif">
+  <rect width="1180" height="700" fill="#ffffff"/>
+
+  <rect x="330" y="36" width="530" height="628" rx="6" fill="none" stroke="#3f3f5a" stroke-width="2"/>
+  <text x="595" y="66" text-anchor="middle" font-size="21" fill="#3f3f5a">UPV-Cal</text>
+
+  <!-- Estudiante -->
+  <g stroke="#3f3f5a" stroke-width="2" fill="none">
+    <circle cx="150" cy="168" r="20"/>
+    <line x1="150" y1="188" x2="150" y2="246"/>
+    <line x1="116" y1="208" x2="184" y2="208"/>
+    <line x1="150" y1="246" x2="122" y2="290"/>
+    <line x1="150" y1="246" x2="178" y2="290"/>
+  </g>
+  <text x="150" y="318" text-anchor="middle" font-size="19" fill="#1a1a1a">Estudiante</text>
+
+  <!-- Usuario registrado -->
+  <g stroke="#3f3f5a" stroke-width="2" fill="none">
+    <circle cx="150" cy="452" r="20"/>
+    <line x1="150" y1="472" x2="150" y2="530"/>
+    <line x1="116" y1="492" x2="184" y2="492"/>
+    <line x1="150" y1="530" x2="122" y2="574"/>
+    <line x1="150" y1="530" x2="178" y2="574"/>
+  </g>
+  <text x="150" y="602" text-anchor="middle" font-size="19" fill="#1a1a1a">Usuario</text>
+  <text x="150" y="626" text-anchor="middle" font-size="19" fill="#1a1a1a">registrado</text>
+
+  <!-- generalisation -->
+  <line x1="150" y1="422" x2="150" y2="342" stroke="#3f3f5a" stroke-width="2"/>
+  <polygon points="150,322 140,344 160,344" fill="#ffffff" stroke="#3f3f5a" stroke-width="2"/>
+
+  <!-- public use cases (top group) -->
+  <g stroke="#3f3f5a" stroke-width="1.8" fill="#f4f4f8">
+    <ellipse cx="595" cy="128" rx="200" ry="40"/>
+    <ellipse cx="595" cy="232" rx="200" ry="40"/>
+    <ellipse cx="595" cy="336" rx="200" ry="40"/>
+  </g>
+  <g text-anchor="middle" font-size="18" fill="#1a1a1a">
+    <text x="595" y="122">CU-01 Consultar exámenes</text>
+    <text x="595" y="145">mediante filtros</text>
+    <text x="595" y="239">CU-02 Alternar entre vistas</text>
+    <text x="595" y="330">CU-05 Suscribir el calendario</text>
+    <text x="595" y="353">personal</text>
+  </g>
+
+  <!-- authenticated use cases (bottom group) -->
+  <g stroke="#3f3f5a" stroke-width="1.8" fill="#ececf4">
+    <ellipse cx="595" cy="470" rx="200" ry="40"/>
+    <ellipse cx="595" cy="580" rx="200" ry="40"/>
+  </g>
+  <g text-anchor="middle" font-size="18" fill="#1a1a1a">
+    <text x="595" y="464">CU-03 Guardar un calendario</text>
+    <text x="595" y="487">personalizado</text>
+    <text x="595" y="574">CU-04 Recuperar un calendario</text>
+    <text x="595" y="597">guardado</text>
+  </g>
+
+  <!-- associations: Estudiante -> public -->
+  <g stroke="#3f3f5a" stroke-width="1.6">
+    <line x1="186" y1="196" x2="398" y2="140"/>
+    <line x1="190" y1="222" x2="398" y2="232"/>
+    <line x1="186" y1="248" x2="398" y2="326"/>
+  </g>
+  <!-- associations: Usuario registrado -> authenticated -->
+  <g stroke="#3f3f5a" stroke-width="1.6">
+    <line x1="188" y1="472" x2="398" y2="474"/>
+    <line x1="186" y1="500" x2="398" y2="572"/>
+  </g>
+
+  <!-- separator between public and authenticated groups -->
+  <line x1="350" y1="404" x2="840" y2="404" stroke="#b9b9c8" stroke-width="1.2" stroke-dasharray="7,5"/>
+  <text x="836" y="396" text-anchor="end" font-size="15" fill="#7a7a90">requiere sesión iniciada ↓</text>
+</svg>

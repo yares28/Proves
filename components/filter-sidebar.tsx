@@ -489,9 +489,9 @@ export function FilterSidebar({
             <Image 
               src={getIconLogo()} 
               alt="UPV Logo" 
-              width={64} 
+              width={86} 
               height={64}
-              className="h-16 w-16"
+              className="h-16 w-auto"
             />
           </div>
           {/* Subtle glow effect */}

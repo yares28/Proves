@@ -6,14 +6,15 @@ name: Web app CI
 # Type-check and lint are real gates: both are clean today, so anything red
 # here is a genuine new regression.
 #
-# Jest is NOT a gate yet. The suite currently has ~76 failing tests across 17
-# files (auth forms describing UI that no longer exists — unrelated to any
-# recent change, confirmed pre-existing). Failing the build on that today would
-# make every PR red regardless of what it touches, which trains reviewers to
-# ignore CI rather than read it. It runs and reports so a NEW regression is
-# still visible in the log, and the count is printed so the debt doesn't hide.
-# Once that pre-existing pile is fixed, flip `continue-on-error: false` on the
-# jest step below to make it a real gate.
+# Jest is a real gate. The pre-existing pile of failing auth/component tests
+# that this file used to describe has been repaired: the suite is green
+# (21 files, 176 tests), so a red Jest step now means a genuine regression.
+#
+# Coverage is gated too. jest.config.js sets per-area thresholds rather than one
+# global number: lib/ and utils/ hold the rules worth protecting (PostgREST
+# escaping, ICS generation, conflict detection, date handling) and are held to a
+# high bar, while the global floor only stops overall coverage sliding back.
+# Every threshold is currently met, so a failure here is a real drop.
 on:
   pull_request:
   push:
@@ -47,13 +48,5 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Tests (report only, not yet a gate — see file header)
-        id: jest
-        continue-on-error: true
-        run: npx jest --ci --watchAll=false
-
-      - name: Summarize test status
-        run: |
-          if [ "${{ steps.jest.outcome }}" = "failure" ]; then
-            echo "::warning::Jest has failing tests. This does not fail the build yet — see the comment at the top of .github/workflows/ci.yml for why, and the Tests step above for which ones."
-          fi
+      - name: Tests + coverage thresholds
+        run: npx jest --ci --coverage --watchAll=false

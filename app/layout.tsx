@@ -5,6 +5,7 @@ import { AuthProvider } from '@/context/auth-context'
 import { SettingsProvider } from '@/context/settings-context'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { Toaster } from "@/components/ui/toaster"
+import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar"
 import { safeJsonLd } from '@/lib/json-ld'
 import './globals.css'
 
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
     default: 'Calendario de Exámenes UPV',
     template: '%s | Calendario de Exámenes UPV',
   },
-  description: 'Gestiona y organiza tus exámenes universitarios',
+  description: 'Consulta el calendario de exámenes de la UPV: filtra por escuela, titulación, curso y asignatura, guarda tus vistas y suscríbete desde Google Calendar.',
   applicationName: 'UPV Exam Calendar',
   keywords: [
     'calendario exámenes',
@@ -35,7 +36,7 @@ export const metadata: Metadata = {
     type: 'website',
     url: siteUrl,
     title: 'Calendario de Exámenes UPV',
-    description: 'Gestiona y organiza tus exámenes universitarios',
+    description: 'Consulta el calendario de exámenes de la UPV: filtra por escuela, titulación, curso y asignatura, guarda tus vistas y suscríbete desde Google Calendar.',
     siteName: 'UPV-Cal',
     images: [
       {
@@ -47,7 +48,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Calendario de Exámenes UPV',
-    description: 'Gestiona y organiza tus exámenes universitarios',
+    description: 'Consulta el calendario de exámenes de la UPV: filtra por escuela, titulación, curso y asignatura, guarda tus vistas y suscríbete desde Google Calendar.',
     images: ['/logoYdark.png'],
   },
   robots: {
@@ -65,7 +66,13 @@ export const metadata: Metadata = {
   icons: {
     icon: '/faviconlight-small.PNG',
     shortcut: '/faviconlight-small.PNG',
-    apple: '/faviconlight-small.PNG',
+    apple: '/apple-touch-icon.png',
+  },
+  // iOS ignores the web app manifest, so standalone mode has to be declared here.
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'UPV-Cal',
   },
 }
 
@@ -148,6 +155,7 @@ export default function RootLayout({
             </AuthProvider>
           </ThemeProvider>
         </ErrorBoundary>
+        <ServiceWorkerRegistrar />
         <Analytics />
       </body>
     </html>

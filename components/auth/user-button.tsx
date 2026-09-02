@@ -8,12 +8,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LogOut, User, Calendar } from "lucide-react"
 import { AuthDialog } from "@/components/auth/auth-dialog"
 import { useRouter } from "next/navigation"
+import { useTranslations } from "@/hooks/use-translations"
 
 export function UserButton() {
   const { user, signOut } = useAuth()
   const [showAuthDialog, setShowAuthDialog] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const router = useRouter()
+  const t = useTranslations()
 
   if (!user) {
     return (
@@ -23,6 +25,7 @@ export function UserButton() {
           size="icon"
           className="relative h-8 w-8 rounded-full"
           onClick={() => setShowAuthDialog(true)}
+          aria-label={t("user.signIn")}
         >
           <User className="h-4 w-4" />
         </Button>
@@ -38,7 +41,7 @@ export function UserButton() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full" aria-label={t("user.account")}>
           <Avatar className="h-8 w-8">
             <AvatarImage 
               src={user.user_metadata?.avatar_url || user.user_metadata?.picture} 

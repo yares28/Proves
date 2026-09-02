@@ -1,0 +1,80 @@
+[
+  {
+    "name": "Inicio",
+    "url": "https://upv-cal.vercel.app/",
+    "c": {
+      "performance": 62,
+      "accessibility": 90,
+      "best-practices": 96,
+      "seo": 100
+    },
+    "fails": [
+      "image-aspect-ratio",
+      "aria-valid-attr-value",
+      "button-name",
+      "bf-cache"
+    ],
+    "fcp": "1.1 s",
+    "lcp": "4.9 s",
+    "tbt": "160 ms",
+    "cls": "0"
+  },
+  {
+    "name": "Lista de examenes",
+    "url": "https://upv-cal.vercel.app/lista-examenes",
+    "c": {
+      "performance": 92,
+      "accessibility": 95,
+      "best-practices": 100,
+      "seo": 92
+    },
+    "fails": [
+      "button-name",
+      "canonical"
+    ],
+    "fcp": "0.9 s",
+    "lcp": "1.7 s",
+    "tbt": "40 ms",
+    "cls": "0"
+  },
+  {
+    "name": "Resultados",
+    "url": "https://upv-cal.vercel.app/exams?school=ETSINF",
+    "c": {
+      "performance": 56,
+      "accessibility": 93,
+      "best-practices": 100,
+      "seo": 92
+    },
+    "fails": [
+      "valid-source-maps",
+      "button-name",
+      "heading-order",
+      "canonical",
+      "bf-cache"
+    ],
+    "fcp": "1.5 s",
+    "lcp": "2.2 s",
+    "tbt": "430 ms",
+    "cls": "0"
+  },
+  {
+    "name": "ETSINF calendarios",
+    "url": "https://upv-cal.vercel.app/ETSINF/calendarios",
+    "c": {
+      "performance": 79,
+      "accessibility": 100,
+      "best-practices": 96,
+      "seo": 100
+    },
+    "fails": [
+      "errors-in-console",
+      "valid-source-maps",
+      "bf-cache"
+    ],
+    "fcp": "1.3 s",
+    "lcp": "1.8 s",
+    "tbt": "150 ms",
+    "cls": "0"
+  }
+]

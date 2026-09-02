@@ -11,7 +11,7 @@ export default function MyCalendarsLayout({
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="container mx-auto py-8 px-4">
+      <main id="main-content" className="container mx-auto py-8 px-4">
         {children}
       </main>
       <Footer />

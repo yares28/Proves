@@ -88,8 +88,8 @@ export function HeroSection() {
         >
           <Image 
             src={getIconLogo()} 
-            alt="UPV Logo" 
-            width={32} 
+            alt="" 
+            width={43} 
             height={32}
             className="blur-sm"
           />
@@ -109,8 +109,8 @@ export function HeroSection() {
         >
           <Image 
             src={getIconLogo()} 
-            alt="UPV Logo" 
-            width={28} 
+            alt="" 
+            width={38} 
             height={28}
             className="blur-sm"
           />
@@ -130,8 +130,8 @@ export function HeroSection() {
         >
           <Image 
             src={getIconLogo()} 
-            alt="UPV Logo" 
-            width={24} 
+            alt="" 
+            width={32} 
             height={24}
             className="blur-sm"
           />
@@ -151,8 +151,8 @@ export function HeroSection() {
         >
           <Image 
             src={getIconLogo()} 
-            alt="UPV Logo" 
-            width={36} 
+            alt="" 
+            width={48} 
             height={36}
             className="blur-sm"
           />
@@ -178,7 +178,7 @@ export function HeroSection() {
                 src={getHeroLogo()}
                 alt="UPV Calendario de Exámenes" 
                 width={260} 
-                height={110}
+                height={194}
                 className="h-auto w-auto max-w-[260px]"
                 priority
                 key={mounted ? 'mounted' : 'unmounted'}

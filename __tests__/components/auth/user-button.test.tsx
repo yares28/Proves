@@ -19,6 +19,13 @@ jest.mock('@/components/auth/auth-dialog', () => ({
   AuthDialog: ({ open }: any) => (open ? <div data-testid="auth-dialog" /> : null),
 }));
 
+// The component uses translations only for the two button labels; map them to
+// fixed strings so these tests exercise behaviour, not the i18n system.
+jest.mock('@/hooks/use-translations', () => ({
+  useTranslations: () => (key: string) =>
+    ({ 'user.signIn': 'Iniciar sesion', 'user.account': 'Cuenta de usuario' }[key] ?? key),
+}));
+
 const signedIn = (metadata: Record<string, unknown>, email?: string) => ({
   user: { id: 'u1', email, user_metadata: metadata },
   signOut: mockSignOut,
@@ -102,6 +109,21 @@ describe('UserButton', () => {
       await user.click(await screen.findByText('Cerrar Sesión'));
 
       expect(mockSignOut).toHaveBeenCalled();
+    });
+  });
+  // Both states render an icon-only button. Without an explicit label the
+  // accessible name is empty, which is a WCAG 4.1.2 failure and was flagged by
+  // the Lighthouse/axe audit; these tests keep the labels from regressing.
+  describe('accessible names', () => {
+    it('labels the signed-out sign-in button', () => {
+      render(<UserButton />);
+      expect(screen.getByRole('button', { name: 'Iniciar sesion' })).toBeInTheDocument();
+    });
+
+    it('labels the signed-in account menu trigger', () => {
+      mockAuthValue = signedIn({ full_name: 'Ada Lovelace' });
+      render(<UserButton />);
+      expect(screen.getByRole('button', { name: 'Cuenta de usuario' })).toBeInTheDocument();
     });
   });
 });

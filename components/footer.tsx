@@ -103,7 +103,7 @@ export function Footer() {
             </div>
           </div>
           <div>
-            <h3 className="mb-6 text-sm font-semibold uppercase tracking-wider">Contacto</h3>
+            <h2 className="mb-6 text-sm font-semibold uppercase tracking-wider">Contacto</h2>
             <ul className="space-y-4 text-sm">
               <li>
                 <Link href="#" className="text-muted-foreground transition-colors hover:text-primary">
@@ -118,7 +118,7 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h3 className="mb-6 text-sm font-semibold uppercase tracking-wider">Documentación</h3>
+            <h2 className="mb-6 text-sm font-semibold uppercase tracking-wider">Documentación</h2>
             <ul className="space-y-4 text-sm">
               <li>
                 <Link href="/lista-examenes" className="text-muted-foreground transition-colors hover:text-primary">

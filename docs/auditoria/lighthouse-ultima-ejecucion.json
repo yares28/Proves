@@ -1,0 +1,56 @@
+[
+  {
+    "name": "Portada",
+    "url": "http://localhost:3100/",
+    "scores": {
+      "performance": 73,
+      "accessibility": 100,
+      "best-practices": 100,
+      "seo": 92
+    },
+    "failures": [
+      "meta-description",
+      "bf-cache"
+    ]
+  },
+  {
+    "name": "Lista de exámenes",
+    "url": "http://localhost:3100/lista-examenes",
+    "scores": {
+      "performance": 83,
+      "accessibility": 100,
+      "best-practices": 100,
+      "seo": 100
+    },
+    "failures": []
+  },
+  {
+    "name": "Resultados de búsqueda",
+    "url": "http://localhost:3100/exams?school=ETSINF",
+    "scores": {
+      "performance": 75,
+      "accessibility": 100,
+      "best-practices": 100,
+      "seo": 100
+    },
+    "failures": [
+      "valid-source-maps",
+      "bf-cache"
+    ]
+  },
+  {
+    "name": "Aterrizaje de escuela (ETSINF)",
+    "url": "http://localhost:3100/ETSINF/calendarios",
+    "scores": {
+      "performance": 67,
+      "accessibility": 100,
+      "best-practices": 96,
+      "seo": 100
+    },
+    "failures": [
+      "errors-in-console",
+      "valid-source-maps",
+      "bf-cache"
+    ]
+  }
+]
