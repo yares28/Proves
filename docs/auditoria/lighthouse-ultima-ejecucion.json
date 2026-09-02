@@ -1,23 +1,22 @@
 [
   {
     "name": "Portada",
-    "url": "http://localhost:3100/",
+    "url": "https://www.upvcal.com/",
     "scores": {
-      "performance": 73,
+      "performance": 61,
       "accessibility": 100,
       "best-practices": 100,
-      "seo": 92
+      "seo": 100
     },
     "failures": [
-      "meta-description",
       "bf-cache"
     ]
   },
   {
     "name": "Lista de exámenes",
-    "url": "http://localhost:3100/lista-examenes",
+    "url": "https://www.upvcal.com/lista-examenes",
     "scores": {
-      "performance": 83,
+      "performance": 93,
       "accessibility": 100,
       "best-practices": 100,
       "seo": 100
@@ -26,9 +25,9 @@
   },
   {
     "name": "Resultados de búsqueda",
-    "url": "http://localhost:3100/exams?school=ETSINF",
+    "url": "https://www.upvcal.com/exams?school=ETSINF",
     "scores": {
-      "performance": 75,
+      "performance": 93,
       "accessibility": 100,
       "best-practices": 100,
       "seo": 100
@@ -40,9 +39,9 @@
   },
   {
     "name": "Aterrizaje de escuela (ETSINF)",
-    "url": "http://localhost:3100/ETSINF/calendarios",
+    "url": "https://www.upvcal.com/ETSINF/calendarios",
     "scores": {
-      "performance": 67,
+      "performance": 82,
       "accessibility": 100,
       "best-practices": 96,
       "seo": 100
