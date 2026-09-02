@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1220" height="600" viewBox="0 0 1220 600" font-family="Georgia, 'Times New Roman', serif">
+  <rect width="1220" height="600" fill="#ffffff"/>
+  <style>
+    .iter   { fill:#f6f6fa; stroke:#3f3f5a; stroke-width:1.8; }
+    .itile  { font-size:17px; fill:#1a1a1a; font-weight:bold; text-anchor:middle; }
+    .phase  { fill:#ffffff; stroke:#6a6a82; stroke-width:1.3; }
+    .ptxt   { font-size:13.5px; fill:#1a1a1a; text-anchor:middle; }
+    .arrow  { stroke:#3f3f5a; stroke-width:1.8; fill:none; }
+    .inc    { stroke:#3f3f5a; stroke-width:1.6; }
+    .lbl    { font-size:14px; fill:#3f3f5a; }
+    .cap    { font-size:13px; fill:#6a6a82; font-style:italic; }
+    .band   { font-size:15px; fill:#1a1a1a; }
+  </style>
+
+  <!-- ================= iteraciones ================= -->
+  <!-- cada bloque: caja de iteración con sus cuatro fases -->
+  <g>
+    <!-- Iteración 1 -->
+    <rect class="iter" x="40" y="60" width="250" height="196" rx="6"/>
+    <text class="itile" x="165" y="86">Iteración 1</text>
+    <text class="cap"   x="165" y="106" text-anchor="middle">2 semanas</text>
+    <rect class="phase" x="62" y="120" width="206" height="28"/><text class="ptxt" x="165" y="139">Diseño</text>
+    <rect class="phase" x="62" y="152" width="206" height="28"/><text class="ptxt" x="165" y="171">Implementación</text>
+    <rect class="phase" x="62" y="184" width="206" height="28"/><text class="ptxt" x="165" y="203">Prueba</text>
+    <rect class="phase" x="62" y="216" width="206" height="28"/><text class="ptxt" x="165" y="235">Despliegue</text>
+
+    <!-- Iteración 2 -->
+    <rect class="iter" x="330" y="60" width="250" height="196" rx="6"/>
+    <text class="itile" x="455" y="86">Iteración 2</text>
+    <text class="cap"   x="455" y="106" text-anchor="middle">2 semanas</text>
+    <rect class="phase" x="352" y="120" width="206" height="28"/><text class="ptxt" x="455" y="139">Diseño</text>
+    <rect class="phase" x="352" y="152" width="206" height="28"/><text class="ptxt" x="455" y="171">Implementación</text>
+    <rect class="phase" x="352" y="184" width="206" height="28"/><text class="ptxt" x="455" y="203">Prueba</text>
+    <rect class="phase" x="352" y="216" width="206" height="28"/><text class="ptxt" x="455" y="235">Despliegue</text>
+
+    <!-- Iteración 3 -->
+    <rect class="iter" x="620" y="60" width="250" height="196" rx="6"/>
+    <text class="itile" x="745" y="86">Iteración 3</text>
+    <text class="cap"   x="745" y="106" text-anchor="middle">2 semanas</text>
+    <rect class="phase" x="642" y="120" width="206" height="28"/><text class="ptxt" x="745" y="139">Diseño</text>
+    <rect class="phase" x="642" y="152" width="206" height="28"/><text class="ptxt" x="745" y="171">Implementación</text>
+    <rect class="phase" x="642" y="184" width="206" height="28"/><text class="ptxt" x="745" y="203">Prueba</text>
+    <rect class="phase" x="642" y="216" width="206" height="28"/><text class="ptxt" x="745" y="235">Despliegue</text>
+
+    <!-- Iteración n -->
+    <rect class="iter" x="910" y="60" width="250" height="196" rx="6" stroke-dasharray="7,5"/>
+    <text class="itile" x="1035" y="86">Iteración n</text>
+    <text class="cap"   x="1035" y="106" text-anchor="middle">2 semanas</text>
+    <rect class="phase" x="932" y="120" width="206" height="28" stroke-dasharray="5,4"/><text class="ptxt" x="1035" y="139">Diseño</text>
+    <rect class="phase" x="932" y="152" width="206" height="28" stroke-dasharray="5,4"/><text class="ptxt" x="1035" y="171">Implementación</text>
+    <rect class="phase" x="932" y="184" width="206" height="28" stroke-dasharray="5,4"/><text class="ptxt" x="1035" y="203">Prueba</text>
+    <rect class="phase" x="932" y="216" width="206" height="28" stroke-dasharray="5,4"/><text class="ptxt" x="1035" y="235">Despliegue</text>
+  </g>
+
+  <!-- flechas entre iteraciones -->
+  <g class="arrow">
+    <line x1="290" y1="158" x2="322" y2="158"/><polygon points="330,158 318,152 318,164" fill="#3f3f5a"/>
+    <line x1="580" y1="158" x2="612" y2="158"/><polygon points="620,158 608,152 608,164" fill="#3f3f5a"/>
+    <line x1="870" y1="158" x2="902" y2="158"/><polygon points="910,158 898,152 898,164" fill="#3f3f5a"/>
+  </g>
+
+  <!-- ================= incremento acumulado ================= -->
+  <text class="band" x="40" y="318">Producto acumulado: cada iteración termina en una versión desplegada y utilizable</text>
+
+  <!-- eje -->
+  <line class="inc" x1="40" y1="500" x2="1180" y2="500"/>
+  <polygon points="1180,500 1166,494 1166,506" fill="#3f3f5a"/>
+  <text class="cap" x="1120" y="522">tiempo</text>
+
+  <!-- barras crecientes -->
+  <rect x="62"  y="452" width="206" height="48" fill="#e3e3ee" stroke="#3f3f5a" stroke-width="1.4"/>
+  <text class="ptxt" x="165" y="481">consulta y filtros</text>
+
+  <rect x="352" y="452" width="206" height="48" fill="#e3e3ee" stroke="#3f3f5a" stroke-width="1.4"/>
+  <rect x="352" y="404" width="206" height="48" fill="#d3d3e4" stroke="#3f3f5a" stroke-width="1.4"/>
+  <text class="ptxt" x="455" y="433">cuentas y guardado</text>
+
+  <rect x="642" y="452" width="206" height="48" fill="#e3e3ee" stroke="#3f3f5a" stroke-width="1.4"/>
+  <rect x="642" y="404" width="206" height="48" fill="#d3d3e4" stroke="#3f3f5a" stroke-width="1.4"/>
+  <rect x="642" y="356" width="206" height="48" fill="#c2c2da" stroke="#3f3f5a" stroke-width="1.4"/>
+  <text class="ptxt" x="745" y="385">exportación iCalendar</text>
+
+  <rect x="932" y="452" width="206" height="48" fill="#e3e3ee" stroke="#3f3f5a" stroke-width="1.4"/>
+  <rect x="932" y="404" width="206" height="48" fill="#d3d3e4" stroke="#3f3f5a" stroke-width="1.4"/>
+  <rect x="932" y="356" width="206" height="48" fill="#c2c2da" stroke="#3f3f5a" stroke-width="1.4"/>
+  <rect x="932" y="308" width="206" height="48" fill="#b1b1cf" stroke="#3f3f5a" stroke-width="1.4" stroke-dasharray="6,4"/>
+  <text class="ptxt" x="1035" y="337">sincronización, PWA…</text>
+
+  <!-- llaves de correspondencia iteración -> incremento -->
+  <g stroke="#9a9ab0" stroke-width="1.2" stroke-dasharray="4,4">
+    <line x1="165" y1="256" x2="165" y2="452"/>
+    <line x1="455" y1="256" x2="455" y2="404"/>
+    <line x1="745" y1="256" x2="745" y2="356"/>
+    <line x1="1035" y1="256" x2="1035" y2="308"/>
+  </g>
+</svg>
